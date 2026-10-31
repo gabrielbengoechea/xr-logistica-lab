@@ -1,0 +1,1155 @@
+{
+  "version": 1,
+  "unidades": "metros",
+  "ejes": "glTF (Y arriba, -Z adelante en Unity)",
+  "activos": [
+    {
+      "id": "forklift",
+      "nodo_raiz": "Forklift",
+      "nombre": "Montacargas eléctrico 2,5 t",
+      "categoria": "Equipos de manipulación",
+      "descripcion": "Autoelevador contrapesado con mástil dúplex, carro portahorquillas y batería de tracción.",
+      "archivos": {
+        "glb": "glb/forklift.glb",
+        "fbx": "fbx/forklift.fbx",
+        "blend": "blend/forklift.blend"
+      },
+      "medidas_m": [
+        4.0,
+        2.63,
+        1.33
+      ],
+      "triangulos": 2076,
+      "masa_kg": 5335.0,
+      "piezas": [
+        {
+          "nodo": "Part_Asiento",
+          "nombre": "Asiento",
+          "material": "Espuma y vinilo",
+          "masa_kg": 18.0,
+          "explotar": [
+            0.0,
+            1.6,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Bateria",
+          "nombre": "Batería de tracción 48 V",
+          "material": "Plomo-ácido",
+          "masa_kg": 980.0,
+          "explotar": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Carro",
+          "nombre": "Carro portahorquillas",
+          "material": "Acero",
+          "masa_kg": 110.0,
+          "explotar": [
+            1.6,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Horquilla_D",
+          "nombre": "Horquilla derecha",
+          "material": "Acero forjado",
+          "masa_kg": 60.0,
+          "explotar": [
+            0.6,
+            0.0,
+            0.35
+          ],
+          "padre": "Part_Carro"
+        },
+        {
+          "nodo": "Part_Horquilla_I",
+          "nombre": "Horquilla izquierda",
+          "material": "Acero forjado",
+          "masa_kg": 60.0,
+          "explotar": [
+            0.6,
+            0.0,
+            -0.35
+          ],
+          "padre": "Part_Carro"
+        },
+        {
+          "nodo": "Part_Chasis",
+          "nombre": "Chasis",
+          "material": "Acero pintado",
+          "masa_kg": 1450.0,
+          "explotar": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Cilindro_Elevacion",
+          "nombre": "Cilindro hidráulico de elevación",
+          "material": "Acero cromado",
+          "masa_kg": 45.0,
+          "explotar": [
+            0.5,
+            0.6,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Contrapeso",
+          "nombre": "Contrapeso",
+          "material": "Fundición",
+          "masa_kg": 1800.0,
+          "explotar": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Mastil_Exterior",
+          "nombre": "Mástil exterior",
+          "material": "Acero laminado",
+          "masa_kg": 320.0,
+          "explotar": [
+            0.8,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Mastil_Interior",
+          "nombre": "Mástil interior",
+          "material": "Acero laminado",
+          "masa_kg": 240.0,
+          "explotar": [
+            1.2,
+            0.4,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Proteccion",
+          "nombre": "Techo protector (FOPS)",
+          "material": "Acero",
+          "masa_kg": 95.0,
+          "explotar": [
+            0.0,
+            1.2,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Rueda_DD",
+          "nombre": "Rueda delantera derecha",
+          "material": "Caucho macizo",
+          "masa_kg": 45.0,
+          "explotar": [
+            0.0,
+            0.0,
+            0.7
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Rueda_DI",
+          "nombre": "Rueda delantera izquierda",
+          "material": "Caucho macizo",
+          "masa_kg": 45.0,
+          "explotar": [
+            0.0,
+            0.0,
+            -0.7
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Rueda_TD",
+          "nombre": "Rueda trasera derecha",
+          "material": "Caucho macizo",
+          "masa_kg": 30.0,
+          "explotar": [
+            0.0,
+            0.0,
+            0.7
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Rueda_TI",
+          "nombre": "Rueda trasera izquierda",
+          "material": "Caucho macizo",
+          "masa_kg": 30.0,
+          "explotar": [
+            0.0,
+            0.0,
+            -0.7
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Volante",
+          "nombre": "Volante y columna",
+          "material": "Acero y caucho",
+          "masa_kg": 7.0,
+          "explotar": [
+            0.4,
+            1.0,
+            0.0
+          ],
+          "padre": null
+        }
+      ],
+      "encajes": [
+        {
+          "nodo": "Snap_Pallet_Horquillas",
+          "acepta": "pallet",
+          "tolerancia_m": 0.12,
+          "posicion": [
+            2.0,
+            0.145,
+            0.0
+          ]
+        }
+      ],
+      "bytes": {
+        "glb": 92368,
+        "fbx": 75916,
+        "blend": 112275
+      }
+    },
+    {
+      "id": "pallet",
+      "nodo_raiz": "Pallet",
+      "nombre": "Pallet EUR con carga",
+      "categoria": "Unidades de carga",
+      "descripcion": "Pallet europeo 1200 × 800 mm (EN 13698-1) con 8 cajas de cartón.",
+      "archivos": {
+        "glb": "glb/pallet.glb",
+        "fbx": "fbx/pallet.fbx",
+        "blend": "blend/pallet.blend"
+      },
+      "medidas_m": [
+        1.245,
+        0.939,
+        0.805
+      ],
+      "triangulos": 1104,
+      "masa_kg": 121.0,
+      "piezas": [
+        {
+          "nodo": "Part_Caja_1",
+          "nombre": "Caja 1",
+          "material": "Cartón corrugado",
+          "masa_kg": 12.0,
+          "explotar": [
+            -0.27,
+            0.35,
+            0.3
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Caja_2",
+          "nombre": "Caja 2",
+          "material": "Cartón corrugado",
+          "masa_kg": 12.0,
+          "explotar": [
+            0.27,
+            0.35,
+            0.3
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Caja_3",
+          "nombre": "Caja 3",
+          "material": "Cartón corrugado",
+          "masa_kg": 12.0,
+          "explotar": [
+            -0.27,
+            0.35,
+            -0.3
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Caja_4",
+          "nombre": "Caja 4",
+          "material": "Cartón corrugado",
+          "masa_kg": 12.0,
+          "explotar": [
+            0.27,
+            0.35,
+            -0.3
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Caja_5",
+          "nombre": "Caja 5",
+          "material": "Cartón corrugado",
+          "masa_kg": 12.0,
+          "explotar": [
+            -0.27,
+            0.8,
+            0.3
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Caja_6",
+          "nombre": "Caja 6",
+          "material": "Cartón corrugado",
+          "masa_kg": 12.0,
+          "explotar": [
+            0.27,
+            0.8,
+            0.3
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Caja_7",
+          "nombre": "Caja 7",
+          "material": "Cartón corrugado",
+          "masa_kg": 12.0,
+          "explotar": [
+            -0.27,
+            0.8,
+            -0.3
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Caja_8",
+          "nombre": "Caja 8",
+          "material": "Cartón corrugado",
+          "masa_kg": 12.0,
+          "explotar": [
+            0.27,
+            0.8,
+            -0.3
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Pallet",
+          "nombre": "Pallet de madera",
+          "material": "Madera de pino",
+          "masa_kg": 25.0,
+          "explotar": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        }
+      ],
+      "encajes": [
+        {
+          "nodo": "Snap_Base",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "bytes": {
+        "glb": 62724,
+        "fbx": 46732,
+        "blend": 96821
+      }
+    },
+    {
+      "id": "rack",
+      "nodo_raiz": "Rack",
+      "nombre": "Rack selectivo de pallets",
+      "categoria": "Almacenamiento",
+      "descripcion": "Estantería de doble módulo, tres niveles de carga con largueros de 2,7 m y fondo de 1,1 m.",
+      "archivos": {
+        "glb": "glb/rack.glb",
+        "fbx": "fbx/rack.fbx",
+        "blend": "blend/rack.blend"
+      },
+      "medidas_m": [
+        5.65,
+        4.5,
+        1.15
+      ],
+      "triangulos": 420,
+      "masa_kg": 431.0,
+      "piezas": [
+        {
+          "nodo": "Part_Bastidor_1",
+          "nombre": "Bastidor 1",
+          "material": "Acero galvanizado y pintado",
+          "masa_kg": 85.0,
+          "explotar": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Bastidor_2",
+          "nombre": "Bastidor 2",
+          "material": "Acero galvanizado y pintado",
+          "masa_kg": 85.0,
+          "explotar": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Bastidor_3",
+          "nombre": "Bastidor 3",
+          "material": "Acero galvanizado y pintado",
+          "masa_kg": 85.0,
+          "explotar": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Larguero_M1_N2_F",
+          "nombre": "Larguero módulo 1 nivel 2 frente",
+          "material": "Acero pintado",
+          "masa_kg": 22.0,
+          "explotar": [
+            0.0,
+            0.25,
+            0.6
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Larguero_M1_N2_T",
+          "nombre": "Larguero módulo 1 nivel 2 fondo",
+          "material": "Acero pintado",
+          "masa_kg": 22.0,
+          "explotar": [
+            0.0,
+            0.25,
+            -0.6
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Larguero_M1_N3_F",
+          "nombre": "Larguero módulo 1 nivel 3 frente",
+          "material": "Acero pintado",
+          "masa_kg": 22.0,
+          "explotar": [
+            0.0,
+            0.5,
+            0.6
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Larguero_M1_N3_T",
+          "nombre": "Larguero módulo 1 nivel 3 fondo",
+          "material": "Acero pintado",
+          "masa_kg": 22.0,
+          "explotar": [
+            0.0,
+            0.5,
+            -0.6
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Larguero_M2_N2_F",
+          "nombre": "Larguero módulo 2 nivel 2 frente",
+          "material": "Acero pintado",
+          "masa_kg": 22.0,
+          "explotar": [
+            0.0,
+            0.25,
+            0.6
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Larguero_M2_N2_T",
+          "nombre": "Larguero módulo 2 nivel 2 fondo",
+          "material": "Acero pintado",
+          "masa_kg": 22.0,
+          "explotar": [
+            0.0,
+            0.25,
+            -0.6
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Larguero_M2_N3_F",
+          "nombre": "Larguero módulo 2 nivel 3 frente",
+          "material": "Acero pintado",
+          "masa_kg": 22.0,
+          "explotar": [
+            0.0,
+            0.5,
+            0.6
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Larguero_M2_N3_T",
+          "nombre": "Larguero módulo 2 nivel 3 fondo",
+          "material": "Acero pintado",
+          "masa_kg": 22.0,
+          "explotar": [
+            0.0,
+            0.5,
+            -0.6
+          ],
+          "padre": null
+        }
+      ],
+      "encajes": [
+        {
+          "nodo": "Snap_M1_N1_P1",
+          "acepta": "pallet",
+          "tolerancia_m": 0.15,
+          "posicion": [
+            -2.025,
+            0.15,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_M1_N1_P2",
+          "acepta": "pallet",
+          "tolerancia_m": 0.15,
+          "posicion": [
+            -0.725,
+            0.15,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_M1_N2_P1",
+          "acepta": "pallet",
+          "tolerancia_m": 0.15,
+          "posicion": [
+            -2.025,
+            1.65,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_M1_N2_P2",
+          "acepta": "pallet",
+          "tolerancia_m": 0.15,
+          "posicion": [
+            -0.725,
+            1.65,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_M1_N3_P1",
+          "acepta": "pallet",
+          "tolerancia_m": 0.15,
+          "posicion": [
+            -2.025,
+            3.15,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_M1_N3_P2",
+          "acepta": "pallet",
+          "tolerancia_m": 0.15,
+          "posicion": [
+            -0.725,
+            3.15,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_M2_N1_P1",
+          "acepta": "pallet",
+          "tolerancia_m": 0.15,
+          "posicion": [
+            0.725,
+            0.15,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_M2_N1_P2",
+          "acepta": "pallet",
+          "tolerancia_m": 0.15,
+          "posicion": [
+            2.025,
+            0.15,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_M2_N2_P1",
+          "acepta": "pallet",
+          "tolerancia_m": 0.15,
+          "posicion": [
+            0.725,
+            1.65,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_M2_N2_P2",
+          "acepta": "pallet",
+          "tolerancia_m": 0.15,
+          "posicion": [
+            2.025,
+            1.65,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_M2_N3_P1",
+          "acepta": "pallet",
+          "tolerancia_m": 0.15,
+          "posicion": [
+            0.725,
+            3.15,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_M2_N3_P2",
+          "acepta": "pallet",
+          "tolerancia_m": 0.15,
+          "posicion": [
+            2.025,
+            3.15,
+            0.0
+          ]
+        }
+      ],
+      "bytes": {
+        "glb": 32860,
+        "fbx": 53084,
+        "blend": 96947
+      }
+    },
+    {
+      "id": "sensor",
+      "nodo_raiz": "Sensor",
+      "nombre": "Sensor fotoeléctrico M18",
+      "categoria": "Sensores",
+      "descripcion": "Sensor de proximidad óptico de barrera con cuerpo roscado M18, LED de estado y conector M12 de 4 pines.",
+      "archivos": {
+        "glb": "glb/sensor.glb",
+        "fbx": "fbx/sensor.fbx",
+        "blend": "blend/sensor.blend"
+      },
+      "medidas_m": [
+        0.095,
+        0.06,
+        0.04
+      ],
+      "triangulos": 468,
+      "masa_kg": 0.129,
+      "piezas": [
+        {
+          "nodo": "Part_Conector",
+          "nombre": "Conector M12 4 pines",
+          "material": "Latón y PA",
+          "masa_kg": 0.012,
+          "explotar": [
+            -0.04,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Cuerpo",
+          "nombre": "Cuerpo roscado M18",
+          "material": "Latón niquelado",
+          "masa_kg": 0.06,
+          "explotar": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_LED",
+          "nombre": "LED de estado",
+          "material": "Epoxi",
+          "masa_kg": 0.001,
+          "explotar": [
+            0.0,
+            0.025,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Lente",
+          "nombre": "Lente",
+          "material": "PMMA",
+          "masa_kg": 0.002,
+          "explotar": [
+            0.04,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Placa",
+          "nombre": "Placa electrónica",
+          "material": "FR-4",
+          "masa_kg": 0.004,
+          "explotar": [
+            0.0,
+            0.03,
+            -0.03
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Soporte",
+          "nombre": "Soporte en L",
+          "material": "Acero inoxidable",
+          "masa_kg": 0.03,
+          "explotar": [
+            0.0,
+            -0.04,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Tuerca_A",
+          "nombre": "Tuerca de fijación delantera",
+          "material": "Acero",
+          "masa_kg": 0.01,
+          "explotar": [
+            0.025,
+            0.02,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Tuerca_B",
+          "nombre": "Tuerca de fijación trasera",
+          "material": "Acero",
+          "masa_kg": 0.01,
+          "explotar": [
+            -0.02,
+            0.02,
+            0.0
+          ],
+          "padre": null
+        }
+      ],
+      "encajes": [
+        {
+          "nodo": "Snap_Montaje",
+          "acepta": "soporte",
+          "tolerancia_m": 0.01,
+          "posicion": [
+            0.004,
+            -0.04,
+            0.0
+          ]
+        }
+      ],
+      "bytes": {
+        "glb": 22812,
+        "fbx": 41196,
+        "blend": 99770
+      }
+    },
+    {
+      "id": "motor",
+      "nodo_raiz": "Motor",
+      "nombre": "Motor eléctrico trifásico 5,5 kW",
+      "categoria": "Motores",
+      "descripcion": "Motor asíncrono de jaula de ardilla IEC 132, 4 polos, carcasa aleteada de aluminio y ventilación externa.",
+      "archivos": {
+        "glb": "glb/motor.glb",
+        "fbx": "fbx/motor.fbx",
+        "blend": "blend/motor.blend"
+      },
+      "medidas_m": [
+        0.6,
+        0.3355,
+        0.285
+      ],
+      "triangulos": 2108,
+      "masa_kg": 52.62,
+      "piezas": [
+        {
+          "nodo": "Part_Caja_Bornes",
+          "nombre": "Caja de bornes",
+          "material": "Aluminio",
+          "masa_kg": 1.0,
+          "explotar": [
+            0.0,
+            0.3,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Carcasa",
+          "nombre": "Carcasa aleteada con patas",
+          "material": "Aluminio inyectado",
+          "masa_kg": 18.0,
+          "explotar": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Chaveta",
+          "nombre": "Chaveta",
+          "material": "Acero",
+          "masa_kg": 0.02,
+          "explotar": [
+            0.7,
+            0.05,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Cubreventilador",
+          "nombre": "Cubreventilador",
+          "material": "Chapa de acero",
+          "masa_kg": 1.1,
+          "explotar": [
+            -0.7,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Estator",
+          "nombre": "Estator bobinado",
+          "material": "Chapa magnética y cobre",
+          "masa_kg": 14.0,
+          "explotar": [
+            0.0,
+            0.35,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Rodamiento_LA",
+          "nombre": "Rodamiento 6308 lado acople",
+          "material": "Acero al cromo",
+          "masa_kg": 0.6,
+          "explotar": [
+            0.6,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Rodamiento_LOA",
+          "nombre": "Rodamiento 6206 lado opuesto",
+          "material": "Acero al cromo",
+          "masa_kg": 0.4,
+          "explotar": [
+            -0.45,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Rotor",
+          "nombre": "Rotor y eje",
+          "material": "Acero y aluminio",
+          "masa_kg": 11.0,
+          "explotar": [
+            0.45,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Tapa_LA",
+          "nombre": "Tapa lado acople",
+          "material": "Fundición",
+          "masa_kg": 3.2,
+          "explotar": [
+            0.3,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Tapa_LOA",
+          "nombre": "Tapa lado opuesto",
+          "material": "Fundición",
+          "masa_kg": 3.0,
+          "explotar": [
+            -0.3,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Ventilador",
+          "nombre": "Ventilador",
+          "material": "Polipropileno",
+          "masa_kg": 0.3,
+          "explotar": [
+            -0.55,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        }
+      ],
+      "encajes": [
+        {
+          "nodo": "Snap_Acople",
+          "acepta": "acople",
+          "tolerancia_m": 0.01,
+          "posicion": [
+            0.33,
+            0.132,
+            0.0
+          ]
+        }
+      ],
+      "bytes": {
+        "glb": 71752,
+        "fbx": 65900,
+        "blend": 111778
+      }
+    },
+    {
+      "id": "cubesat",
+      "nodo_raiz": "CubeSat",
+      "nombre": "CubeSat 1U",
+      "categoria": "Satélites",
+      "descripcion": "Nanosatélite estándar 1U: estructura de aluminio 7075, pila PC/104 (OBC, EPS, COM), batería y paneles solares.",
+      "archivos": {
+        "glb": "glb/cubesat.glb",
+        "fbx": "fbx/cubesat.fbx",
+        "blend": "blend/cubesat.blend"
+      },
+      "medidas_m": [
+        0.214,
+        0.1182,
+        0.108
+      ],
+      "triangulos": 432,
+      "masa_kg": 0.69,
+      "piezas": [
+        {
+          "nodo": "Part_Antena",
+          "nombre": "Antena UHF desplegable",
+          "material": "Cinta de acero",
+          "masa_kg": 0.08,
+          "explotar": [
+            0.0,
+            0.1,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Bateria",
+          "nombre": "Batería Li-ion 2S",
+          "material": "Celdas 18650",
+          "masa_kg": 0.1,
+          "explotar": [
+            0.0,
+            -0.08,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Estructura",
+          "nombre": "Estructura 1U",
+          "material": "Aluminio 7075 anodizado",
+          "masa_kg": 0.1,
+          "explotar": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Panel_XM",
+          "nombre": "Panel solar X−",
+          "material": "GaAs triple juntura",
+          "masa_kg": 0.05,
+          "explotar": [
+            -0.12,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Panel_XP",
+          "nombre": "Panel solar X+",
+          "material": "GaAs triple juntura",
+          "masa_kg": 0.05,
+          "explotar": [
+            0.12,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Panel_YM",
+          "nombre": "Panel solar Y−",
+          "material": "GaAs triple juntura",
+          "masa_kg": 0.05,
+          "explotar": [
+            0.0,
+            0.0,
+            0.12
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Panel_YP",
+          "nombre": "Panel solar Y+",
+          "material": "GaAs triple juntura",
+          "masa_kg": 0.05,
+          "explotar": [
+            0.0,
+            0.0,
+            -0.12
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Placa_COM",
+          "nombre": "Comunicaciones UHF (COM)",
+          "material": "FR-4",
+          "masa_kg": 0.07,
+          "explotar": [
+            0.0,
+            0.22,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Placa_EPS",
+          "nombre": "Sistema de potencia (EPS)",
+          "material": "FR-4",
+          "masa_kg": 0.07,
+          "explotar": [
+            0.0,
+            0.16999999999999998,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Part_Placa_OBC",
+          "nombre": "Computadora de a bordo (OBC)",
+          "material": "FR-4",
+          "masa_kg": 0.07,
+          "explotar": [
+            0.0,
+            0.12,
+            0.0
+          ],
+          "padre": null
+        }
+      ],
+      "encajes": [
+        {
+          "nodo": "Snap_Despliegue",
+          "acepta": "pod_1u",
+          "tolerancia_m": 0.002,
+          "posicion": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_Ranura_COM",
+          "acepta": "placa_com",
+          "tolerancia_m": 0.006,
+          "posicion": [
+            0.0,
+            0.07,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_Ranura_EPS",
+          "acepta": "placa_eps",
+          "tolerancia_m": 0.006,
+          "posicion": [
+            0.0,
+            0.05,
+            0.0
+          ]
+        },
+        {
+          "nodo": "Snap_Ranura_OBC",
+          "acepta": "placa_obc",
+          "tolerancia_m": 0.006,
+          "posicion": [
+            0.0,
+            0.03,
+            0.0
+          ]
+        }
+      ],
+      "bytes": {
+        "glb": 34044,
+        "fbx": 47484,
+        "blend": 101334
+      }
+    }
+  ]
+}

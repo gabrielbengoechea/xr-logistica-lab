@@ -1,0 +1,19 @@
+* text=auto eol=lf
+
+# Activos 3D y binarios: sin conversión de fin de línea ni diff de texto
+*.glb   binary
+*.gltf  text diff=json
+*.fbx   binary
+*.blend binary
+*.usdz  binary
+*.png   binary
+*.jpg   binary
+*.webp  binary
+*.ktx2  binary
+
+# Unity: los .meta y escenas son YAML de texto
+*.unity  text eol=lf
+*.prefab text eol=lf
+*.asset  text eol=lf
+*.meta   text eol=lf
+*.cs     text eol=lf diff=csharp

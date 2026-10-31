@@ -1,0 +1,19 @@
+name: Modelos 3D
+
+on:
+  push:
+    branches: [main]
+    paths: ["models/**", ".github/workflows/models.yml"]
+  pull_request:
+    paths: ["models/**", ".github/workflows/models.yml"]
+
+jobs:
+  manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: El manifest coincide con los archivos
+        run: python3 models/tools/verificar_manifest.py

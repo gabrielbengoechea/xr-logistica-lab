@@ -1,0 +1,48 @@
+# --- Python (backend) ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+backend/data/*.db
+backend/data/*.db-*
+
+# --- Node (web-dashboard) ---
+node_modules/
+web-dashboard/dist/
+web-dashboard/coverage/
+*.tsbuildinfo
+
+# --- Unity (vr-client) ---
+vr-client/[Ll]ibrary/
+vr-client/[Tt]emp/
+vr-client/[Oo]bj/
+vr-client/[Bb]uild/
+vr-client/[Bb]uilds/
+vr-client/[Ll]ogs/
+vr-client/[Uu]ser[Ss]ettings/
+vr-client/MemoryCaptures/
+vr-client/*.csproj
+vr-client/*.sln
+vr-client/*.apk
+vr-client/*.aab
+vr-client/.vs/
+vr-client/.idea/
+vr-client/Assets/StreamingAssets/aa*
+# verificación de compilación fuera de Unity (vr-client/Tools/verificar-compilacion)
+vr-client/Tools/verificar-compilacion/bin/
+vr-client/Tools/verificar-compilacion/obj/
+
+# --- Blender ---
+*.blend1
+*.blend2
+
+# --- Varios ---
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
