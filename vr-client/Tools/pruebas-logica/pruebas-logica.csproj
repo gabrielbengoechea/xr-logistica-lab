@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Pruebas de la lógica pura del cliente VR (sin Unity): vista explotada, reglas de encaje, telemetría
+    (JSON, reintentos, bandeja), argumentos de compilación y propiedades del FBX. Corren sobre la matemática real
+    de Tools/verificar-compilacion/Stubs/UnityMath.cs.
+      dotnet run
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="*.cs" />
+    <Compile Include="../verificar-compilacion/Stubs/UnityMath.cs" LinkBase="Stubs" />
+    <Compile Include="../verificar-compilacion/Stubs/UnityEngine.cs" LinkBase="Stubs" />
+    <Compile Include="../../Assets/Scripts/Core/*.cs" LinkBase="Scripts/Core" />
+    <Compile Include="../../Assets/Scripts/Telemetry/TelemetryModels.cs" LinkBase="Scripts/Telemetry" />
+    <Compile Include="../../Assets/Scripts/Telemetry/TelemetryUploader.cs" LinkBase="Scripts/Telemetry" />
+    <Compile Include="../../Assets/Scripts/Editor/BuildArguments.cs" LinkBase="Scripts/Editor" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,18 @@
+{
+  "dependencies": {
+    "com.unity.cloud.gltfast": "6.8.0",
+    "com.unity.inputsystem": "1.11.2",
+    "com.unity.render-pipelines.universal": "17.0.3",
+    "com.unity.test-framework": "1.4.5",
+    "com.unity.xr.hands": "1.5.0",
+    "com.unity.xr.interaction.toolkit": "3.0.7",
+    "com.unity.xr.management": "4.5.0",
+    "com.unity.xr.meta-openxr": "2.1.0",
+    "com.unity.xr.openxr": "1.13.0",
+    "com.unity.modules.androidjni": "1.0.0",
+    "com.unity.modules.jsonserialize": "1.0.0",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.unitywebrequest": "1.0.0",
+    "com.unity.modules.xr": "1.0.0"
+  }
+}
