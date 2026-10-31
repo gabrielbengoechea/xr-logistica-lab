@@ -74,7 +74,7 @@ Las escenas, los prefabs y los ajustes de XR se guardan en el proyecto de Unity 
 4. **Escena** `Assets/Scenes/Lab.unity`:
    - **Rig:** el prefab `XR Origin (XR Rig)` de los Starter Assets.
    - **Passthrough:** un `AR Session` en la escena. En la cámara del rig, `AR Camera Manager` y fondo de color sólido negro con **alfa 0**.
-   - **Telemetría:** un objeto con `TelemetryLogger`. Configurar la URL del backend en la red del aula (p. ej. `http://192.168.0.10:8000`), el escenario (`cubesat`, `motor`…) y el alumno. La URL y el alumno se pueden cambiar en el visor con `TelemetryLogger.Configure` y quedan guardados.
+   - **Telemetría:** un objeto con `TelemetryLogger`. Configurar la URL del backend en la red del aula (p. ej. `http://192.168.0.10:8000`), el escenario (`cubesat`, `motor`…), el alumno y, si el backend la exige (`XRLAB_API_KEY`), la clave. Se pueden cambiar en el visor con `TelemetryLogger.Configure` y quedan guardados.
 5. **Modelos**:
    1. Copiar los FBX de `/models/fbx` a `Assets/Models/`. El importador arma las zonas de encaje, la vista explotada y las piezas tomables.
    2. Arrastrar el modelo a la escena.

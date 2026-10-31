@@ -27,11 +27,14 @@ namespace XRLab
     {
         public const string PrefServer = "xrlab.server";
         public const string PrefStudent = "xrlab.student";
+        public const string PrefApiKey = "xrlab.apikey";
         private const string OutboxFile = "telemetria_pendiente.txt";
 
         [Header("Servidor")]
         [Tooltip("URL del backend (sin barra final). Se puede cambiar en el visor y queda guardada (PlayerPrefs).")]
         [SerializeField] private string serverUrl = "http://192.168.0.10:8000";
+        [Tooltip("Clave del backend (XRLAB_API_KEY), si la exige. Va en la cabecera X-API-Key.")]
+        [SerializeField] private string apiKey;
         [Min(1)] [SerializeField] private int requestTimeoutSeconds = 10;
         [Min(1)] [SerializeField] private int maxAttempts = 5;
 
@@ -75,6 +78,7 @@ namespace XRLab
         {
             serverUrl = PlayerPrefs.GetString(PrefServer, serverUrl).TrimEnd('/');
             studentId = PlayerPrefs.GetString(PrefStudent, studentId);
+            apiKey = PlayerPrefs.GetString(PrefApiKey, apiKey ?? string.Empty);
             _cancel = new CancellationTokenSource();
             _outboxPath = Path.Combine(Application.persistentDataPath, OutboxFile);
             _uploader = new TelemetryUploader(SendJsonAsync, DelayAsync, new RetryPolicy(maxAttempts), LoadOutbox());
@@ -132,9 +136,14 @@ namespace XRLab
             _cancel = null;
         }
 
-        /// <summary>Configura el servidor y el alumno (por ejemplo, desde un menú en el visor). Quedan guardados.</summary>
-        public void Configure(string url, string student)
+        /// <summary>Configura el servidor, el alumno y la clave (por ejemplo, desde un menú en el visor). Quedan guardados.</summary>
+        public void Configure(string url, string student, string key = null)
         {
+            if (key != null)
+            {
+                apiKey = key.Trim();
+                PlayerPrefs.SetString(PrefApiKey, apiKey);
+            }
             if (!string.IsNullOrWhiteSpace(url))
             {
                 serverUrl = url.Trim().TrimEnd('/');
@@ -294,6 +303,10 @@ namespace XRLab
                 req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json)) { contentType = "application/json" };
                 req.downloadHandler = new DownloadHandlerBuffer();
                 req.SetRequestHeader("Content-Type", "application/json");
+                if (!string.IsNullOrEmpty(apiKey))
+                {
+                    req.SetRequestHeader("X-API-Key", apiKey);
+                }
                 req.timeout = requestTimeoutSeconds;
                 var done = new TaskCompletionSource<bool>();
                 UnityWebRequestAsyncOperation op = req.SendWebRequest();
