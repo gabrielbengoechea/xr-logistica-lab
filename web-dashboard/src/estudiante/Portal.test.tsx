@@ -36,7 +36,7 @@ describe('Portal de estudiantes', () => {
   it('cada simulador tiene su imagen en public/simuladores', async () => {
     const { existsSync } = await import('node:fs')
     for (const s of GRUPOS.flatMap((g) => g.simuladores)) {
-      expect(existsSync(`public${s.imagen}`), s.imagen).toBe(true)
+      expect(existsSync(`public/${s.imagen}`), s.imagen).toBe(true)
     }
   })
 })

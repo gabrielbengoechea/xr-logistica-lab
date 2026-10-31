@@ -34,6 +34,19 @@ VITE_API_BASE=http://192.168.0.10:8000 npm run build
 
 En ese caso, agregar el origen del tablero a `XRLAB_CORS_ORIGINS` en el backend.
 
+## Sitio publicado (GitHub Pages)
+
+https://gabrielbengoechea.github.io/xr-logistica-lab/ tiene la portada, el visor 3D y el inventario, sin servidor: se puede abrir en el navegador del Quest o del celular. El panel en vivo muestra un aviso, porque la telemetría necesita el backend del aula.
+
+El workflow `pages.yml` lo publica en la rama `gh-pages` en cada push a `main`. A mano:
+
+```bash
+cd web-dashboard && XRLAB_BASE=/xr-logistica-lab/ VITE_SITIO_ESTATICO=1 npx vite build
+cd .. && python3 backend/tools/exportar_sitio.py web-dashboard/dist   # datos/*.json y models/
+```
+
+Con `VITE_SITIO_ESTATICO=1`, `apiUrl` lee el manifest y el inventario de `datos/` y los modelos de `models/` (ver `rutaEstatica` en `src/lib/api.ts`).
+
 ## Estructura
 
 | Carpeta o archivo | Contenido |

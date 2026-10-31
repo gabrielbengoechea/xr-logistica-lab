@@ -19,7 +19,7 @@ export function TarjetaSimulador({ simulador }: { simulador: Simulador }) {
           {NOMBRE_AREA[area]}
         </span>
         <img
-          src={imagen}
+          src={`${import.meta.env.BASE_URL}${imagen}`}
           alt=""
           loading="lazy"
           className="absolute bottom-[7%] left-[5%] h-[76%] w-[68%] object-contain drop-shadow-[0_12px_10px_rgb(0_0_0/0.35)] transition-transform duration-300 ease-out group-hover:-translate-y-1.5 group-focus-visible:-translate-y-1.5"

@@ -41,6 +41,8 @@ cd backend && uvicorn app.main:app --reload --port 8000        # http://localhos
 cd web-dashboard && npm ci
 cd web-dashboard && npm run dev       # http://localhost:5173 (proxy /api y /ws → :8000)
 cd web-dashboard && npm test && npm run build && npm run lint
+# Sitio estático para GitHub Pages (lo publica .github/workflows/pages.yml en cada push a main)
+cd web-dashboard && XRLAB_BASE=/xr-logistica-lab/ VITE_SITIO_ESTATICO=1 npx vite build && cd .. && python3 backend/tools/exportar_sitio.py web-dashboard/dist
 
 # Cliente VR
 # Compilación de los scripts fuera de Unity, contra firmas mínimas de la API de Unity (sin licencia):
@@ -91,6 +93,6 @@ Unity -batchmode -quit -projectPath vr-client -executeMethod XRLab.Editor.BuildS
 | Scripts Unity: vista explotada, encajes, telemetría y build batch | PR `feature/vr-scripts` |
 | Tablero web: visor 3D y panel docente | PR `feature/web-dashboard` |
 | Modelos de los otros proyectos en el catálogo y el visor (colecciones) | PR `feature/modelos-proyectos` |
-| Portada de estudiantes para elegir simulador | PR `feature/portal-estudiantes` |
+| Portada de estudiantes para elegir simulador y sitio en GitHub Pages | PR `feature/portal-estudiantes` |
 | Escenas Unity, prefabs y configuración XR del proyecto | Se arman en el editor de Unity a partir de los scripts (ver `vr-client/README.md`) |
-| Autenticación de docentes y despliegue en la nube | Pendiente |
+| Autenticación de docentes y backend en la nube | Pendiente |

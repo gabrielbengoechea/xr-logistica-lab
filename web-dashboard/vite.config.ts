@@ -6,6 +6,8 @@ import { defineConfig } from 'vite'
 const backend = process.env.XRLAB_BACKEND ?? 'http://127.0.0.1:8000'
 
 export default defineConfig({
+  // En GitHub Pages el sitio vive en /xr-logistica-lab/ (XRLAB_BASE lo define al compilar).
+  base: process.env.XRLAB_BASE ?? '/',
   plugins: [react()],
   server: {
     port: 5173,

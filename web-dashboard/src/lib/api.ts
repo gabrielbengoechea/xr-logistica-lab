@@ -12,7 +12,36 @@ export class ApiError extends Error {
   }
 }
 
+/** Sitio estático (GitHub Pages): sin backend, con el manifest, el inventario y los modelos copiados como archivos. */
+export const SITIO_ESTATICO: boolean = import.meta.env.VITE_SITIO_ESTATICO === '1'
+
+/** Nombre de archivo para una zona del inventario: minúsculas, sin tildes y con guiones ("Pañol" → "panol"). */
+export function slugZona(zona: string): string {
+  return zona
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+/**
+ * Ruta de un recurso de la API en el sitio estático. El manifest y el inventario son JSON exportados por
+ * backend/tools/exportar_sitio.py; los modelos van en models/. Lo demás (telemetría) no existe sin servidor.
+ */
+export function rutaEstatica(path: string, base: string = import.meta.env.BASE_URL): string {
+  const [ruta = '', consulta = ''] = path.split('?')
+  if (ruta === '/api/v1/models/manifest') return `${base}datos/manifest.json`
+  if (ruta === '/api/v1/inventory') {
+    const zona = new URLSearchParams(consulta).get('zone')
+    return `${base}datos/${zona ? `inventario-${slugZona(zona)}` : 'inventario'}.json`
+  }
+  if (ruta.startsWith('/models/')) return `${base}${ruta.slice(1)}`
+  return path
+}
+
 export function apiUrl(path: string): string {
+  if (SITIO_ESTATICO) return rutaEstatica(path)
   return `${API_BASE}${path}`
 }
 

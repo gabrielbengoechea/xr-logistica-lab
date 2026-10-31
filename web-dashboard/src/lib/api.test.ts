@@ -23,3 +23,16 @@ describe('cliente de la API', () => {
     expect(wsUrl('/ws/telemetry', { protocol: 'https:', host: 'lab.utec.edu.uy' })).toBe('wss://lab.utec.edu.uy/ws/telemetry')
   })
 })
+
+describe('sitio estático', () => {
+  it('lleva cada recurso de la API a su archivo', async () => {
+    const { rutaEstatica, slugZona } = await import('./api')
+    const b = '/xr-logistica-lab/'
+    expect(rutaEstatica('/api/v1/models/manifest', b)).toBe('/xr-logistica-lab/datos/manifest.json')
+    expect(rutaEstatica('/api/v1/inventory', b)).toBe('/xr-logistica-lab/datos/inventario.json')
+    expect(rutaEstatica('/api/v1/inventory?zone=Pa%C3%B1ol', b)).toBe('/xr-logistica-lab/datos/inventario-panol.json')
+    expect(rutaEstatica('/models/proyectos/robot/robot-6-ejes.glb', b)).toBe('/xr-logistica-lab/models/proyectos/robot/robot-6-ejes.glb')
+    expect(slugZona('Laboratorio espacial')).toBe('laboratorio-espacial')
+    expect(slugZona('A-Racks')).toBe('a-racks')
+  })
+})

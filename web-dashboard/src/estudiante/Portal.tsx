@@ -22,7 +22,7 @@ export function Portal() {
     <div className="portal min-h-full bg-niebla font-lectura text-tinta">
       <header className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 pt-5 sm:px-6">
         <div className="flex items-center gap-2.5">
-          <img src="/icono.svg" alt="" className="h-8 w-8" />
+          <img src={`${import.meta.env.BASE_URL}icono.svg`} alt="" className="h-8 w-8" />
           <span className="font-rotulo text-xl font-semibold leading-none">XR Logística Lab</span>
         </div>
         <a href="#panel" className="rounded-full px-3 py-1.5 text-sm text-tenue underline-offset-4 hover:text-tinta hover:underline">

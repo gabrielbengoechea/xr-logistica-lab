@@ -15,7 +15,7 @@ export interface Simulador {
   url: string
   area: Area
   dispositivos: Dispositivo[]
-  /** Imagen del modelo principal, renderizada con fondo transparente (public/simuladores). */
+  /** Imagen del modelo principal, renderizada con fondo transparente (relativa a public/). */
   imagen: string
 }
 
@@ -54,7 +54,7 @@ export const GRUPOS: GrupoSimuladores[] = [
         url: 'https://gabrielbengoechea.github.io/logistica3d/',
         area: 'puerto',
         dispositivos: ['quest', 'compu'],
-        imagen: '/simuladores/logistica-3d.webp',
+        imagen: 'simuladores/logistica-3d.webp',
       },
       {
         id: 'centro-logistico',
@@ -63,7 +63,7 @@ export const GRUPOS: GrupoSimuladores[] = [
         url: 'https://gabrielbengoechea.github.io/logi/',
         area: 'deposito',
         dispositivos: ['quest', 'compu'],
-        imagen: '/simuladores/centro-logistico.webp',
+        imagen: 'simuladores/centro-logistico.webp',
       },
       {
         id: 'estiba',
@@ -72,7 +72,7 @@ export const GRUPOS: GrupoSimuladores[] = [
         url: 'https://gabrielbengoechea.github.io/Estiba-VR/',
         area: 'puerto',
         dispositivos: ['quest', 'compu', 'celular'],
-        imagen: '/simuladores/estiba.webp',
+        imagen: 'simuladores/estiba.webp',
       },
     ],
   },
@@ -88,7 +88,7 @@ export const GRUPOS: GrupoSimuladores[] = [
         url: `${PILOTOS}/autoelevador/`,
         area: 'deposito',
         dispositivos: ['quest', 'compu', 'celular'],
-        imagen: '/simuladores/autoelevador.webp',
+        imagen: 'simuladores/autoelevador.webp',
       },
       {
         id: 'robot',
@@ -97,7 +97,7 @@ export const GRUPOS: GrupoSimuladores[] = [
         url: `${PILOTOS}/robot-6-ejes/`,
         area: 'taller',
         dispositivos: ['quest', 'compu', 'celular'],
-        imagen: '/simuladores/robot.webp',
+        imagen: 'simuladores/robot.webp',
       },
     ],
   },
@@ -113,7 +113,7 @@ export const GRUPOS: GrupoSimuladores[] = [
         url: `${PILOTOS}/atlas.html`,
         area: 'geografia',
         dispositivos: ['quest', 'compu', 'celular'],
-        imagen: '/simuladores/atlas.webp',
+        imagen: 'simuladores/atlas.webp',
       },
       {
         id: 'motor-turbofan',
@@ -122,7 +122,7 @@ export const GRUPOS: GrupoSimuladores[] = [
         url: `${PILOTOS}/motor-jet/`,
         area: 'taller',
         dispositivos: ['quest', 'compu'],
-        imagen: '/simuladores/motor-turbofan.webp',
+        imagen: 'simuladores/motor-turbofan.webp',
       },
       {
         id: 'ra-mesa',
@@ -131,7 +131,7 @@ export const GRUPOS: GrupoSimuladores[] = [
         url: `${PILOTOS}/ar-mesa/`,
         area: 'geografia',
         dispositivos: ['quest', 'celular'],
-        imagen: '/simuladores/ra-mesa.webp',
+        imagen: 'simuladores/ra-mesa.webp',
       },
     ],
   },

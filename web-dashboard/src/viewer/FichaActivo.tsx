@@ -1,3 +1,4 @@
+import { apiUrl } from '../lib/api'
 import type { ModelAsset } from '../api/types'
 import { bytes, kilos, medidas, numero } from '../lib/formato'
 import type { DatosPieza } from '../lib/explotada'
@@ -124,7 +125,7 @@ export function FichaActivo({ activo, despiece, alCambiarDespiece, mostrarEncaje
         <ul className="flex flex-wrap gap-2">
           {(['glb', 'usdz', 'fbx', 'blend'] as const).filter((k) => activo.urls[k]).map((k) => (
             <li key={k}>
-              <a href={activo.urls[k] ?? undefined} download title={k === 'usdz' ? 'Para ver en realidad aumentada en iPhone o iPad' : undefined} className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs ring-1 ring-borde hover:bg-plano">
+              <a href={activo.urls[k] ? apiUrl(activo.urls[k]) : undefined} download title={k === 'usdz' ? 'Para ver en realidad aumentada en iPhone o iPad' : undefined} className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs ring-1 ring-borde hover:bg-plano">
                 <span className="font-semibold uppercase">{k}</span>
                 <span className="text-apagada">{bytes(activo.sizes_bytes[k])}</span>
               </a>
