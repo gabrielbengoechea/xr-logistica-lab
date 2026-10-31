@@ -32,6 +32,24 @@ export function factorEscalonado(global: number, i: number, n: number, escalonad
   return Math.min(1, Math.max(0, (g - inicio) / ventana))
 }
 
+/** El GLTFLoader limpia los nombres de los nodos (saca puntos, corchetes…): «Trolley.001» llega como «Trolley001». */
+export const nombreNodo = (n: string): string => THREE.PropertyBinding.sanitizeNodeName(n)
+
+/**
+ * Mallas que no son el objeto visible: colisiones del kit portuario (UCX_*), niveles de detalle bajos (*_LOD1, *_LOD2)
+ * y planos que solo reciben sombra (ShadowCatcher). Devuelve cuántas ocultó.
+ */
+export function ocultarAuxiliares(raiz: THREE.Object3D): number {
+  let n = 0
+  raiz.traverse((o) => {
+    if (/^UCX_/.test(o.name) || /^ShadowCatcher/.test(o.name) || /_LOD[1-9](\d{3})?$/.test(o.name)) {
+      o.visible = false
+      n++
+    }
+  })
+  return n
+}
+
 export interface PiezaExplotada {
   objeto: THREE.Object3D
   nodo: string
@@ -45,16 +63,19 @@ function esVec3(v: unknown): v is Vec3 {
 }
 
 /**
- * Recorre el activo y prepara sus piezas (Part_* con userData.explotar, o con el desplazamiento que diga
- * `porNodo`, que viene del manifest). Hay que llamarlo con el modelo armado.
+ * Recorre el activo y prepara sus piezas: las que nombra `porNodo` (el manifest; cualquier nombre de nodo) y las
+ * Part_* con userData.explotar (modelos del laboratorio). Hay que llamarlo con el modelo armado.
  */
 export function prepararPiezas(raiz: THREE.Object3D, porNodo: Record<string, Vec3> = {}): PiezaExplotada[] {
   raiz.updateWorldMatrix(true, true)
   const raizInv = new THREE.Matrix4().copy(raiz.matrixWorld).invert()
+  const limpio: Record<string, Vec3> = {}
+  for (const [k, v] of Object.entries(porNodo)) limpio[nombreNodo(k)] = v
   const piezas: PiezaExplotada[] = []
   raiz.traverse((o) => {
-    if (!o.name.startsWith('Part_')) return
-    const datos = porNodo[o.name] ?? (o.userData as { explotar?: unknown }).explotar
+    const delManifest = limpio[o.name]
+    if (!delManifest && !o.name.startsWith('Part_')) return
+    const datos = delManifest ?? (o.userData as { explotar?: unknown }).explotar
     if (!esVec3(datos)) return
     // espacio de la raíz → mundo → espacio del padre: solo la parte lineal de las matrices (sin traslación)
     const enRaiz = new THREE.Vector3(...datos)
@@ -83,10 +104,23 @@ export interface DatosPieza {
   masaKg: number | null
 }
 
-export function datosPieza(o: THREE.Object3D): DatosPieza | null {
+/** Datos de las piezas según el manifest, por nombre de nodo tal como lo deja el GLTFLoader. */
+export type FichasPiezas = Record<string, { nombre: string; material: string; masaKg: number | null }>
+
+export function fichasDe(partes: { node: string; name: string; material: string; mass_kg: number | null }[]): FichasPiezas {
+  return Object.fromEntries(partes.map((p) => [nombreNodo(p.node), { nombre: p.name, material: p.material, masaKg: p.mass_kg }]))
+}
+
+/**
+ * La pieza a la que pertenece un objeto tocado: sube por la jerarquía hasta un nodo del manifest (`fichas`) o una
+ * Part_* con extras del glTF.
+ */
+export function datosPieza(o: THREE.Object3D, fichas: FichasPiezas = {}): DatosPieza | null {
   let actual: THREE.Object3D | null = o
-  while (actual && !actual.name.startsWith('Part_')) actual = actual.parent
+  while (actual && !fichas[actual.name] && !actual.name.startsWith('Part_')) actual = actual.parent
   if (!actual) return null
+  const f = fichas[actual.name]
+  if (f) return { nodo: actual.name, nombre: f.nombre, material: f.material, masaKg: f.masaKg }
   const u = actual.userData as { pieza?: unknown; material?: unknown; masa_kg?: unknown }
   return {
     nodo: actual.name,

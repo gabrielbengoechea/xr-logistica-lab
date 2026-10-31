@@ -39,4 +39,5 @@ def test_evento_sin_tableros(client: TestClient) -> None:
 
 def test_health(client: TestClient) -> None:
     h = client.get("/api/v1/health").json()
-    assert h == {"status": "ok", "version": "0.1.0", "models_available": 6, "sessions": 0}
+    # 6 del laboratorio + 9 de los otros proyectos (models/proyectos)
+    assert h == {"status": "ok", "version": "0.1.0", "models_available": 15, "sessions": 0}

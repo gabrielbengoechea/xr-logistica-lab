@@ -57,7 +57,7 @@ class ModelPart(BaseModel):
     node: str
     name: str
     material: str
-    mass_kg: float
+    mass_kg: float | None = Field(default=None, description="Desconocida en los modelos importados de otros proyectos")
     explode_offset: Vec3
     parent: str | None = None
 
@@ -71,12 +71,16 @@ class SnapPoint(BaseModel):
 
 class ModelFiles(BaseModel):
     glb: str
-    fbx: str
-    blend: str
+    fbx: str | None = None
+    blend: str | None = None
+    usdz: str | None = Field(default=None, description="Para la RA del iPhone (Quick Look)")
 
 
 class ModelAsset(BaseModel):
     id: str
+    collection: str = Field(default="laboratorio", description="laboratorio (generados acá) o el proyecto de origen")
+    collection_name: str = "Laboratorio"
+    source: str | None = Field(default=None, description="De dónde sale el modelo, si viene de otro proyecto")
     root_node: str
     name: str
     category: str
@@ -84,10 +88,10 @@ class ModelAsset(BaseModel):
     files: ModelFiles = Field(description="Rutas relativas a /models")
     urls: ModelFiles = Field(description="URLs servidas por este backend")
     sizes_bytes: dict[str, int]
-    available: bool = Field(description="Los tres archivos existen en el servidor")
+    available: bool = Field(description="Todos los archivos declarados existen en el servidor")
     dimensions_m: Vec3
     triangles: int
-    mass_kg: float
+    mass_kg: float | None
     parts: list[ModelPart]
     snap_points: list[SnapPoint]
 
@@ -96,6 +100,7 @@ class ModelManifest(BaseModel):
     version: int
     units: str
     axes: str
+    collections: dict[str, str] = Field(default_factory=dict, description="Id de colección → nombre, en orden")
     assets: list[ModelAsset]
 
 

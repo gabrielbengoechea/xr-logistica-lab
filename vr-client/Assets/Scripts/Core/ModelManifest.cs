@@ -13,8 +13,11 @@ namespace XRLab
     public sealed class ModelFilesDto
     {
         public string glb;
+        /// <summary>Puede faltar (null) en los modelos importados de otros proyectos.</summary>
         public string fbx;
         public string blend;
+        /// <summary>Para la RA del iPhone; null si el modelo no lo trae.</summary>
+        public string usdz;
     }
 
     [Serializable]
@@ -23,6 +26,7 @@ namespace XRLab
         public string node;
         public string name;
         public string material;
+        /// <summary>null en el JSON si se desconoce: JsonUtility lo deja en 0.</summary>
         public float mass_kg;
         public float[] explode_offset;
         public string parent;
@@ -41,6 +45,10 @@ namespace XRLab
     public sealed class ModelAssetDto
     {
         public string id;
+        /// <summary>"laboratorio" (generados en el repo) o el proyecto de origen: puerto, autoelevador, atlas, robot.</summary>
+        public string collection;
+        public string collection_name;
+        public string source;
         public string root_node;
         public string name;
         public string category;

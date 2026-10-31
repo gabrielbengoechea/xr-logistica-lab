@@ -23,7 +23,8 @@ export function porcentaje(fraccion: number): string {
   return `${entero.format(Math.round(Math.min(1, Math.max(0, fraccion)) * 100))} %`
 }
 
-export function kilos(kg: number): string {
+export function kilos(kg: number | null | undefined): string {
+  if (kg == null) return '—'
   return kg >= 1000 ? `${num.format(kg / 1000)} t` : kg >= 1 ? `${num.format(kg)} kg` : `${entero.format(kg * 1000)} g`
 }
 

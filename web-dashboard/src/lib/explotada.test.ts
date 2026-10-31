@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { aplicarFactor, datosPieza, ease, factorEscalonado, prepararPiezas } from './explotada'
+import { aplicarFactor, datosPieza, ease, factorEscalonado, fichasDe, nombreNodo, ocultarAuxiliares, prepararPiezas } from './explotada'
 
 function conjunto() {
   const raiz = new THREE.Group()
@@ -73,5 +73,45 @@ describe('vista explotada (igual que ExplodedViewMath.cs)', () => {
     expect(datosPieza(carro)).toEqual({ nodo: 'Part_Carro', nombre: 'Carro portahorquillas', material: 'Acero', masaKg: 110 })
     expect(datosPieza(horquillas)?.nombre).toBe('Horquillas')
     expect(datosPieza(new THREE.Object3D())).toBeNull()
+  })
+})
+
+describe('modelos de otros proyectos', () => {
+  it('oculta colisiones, niveles de detalle bajos y planos de sombra', () => {
+    const raiz = new THREE.Group()
+    const nombres = ['STS_Structure_LOD0', 'STS_Structure_LOD1', 'STS_Spreader_LOD2001', 'UCX_Pata_Mar_D', 'ShadowCatcher', 'Trolley']
+    for (const n of nombres) {
+      const o = new THREE.Object3D()
+      o.name = n
+      raiz.add(o)
+    }
+    expect(ocultarAuxiliares(raiz)).toBe(4)
+    expect(raiz.children.filter((o) => o.visible).map((o) => o.name)).toEqual(['STS_Structure_LOD0', 'Trolley'])
+  })
+
+  it('despieza nodos con cualquier nombre si el manifest los nombra (con los nombres limpios del GLTFLoader)', () => {
+    const raiz = new THREE.Group()
+    const hombro = new THREE.Group()
+    hombro.name = 'Shoulder_Joint'
+    const carro = new THREE.Group()
+    carro.name = nombreNodo('Trolley.001')
+    raiz.add(hombro, carro)
+    expect(carro.name).toBe('Trolley001')
+    const piezas = prepararPiezas(raiz, { Shoulder_Joint: [0, 0.2, 0], 'Trolley.001': [0, 0, 3] })
+    expect(piezas.map((p) => p.nodo).sort()).toEqual(['Shoulder_Joint', 'Trolley001'])
+    aplicarFactor(piezas, 1, 0, 'lineal')
+    expect(hombro.position.y).toBeCloseTo(0.2)
+    expect(carro.position.z).toBeCloseTo(3)
+  })
+
+  it('los datos de la pieza salen del manifest subiendo por la jerarquía', () => {
+    const brazo = new THREE.Group()
+    brazo.name = 'Upper_Arm'
+    const malla = new THREE.Mesh()
+    malla.name = 'Upper_Arm_Mesh'
+    brazo.add(malla)
+    const fichas = fichasDe([{ node: 'Upper_Arm', name: 'Brazo', material: 'Aluminio fundido', mass_kg: null }])
+    expect(datosPieza(malla, fichas)).toEqual({ nodo: 'Upper_Arm', nombre: 'Brazo', material: 'Aluminio fundido', masaKg: null })
+    expect(datosPieza(malla)).toBeNull()
   })
 })

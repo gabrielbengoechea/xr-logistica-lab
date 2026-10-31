@@ -40,7 +40,8 @@ export interface ModelPart {
   node: string
   name: string
   material: string
-  mass_kg: number
+  /** Desconocida en los modelos importados de otros proyectos. */
+  mass_kg: number | null
   explode_offset: Vec3
   parent: string | null
 }
@@ -54,12 +55,18 @@ export interface SnapPoint {
 
 export interface ModelFiles {
   glb: string
-  fbx: string
-  blend: string
+  fbx: string | null
+  blend: string | null
+  /** Para la RA del iPhone (Quick Look). */
+  usdz: string | null
 }
 
 export interface ModelAsset {
   id: string
+  /** «laboratorio» (generados en este repo) o el proyecto de origen: puerto, autoelevador, atlas, robot… */
+  collection: string
+  collection_name: string
+  source: string | null
   root_node: string
   name: string
   category: string
@@ -70,7 +77,7 @@ export interface ModelAsset {
   available: boolean
   dimensions_m: Vec3
   triangles: number
-  mass_kg: number
+  mass_kg: number | null
   parts: ModelPart[]
   snap_points: SnapPoint[]
 }
@@ -79,6 +86,8 @@ export interface ModelManifest {
   version: number
   units: string
   axes: string
+  /** Id de colección → nombre, en el orden en que se muestran. */
+  collections: Record<string, string>
   assets: ModelAsset[]
 }
 

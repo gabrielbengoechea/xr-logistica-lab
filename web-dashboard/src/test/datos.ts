@@ -37,12 +37,15 @@ export const RESUMEN: TelemetrySummary = {
 
 export const CUBESAT: ModelAsset = {
   id: 'cubesat',
+  collection: 'laboratorio',
+  collection_name: 'Laboratorio',
+  source: null,
   root_node: 'CubeSat',
   name: 'CubeSat 1U',
   category: 'Aeroespacial',
   description: 'Nanosatélite de 10 cm con pila PC/104.',
-  files: { glb: 'glb/cubesat.glb', fbx: 'fbx/cubesat.fbx', blend: 'blend/cubesat.blend' },
-  urls: { glb: '/models/glb/cubesat.glb', fbx: '/models/fbx/cubesat.fbx', blend: '/models/blend/cubesat.blend' },
+  files: { glb: 'glb/cubesat.glb', fbx: 'fbx/cubesat.fbx', blend: 'blend/cubesat.blend', usdz: null },
+  urls: { glb: '/models/glb/cubesat.glb', fbx: '/models/fbx/cubesat.fbx', blend: '/models/blend/cubesat.blend', usdz: null },
   sizes_bytes: { glb: 34044, fbx: 47484, blend: 101334 },
   available: true,
   dimensions_m: [0.1, 0.1135, 0.1],
@@ -55,11 +58,47 @@ export const CUBESAT: ModelAsset = {
   snap_points: [{ node: 'Snap_Ranura_OBC', accepts: 'placa_obc', tolerance_m: 0.004, position: [0, 0.03, 0] }],
 }
 
+/** Un modelo de otro proyecto: sin fbx ni blend, con usdz para la RA y masa desconocida. */
+export const ROBOT: ModelAsset = {
+  id: 'robot-6-ejes',
+  collection: 'robot',
+  collection_name: 'Brazo robótico (RA)',
+  source: 'quest-xr-pilotos · robot-6-ejes/modelo',
+  root_node: 'Base_Mesh',
+  name: 'Brazo robótico de 6 ejes',
+  category: 'Automatización',
+  description: 'Robot industrial articulado.',
+  files: { glb: 'proyectos/robot/robot-6-ejes.glb', fbx: null, blend: null, usdz: 'proyectos/robot/robot-6-ejes.usdz' },
+  urls: { glb: '/models/proyectos/robot/robot-6-ejes.glb', fbx: null, blend: null, usdz: '/models/proyectos/robot/robot-6-ejes.usdz' },
+  sizes_bytes: { glb: 964756, usdz: 6430032 },
+  available: true,
+  dimensions_m: [0.38, 1.09, 0.3],
+  triangles: 8122,
+  mass_kg: null,
+  parts: [
+    { node: 'Shoulder_Joint', name: 'Hombro (eje 1-2)', material: 'Aluminio fundido', mass_kg: null, explode_offset: [0.2, 0.1, 0], parent: null },
+    { node: 'Upper_Arm', name: 'Brazo', material: 'Aluminio fundido', mass_kg: null, explode_offset: [0, 0.13, 0], parent: 'Shoulder_Joint' },
+  ],
+  snap_points: [],
+}
+
+export const CONTENEDOR: ModelAsset = {
+  ...ROBOT,
+  id: 'puerto-contenedor-40',
+  collection: 'puerto',
+  collection_name: 'Terminal portuaria',
+  name: "Contenedor ISO de 40'",
+  files: { ...ROBOT.files, usdz: null },
+  urls: { ...ROBOT.urls, glb: '/models/proyectos/puerto/puerto-contenedor-40.glb', usdz: null },
+  parts: [],
+}
+
 export const MANIFEST: ModelManifest = {
   version: 1,
   units: 'metros',
   axes: 'glTF',
-  assets: [CUBESAT, { ...CUBESAT, id: 'motor', name: 'Motor trifásico IEC 132', root_node: 'Motor', available: false }],
+  collections: { laboratorio: 'Laboratorio', puerto: 'Terminal portuaria', robot: 'Brazo robótico (RA)' },
+  assets: [CUBESAT, { ...CUBESAT, id: 'motor', name: 'Motor trifásico IEC 132', root_node: 'Motor', available: false }, CONTENEDOR, ROBOT],
 }
 
 export const INVENTARIO: InventoryResponse = {

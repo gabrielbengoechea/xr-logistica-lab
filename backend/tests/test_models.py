@@ -13,7 +13,7 @@ def test_manifest_con_rutas_y_piezas(client: TestClient) -> None:
     m = r.json()
     ids = {a["id"] for a in m["assets"]}
     assert {"forklift", "pallet", "rack", "sensor", "motor", "cubesat"} <= ids
-    for a in m["assets"]:
+    for a in (x for x in m["assets"] if x["collection"] == "laboratorio"):
         assert a["available"] is True
         assert a["urls"]["glb"] == f"/models/glb/{a['id']}.glb"
         assert a["files"]["fbx"].endswith(".fbx")
@@ -53,3 +53,44 @@ def test_sin_manifest_devuelve_lista_vacia(tmp_path: Path, settings: Settings) -
     cfg = settings.model_copy(update={"models_dir": tmp_path})
     with TestClient(create_app(cfg)) as c:
         assert c.get("/api/v1/models/manifest").json()["assets"] == []
+
+
+def test_modelos_de_los_proyectos_agrupados(client: TestClient) -> None:
+    m = client.get("/api/v1/models/manifest").json()
+    assert list(m["collections"]) == ["laboratorio", "puerto", "autoelevador", "atlas", "robot"]
+    por_coleccion: dict[str, list[dict]] = {}
+    for a in m["assets"]:
+        por_coleccion.setdefault(a["collection"], []).append(a)
+    assert {a["id"] for a in por_coleccion["puerto"]} >= {"puerto-sts", "puerto-rtg", "puerto-buque", "puerto-contenedor-40"}
+    robot = client.get("/api/v1/models/robot-6-ejes").json()
+    assert robot["collection_name"] == "Brazo robótico (RA)"
+    assert robot["available"] is True
+    assert robot["urls"]["glb"] == "/models/proyectos/robot/robot-6-ejes.glb"
+    assert robot["urls"]["usdz"].endswith(".usdz")
+    assert robot["files"]["fbx"] is None
+    assert robot["mass_kg"] is None
+    assert [p["node"] for p in robot["parts"]][:2] == ["Shoulder_Joint", "Upper_Arm"]
+    assert robot["parts"][1]["parent"] == "Shoulder_Joint"
+    contenedor = client.get("/api/v1/models/puerto-contenedor-40").json()
+    assert len(contenedor["snap_points"]) == 4
+    assert client.get(robot["urls"]["usdz"]).status_code == 200
+
+
+def test_solo_proyectos_o_ids_repetidos(tmp_path: Path, settings: Settings) -> None:
+    proyectos = json.loads((settings.models_dir / "proyectos" / "manifest.json").read_text(encoding="utf-8"))
+    (tmp_path / "proyectos").mkdir()
+    (tmp_path / "proyectos" / "manifest.json").write_text(json.dumps(proyectos), encoding="utf-8")
+    from app.catalog import cargar_manifest
+
+    m = cargar_manifest(tmp_path)
+    assert "laboratorio" not in m.collections
+    assert m.assets and all(a.available is False for a in m.assets)  # los archivos no están en tmp_path
+    base = json.loads((settings.models_dir / "manifest.json").read_text(encoding="utf-8"))
+    base["activos"][0]["id"] = proyectos["activos"][0]["id"]
+    (tmp_path / "manifest.json").write_text(json.dumps(base), encoding="utf-8")
+    try:
+        cargar_manifest(tmp_path)
+    except ValueError as e:
+        assert "repetidos" in str(e)
+    else:
+        raise AssertionError("se esperaba un error por id repetido")

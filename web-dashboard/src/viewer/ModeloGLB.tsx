@@ -3,7 +3,7 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { SnapPoint, Vec3 } from '../api/types'
-import { aplicarFactor, datosPieza, prepararPiezas, type DatosPieza } from '../lib/explotada'
+import { aplicarFactor, datosPieza, nombreNodo as nodoLimpio, ocultarAuxiliares, prepararPiezas, type DatosPieza, type FichasPiezas } from '../lib/explotada'
 import { nombreNodo } from '../lib/formato'
 
 interface Props {
@@ -11,6 +11,8 @@ interface Props {
   /** Despiece pedido (0 armado, 1 despiezado); el modelo llega con una transición suave. */
   factor: number
   desplazamientos: Record<string, Vec3>
+  /** Nombre, material y masa de cada pieza según el manifest (por nodo). */
+  fichas: FichasPiezas
   encajes: SnapPoint[]
   /** Lado mayor del activo (m): el marcador de los encajes se dimensiona con él. */
   tamano: number
@@ -46,10 +48,11 @@ function teñir(o: THREE.Object3D, activo: boolean) {
   })
 }
 
-export function ModeloGLB({ url, factor, desplazamientos, encajes, tamano, mostrarEncajes, resaltada, alPasar, alElegir }: Props) {
+export function ModeloGLB({ url, factor, desplazamientos, fichas, encajes, tamano, mostrarEncajes, resaltada, alPasar, alElegir }: Props) {
   const { scene } = useGLTF(url)
   const modelo = useMemo(() => {
     const raiz = scene.clone(true)
+    ocultarAuxiliares(raiz)
     materialesPropios(raiz)
     return raiz
   }, [scene])
@@ -66,11 +69,12 @@ export function ModeloGLB({ url, factor, desplazamientos, encajes, tamano, mostr
   })
 
   useEffect(() => {
-    const objetivo = piezas.find((p) => p.nodo === resaltada)?.objeto
+    const buscado = resaltada ? nodoLimpio(resaltada) : null
+    const objetivo = piezas.find((p) => p.nodo === buscado)?.objeto
     piezas.forEach((p) => teñir(p.objeto, p.objeto === objetivo))
   }, [piezas, resaltada])
 
-  const pieza = (e: ThreeEvent<PointerEvent | MouseEvent>) => datosPieza(e.object)
+  const pieza = (e: ThreeEvent<PointerEvent | MouseEvent>) => datosPieza(e.object, fichas)
 
   return (
     <group>

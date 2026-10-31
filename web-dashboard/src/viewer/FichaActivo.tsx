@@ -19,9 +19,12 @@ export function FichaActivo({ activo, despiece, alCambiarDespiece, mostrarEncaje
   return (
     <div className="space-y-5 text-sm">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-tenue">{activo.category}</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-tenue">
+          {activo.collection === 'laboratorio' ? activo.category : `${activo.collection_name} · ${activo.category}`}
+        </p>
         <h2 className="mt-0.5 text-lg font-semibold leading-snug">{activo.name}</h2>
         <p className="mt-1 text-tenue">{activo.description}</p>
+        {activo.source && <p className="mt-1 text-xs text-apagada">Origen: {activo.source}</p>}
       </div>
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
@@ -45,6 +48,9 @@ export function FichaActivo({ activo, despiece, alCambiarDespiece, mostrarEncaje
         </div>
       </dl>
 
+      {activo.parts.length === 0 ? (
+        <p className="rounded-lg bg-plano p-3 text-tenue">Este modelo es de una sola pieza: no tiene vista explotada.</p>
+      ) : (
       <fieldset className="space-y-3 rounded-lg bg-plano p-3">
         <legend className="sr-only">Controles del visor</legend>
         <div className="flex items-center justify-between gap-3">
@@ -74,6 +80,7 @@ export function FichaActivo({ activo, despiece, alCambiarDespiece, mostrarEncaje
           Mostrar los encajes ({activo.snap_points.length})
         </label>
       </fieldset>
+      )}
 
       {elegida && (
         <div className="rounded-lg p-3 ring-1 ring-acento/50" aria-live="polite">
@@ -86,6 +93,7 @@ export function FichaActivo({ activo, despiece, alCambiarDespiece, mostrarEncaje
         </div>
       )}
 
+      {activo.parts.length > 0 && (
       <div>
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-tenue">Piezas</h3>
         <ul className="divide-y divide-borde/70" onMouseLeave={() => alResaltar(null)}>
@@ -109,13 +117,14 @@ export function FichaActivo({ activo, despiece, alCambiarDespiece, mostrarEncaje
           ))}
         </ul>
       </div>
+      )}
 
       <div>
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-tenue">Archivos</h3>
         <ul className="flex flex-wrap gap-2">
-          {(['glb', 'fbx', 'blend'] as const).map((k) => (
+          {(['glb', 'usdz', 'fbx', 'blend'] as const).filter((k) => activo.urls[k]).map((k) => (
             <li key={k}>
-              <a href={activo.urls[k]} download className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs ring-1 ring-borde hover:bg-plano">
+              <a href={activo.urls[k] ?? undefined} download title={k === 'usdz' ? 'Para ver en realidad aumentada en iPhone o iPad' : undefined} className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs ring-1 ring-borde hover:bg-plano">
                 <span className="font-semibold uppercase">{k}</span>
                 <span className="text-apagada">{bytes(activo.sizes_bytes[k])}</span>
               </a>
