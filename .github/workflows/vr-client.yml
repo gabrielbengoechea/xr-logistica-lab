@@ -1,0 +1,24 @@
+name: Cliente VR
+
+on:
+  push:
+    branches: [main]
+    paths: ["vr-client/**", ".github/workflows/vr-client.yml"]
+  pull_request:
+    paths: ["vr-client/**", ".github/workflows/vr-client.yml"]
+
+jobs:
+  scripts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vr-client/Tools/verificar-compilacion
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Compilan todos los scripts (contra las firmas de Unity)
+        run: dotnet build -warnaserror
+      - name: Pruebas de la lógica pura
+        run: dotnet run --project ../pruebas-logica

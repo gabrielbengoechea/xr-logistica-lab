@@ -35,6 +35,8 @@ vr-client/Assets/StreamingAssets/aa*
 # verificación de compilación fuera de Unity (vr-client/Tools/verificar-compilacion)
 vr-client/Tools/verificar-compilacion/bin/
 vr-client/Tools/verificar-compilacion/obj/
+vr-client/Tools/pruebas-logica/bin/
+vr-client/Tools/pruebas-logica/obj/
 
 # --- Blender ---
 *.blend1

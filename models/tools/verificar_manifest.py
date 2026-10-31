@@ -1,6 +1,9 @@
 """
-Comprueba que models/manifest.json describe los archivos que hay en /models: que existen, que el tamaño coincide, que
-cada .glb es glTF 2.0 válido y que sus nodos incluyen todas las piezas y encajes declarados.
+Comprueba que los manifests describen los archivos que hay en /models: que existen, que el tamaño coincide, que cada .glb
+es glTF 2.0 válido y que sus nodos incluyen todas las piezas y encajes declarados.
+
+- models/manifest.json: modelos del laboratorio (generar_modelos.py);
+- models/proyectos/manifest.json: modelos de los otros proyectos (importar_proyectos.py), si existe.
 
     python3 models/tools/verificar_manifest.py
 Sale con código 1 si encuentra algún problema.
@@ -26,15 +29,15 @@ def nodos_glb(ruta):
     return {n.get("name") for n in gltf.get("nodes", [])}
 
 
-def main():
-    with open(os.path.join(RAIZ, "manifest.json"), encoding="utf-8") as f:
-        manifest = json.load(f)
+def verificar(manifest, ids):
     errores = []
-    ids = set()
     for a in manifest["activos"]:
         if a["id"] in ids:
             errores.append(f"id repetido: {a['id']}")
         ids.add(a["id"])
+        if "glb" not in a["archivos"]:
+            errores.append(f"{a['id']}: falta el .glb en el manifest")
+            continue
         for tipo, rel in a["archivos"].items():
             ruta = os.path.join(RAIZ, rel)
             if not os.path.isfile(ruta):
@@ -56,9 +59,26 @@ def main():
                 errores.append(f"{a['id']}: el encaje {e['nodo']} no está en el glb")
         if a["nodo_raiz"] not in nodos:
             errores.append(f"{a['id']}: falta el nodo raíz {a['nodo_raiz']}")
+    return errores
+
+
+def main():
+    errores = []
+    ids = set()
+    total = 0
+    for rel in ("manifest.json", os.path.join("proyectos", "manifest.json")):
+        ruta = os.path.join(RAIZ, rel)
+        if not os.path.isfile(ruta):
+            if rel == "manifest.json":
+                errores.append("falta models/manifest.json")
+            continue
+        with open(ruta, encoding="utf-8") as f:
+            manifest = json.load(f)
+        errores += verificar(manifest, ids)
+        total += len(manifest["activos"])
     for e in errores:
         print("ERROR", e)
-    print(f"{len(manifest['activos'])} activos, {len(errores)} problemas")
+    print(f"{total} activos, {len(errores)} problemas")
     return 1 if errores else 0
 
 

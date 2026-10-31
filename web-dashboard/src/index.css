@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Tokens del tablero (canales RGB para que Tailwind pueda aplicar opacidad).
+  Paleta de datos: serie = azul del método de visualización (validado contra estas superficies);
+  bien / alerta / crítico = paleta de estado, siempre con texto o ícono al lado (nunca solo color).
+*/
+:root {
+  color-scheme: light;
+  --plano: 249 249 247;
+  --superficie: 252 252 251;
+  --elevada: 255 255 255;
+  --borde: 225 224 217;
+  --rejilla: 225 224 217;
+  --tinta: 11 11 11;
+  --tenue: 82 81 78;
+  --apagada: 112 110 105;
+  --acento: 28 92 171;
+  --acento-tinta: 255 255 255;
+  --serie: 42 120 214;
+  --bien: 12 163 12;
+  --alerta: 250 178 25;
+  --critico: 208 59 59;
+  /* Portada de estudiantes: niebla del puerto de fondo y un color de contenedor por área. */
+  --niebla: 233 238 241;
+  --area-puerto: 36 89 168;
+  --area-deposito: 201 86 26;
+  --area-taller: 46 122 87;
+  --area-geografia: 168 118 12;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    color-scheme: dark;
+    --plano: 13 13 13;
+    --superficie: 26 26 25;
+    --elevada: 36 36 34;
+    --borde: 56 56 53;
+    --rejilla: 44 44 42;
+    --tinta: 240 239 236;
+    --tenue: 195 194 183;
+    --apagada: 150 148 141;
+    --acento: 57 135 229;
+    --acento-tinta: 255 255 255;
+    --serie: 57 135 229;
+    --niebla: 15 23 30;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --plano: 13 13 13;
+  --superficie: 26 26 25;
+  --elevada: 36 36 34;
+  --borde: 56 56 53;
+  --rejilla: 44 44 42;
+  --tinta: 240 239 236;
+  --tenue: 195 194 183;
+  --apagada: 150 148 141;
+  --acento: 57 135 229;
+  --acento-tinta: 255 255 255;
+  --serie: 57 135 229;
+  --niebla: 15 23 30;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-plano font-sans text-tinta antialiased;
+  font-feature-settings: 'tnum' 1;
+}
+
+:focus-visible {
+  @apply outline outline-2 outline-offset-2 outline-acento;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+  Puerta de contenedor de las tarjetas de simuladores: chapa corrugada vertical, marco superior e inferior
+  y las dos barras de cierre. El color sale del área (puerto, depósito, taller o geografía).
+*/
+.area-puerto { --area: var(--area-puerto); }
+.area-deposito { --area: var(--area-deposito); }
+.area-taller { --area: var(--area-taller); }
+.area-geografia { --area: var(--area-geografia); }
+
+.puerta-contenedor {
+  background-color: rgb(var(--area));
+  background-image:
+    linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(0 0 0 / 0.18)),
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.13) 0 2px, transparent 2px 8px, rgb(0 0 0 / 0.16) 8px 10px, transparent 10px 16px);
+  box-shadow: inset 0 9px 0 rgb(0 0 0 / 0.2), inset 0 -9px 0 rgb(0 0 0 / 0.26), inset 6px 0 0 rgb(0 0 0 / 0.12), inset -6px 0 0 rgb(0 0 0 / 0.12);
+}
+
+.puerta-contenedor::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  right: 22%;
+  width: 4px;
+  border-radius: 2px;
+  background: rgb(222 226 230 / 0.85);
+  box-shadow: 26px 0 0 rgb(222 226 230 / 0.85);
+}
+
+.puerta-contenedor::after {
+  content: '';
+  position: absolute;
+  top: 52%;
+  right: calc(22% - 5px);
+  width: 14px;
+  height: 22px;
+  border-radius: 3px;
+  background: rgb(190 196 202 / 0.9);
+  box-shadow: 26px 0 0 rgb(190 196 202 / 0.9);
+}
+
+.boton-entrar {
+  background-color: rgb(var(--area));
+}
+
+.tarjeta-simulador:hover {
+  box-shadow: 0 1px 0 rgb(var(--tinta) / 0.06), 0 18px 32px -16px rgb(var(--tinta) / 0.45);
+}

@@ -1,0 +1,1009 @@
+{
+  "version": 1,
+  "unidades": "metros",
+  "ejes": "glTF (Y arriba, -Z adelante en Unity)",
+  "proyectos": {
+    "puerto": "Terminal portuaria",
+    "autoelevador": "Juego del montacargas",
+    "atlas": "Atlas XR",
+    "robot": "Brazo robótico (RA)"
+  },
+  "activos": [
+    {
+      "id": "puerto-sts",
+      "proyecto": "puerto",
+      "nodo_raiz": "STS_Crane",
+      "nombre": "Grúa pórtico de muelle (STS)",
+      "categoria": "Puerto",
+      "descripcion": "Grúa de muelle de 28 m de trocha y 60 m de alcance: pluma abatible, carro, spreader telescópico de 20'/40' con twistlocks.",
+      "origen": "logistica3d · kit portuario de Blender (tools/blender/kit_portuario)",
+      "archivos": {
+        "glb": "proyectos/puerto/puerto-sts.glb"
+      },
+      "bytes": {
+        "glb": 1128808
+      },
+      "medidas_m": [
+        28.5,
+        74.6587,
+        114.1
+      ],
+      "triangulos": 5352,
+      "masa_kg": null,
+      "piezas": [
+        {
+          "nodo": "Boom_Hinge",
+          "nombre": "Pluma abatible",
+          "material": "Acero pintado",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            9.7487,
+            -23.1316
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Forestays",
+          "nombre": "Tirantes de la pluma",
+          "material": "Cable de acero",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            22.2458,
+            -11.6291
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Trolley",
+          "nombre": "Carro",
+          "material": "Acero pintado",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            7.958,
+            23.8072
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Spreader",
+          "nombre": "Spreader telescópico",
+          "material": "Acero pintado",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            13.692,
+            0.0
+          ],
+          "padre": "Trolley"
+        }
+      ],
+      "encajes": []
+    },
+    {
+      "id": "puerto-rtg",
+      "proyecto": "puerto",
+      "nodo_raiz": "RTG_Crane",
+      "nombre": "Grúa de patio sobre neumáticos (RTG)",
+      "categoria": "Puerto",
+      "descripcion": "Grúa de patio de 23,5 m de trocha para 6 filas y 5 niveles, con bogies que giran 90° para cambiar de bloque.",
+      "origen": "logistica3d · kit portuario de Blender (tools/blender/kit_portuario)",
+      "archivos": {
+        "glb": "proyectos/puerto/puerto-rtg.glb"
+      },
+      "bytes": {
+        "glb": 892520
+      },
+      "medidas_m": [
+        12.594,
+        23.25,
+        27.39
+      ],
+      "triangulos": 2050,
+      "masa_kg": null,
+      "piezas": [
+        {
+          "nodo": "Trolley.001",
+          "nombre": "Carro",
+          "material": "Acero pintado",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            5.1686,
+            3.0977
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Bogie_FL",
+          "nombre": "Bogie delantero izquierdo",
+          "material": "Acero y caucho",
+          "masa_kg": null,
+          "explotar": [
+            1.4513,
+            0.0,
+            -5.8484
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Bogie_FR",
+          "nombre": "Bogie delantero derecho",
+          "material": "Acero y caucho",
+          "masa_kg": null,
+          "explotar": [
+            1.7453,
+            0.0,
+            5.7675
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Bogie_RL",
+          "nombre": "Bogie trasero izquierdo",
+          "material": "Acero y caucho",
+          "masa_kg": null,
+          "explotar": [
+            -1.4513,
+            0.0,
+            -5.8484
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Bogie_RR",
+          "nombre": "Bogie trasero derecho",
+          "material": "Acero y caucho",
+          "masa_kg": null,
+          "explotar": [
+            -1.7453,
+            0.0,
+            5.7675
+          ],
+          "padre": null
+        }
+      ],
+      "encajes": []
+    },
+    {
+      "id": "puerto-buque",
+      "proyecto": "puerto",
+      "nodo_raiz": "Ship_Panamax",
+      "nombre": "Buque portacontenedores Panamax",
+      "categoria": "Puerto",
+      "descripcion": "Buque de 262 × 32,2 m (calado 11,5 m) con superestructura a popa, timón y hélice.",
+      "origen": "logistica3d · kit portuario de Blender (tools/blender/kit_portuario)",
+      "archivos": {
+        "glb": "proyectos/puerto/puerto-buque.glb"
+      },
+      "bytes": {
+        "glb": 1012444
+      },
+      "medidas_m": [
+        269.3037,
+        64.8,
+        33.2
+      ],
+      "triangulos": 5489,
+      "masa_kg": null,
+      "piezas": [
+        {
+          "nodo": "Rudder.001",
+          "nombre": "Timón",
+          "material": "Acero",
+          "masa_kg": null,
+          "explotar": [
+            -59.2468,
+            0.0,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Propeller.001",
+          "nombre": "Hélice",
+          "material": "Bronce",
+          "masa_kg": null,
+          "explotar": [
+            -59.2468,
+            0.0,
+            -0.0633
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Funnel_Band.001",
+          "nombre": "Franja de la chimenea",
+          "material": "Pintura",
+          "masa_kg": null,
+          "explotar": [
+            -57.8432,
+            12.8198,
+            0.0
+          ],
+          "padre": null
+        }
+      ],
+      "encajes": []
+    },
+    {
+      "id": "puerto-contenedor-40",
+      "proyecto": "puerto",
+      "nodo_raiz": "Container_40",
+      "nombre": "Contenedor ISO de 40'",
+      "categoria": "Puerto",
+      "descripcion": "Contenedor 42G1 (12,19 × 2,44 × 2,59 m) con chapa corrugada y esquineros ISO 1161 para apilar.",
+      "origen": "logistica3d · kit portuario de Blender (tools/blender/kit_portuario)",
+      "archivos": {
+        "glb": "proyectos/puerto/puerto-contenedor-40.glb"
+      },
+      "bytes": {
+        "glb": 519364
+      },
+      "medidas_m": [
+        12.208,
+        2.599,
+        2.454
+      ],
+      "triangulos": 108,
+      "masa_kg": null,
+      "piezas": [],
+      "encajes": [
+        {
+          "nodo": "Socket_40_T1",
+          "acepta": "contenedor_40",
+          "tolerancia_m": 0.025,
+          "posicion": [
+            -6.007,
+            2.532,
+            1.138
+          ]
+        },
+        {
+          "nodo": "Socket_40_T2",
+          "acepta": "contenedor_40",
+          "tolerancia_m": 0.025,
+          "posicion": [
+            -6.007,
+            2.532,
+            -1.138
+          ]
+        },
+        {
+          "nodo": "Socket_40_T3",
+          "acepta": "contenedor_40",
+          "tolerancia_m": 0.025,
+          "posicion": [
+            6.007,
+            2.532,
+            1.138
+          ]
+        },
+        {
+          "nodo": "Socket_40_T4",
+          "acepta": "contenedor_40",
+          "tolerancia_m": 0.025,
+          "posicion": [
+            6.007,
+            2.532,
+            -1.138
+          ]
+        }
+      ]
+    },
+    {
+      "id": "puerto-tractor-patio",
+      "proyecto": "puerto",
+      "nodo_raiz": "Yard_Tractor",
+      "nombre": "Tractor de terminal",
+      "categoria": "Puerto",
+      "descripcion": "Tractor de patio que lleva los contenedores entre el muelle y los bloques, con quinta rueda.",
+      "origen": "logistica3d · kit portuario de Blender (tools/blender/kit_portuario)",
+      "archivos": {
+        "glb": "proyectos/puerto/puerto-tractor-patio.glb"
+      },
+      "bytes": {
+        "glb": 775180
+      },
+      "medidas_m": [
+        5.41,
+        3.21,
+        2.9842
+      ],
+      "triangulos": 688,
+      "masa_kg": null,
+      "piezas": [
+        {
+          "nodo": "Steer_FL.001",
+          "nombre": "Rueda delantera izquierda",
+          "material": "Caucho",
+          "masa_kg": null,
+          "explotar": [
+            0.9294,
+            0.0,
+            -0.7435
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Steer_FR.001",
+          "nombre": "Rueda delantera derecha",
+          "material": "Caucho",
+          "masa_kg": null,
+          "explotar": [
+            0.9294,
+            0.0,
+            0.7435
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Wheel_RL",
+          "nombre": "Rueda trasera izquierda",
+          "material": "Caucho",
+          "masa_kg": null,
+          "explotar": [
+            -1.0552,
+            0.0,
+            -0.5505
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Wheel_RR",
+          "nombre": "Rueda trasera derecha",
+          "material": "Caucho",
+          "masa_kg": null,
+          "explotar": [
+            -1.0552,
+            0.0,
+            0.5505
+          ],
+          "padre": null
+        }
+      ],
+      "encajes": []
+    },
+    {
+      "id": "juego-autoelevador",
+      "proyecto": "autoelevador",
+      "nodo_raiz": "Forklift_Root",
+      "nombre": "Autoelevador del juego",
+      "categoria": "Equipos de manipulación",
+      "descripcion": "El montacargas del juego en VR: mástil de dos etapas, carro con horquillas, palancas de elevación, inclinación y desplazamiento lateral, pedales y volante.",
+      "origen": "quest-xr-pilotos · autoelevador/modelo",
+      "archivos": {
+        "glb": "proyectos/autoelevador/juego-autoelevador.glb"
+      },
+      "bytes": {
+        "glb": 2048572
+      },
+      "medidas_m": [
+        1.5946,
+        2.31,
+        3.882
+      ],
+      "triangulos": 18718,
+      "masa_kg": null,
+      "piezas": [
+        {
+          "nodo": "Mast_Outer_Stage",
+          "nombre": "Mástil exterior",
+          "material": "Acero",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            0.0055,
+            0.854
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Mast_Inner_Stage",
+          "nombre": "Mástil interior",
+          "material": "Acero",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            0.4658,
+            0.0
+          ],
+          "padre": "Mast_Outer_Stage"
+        },
+        {
+          "nodo": "Fork_Carriage",
+          "nombre": "Carro portahorquillas",
+          "material": "Acero",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            0.4658,
+            0.0
+          ],
+          "padre": "Mast_Inner_Stage"
+        },
+        {
+          "nodo": "Fork_Left",
+          "nombre": "Horquilla izquierda",
+          "material": "Acero forjado",
+          "masa_kg": null,
+          "explotar": [
+            0.4194,
+            0.0,
+            0.2028
+          ],
+          "padre": "Fork_Carriage"
+        },
+        {
+          "nodo": "Fork_Right",
+          "nombre": "Horquilla derecha",
+          "material": "Acero forjado",
+          "masa_kg": null,
+          "explotar": [
+            -0.4194,
+            0.0,
+            0.2028
+          ],
+          "padre": "Fork_Carriage"
+        },
+        {
+          "nodo": "Steering_Wheel",
+          "nombre": "Volante",
+          "material": "Plástico",
+          "masa_kg": null,
+          "explotar": [
+            0.1986,
+            0.5829,
+            -0.5917
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Rear_Axle",
+          "nombre": "Eje trasero direccional",
+          "material": "Acero",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            0.0,
+            -0.854
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Wheel_Front_Left",
+          "nombre": "Rueda delantera izquierda",
+          "material": "Caucho",
+          "masa_kg": null,
+          "explotar": [
+            0.8176,
+            0.0,
+            0.2469
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Wheel_Front_Right",
+          "nombre": "Rueda delantera derecha",
+          "material": "Caucho",
+          "masa_kg": null,
+          "explotar": [
+            -0.8176,
+            0.0,
+            0.2469
+          ],
+          "padre": null
+        }
+      ],
+      "encajes": []
+    },
+    {
+      "id": "juego-deposito",
+      "proyecto": "autoelevador",
+      "nodo_raiz": "Warehouse_Root",
+      "nombre": "Depósito del juego",
+      "categoria": "Almacenamiento",
+      "descripcion": "La nave del juego: racks de 4 calles con 24 posiciones, 12 pallets con carga, conos y 3 zonas de entrega.",
+      "origen": "quest-xr-pilotos · autoelevador/modelo",
+      "archivos": {
+        "glb": "proyectos/autoelevador/juego-deposito.glb"
+      },
+      "bytes": {
+        "glb": 2609468
+      },
+      "medidas_m": [
+        28.0,
+        8.0,
+        20.0
+      ],
+      "triangulos": 9486,
+      "masa_kg": null,
+      "piezas": [
+        {
+          "nodo": "Racks",
+          "nombre": "Racks",
+          "material": "Acero pintado",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            0.0,
+            -6.16
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Pallet_01",
+          "nombre": "Pallet 1 con carga",
+          "material": "Madera",
+          "masa_kg": null,
+          "explotar": [
+            -5.9767,
+            0.0,
+            -1.4917
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Pallet_02",
+          "nombre": "Pallet 2 con carga",
+          "material": "Madera",
+          "masa_kg": null,
+          "explotar": [
+            -5.5099,
+            0.0,
+            -2.7544
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Pallet_03",
+          "nombre": "Pallet 3 con carga",
+          "material": "Madera",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            0.0,
+            -6.16
+          ],
+          "padre": null
+        }
+      ],
+      "encajes": [
+        {
+          "nodo": "DropZone_A",
+          "acepta": "pallet",
+          "tolerancia_m": 0.25,
+          "posicion": [
+            5.2,
+            0.0,
+            6.6
+          ]
+        },
+        {
+          "nodo": "DropZone_B",
+          "acepta": "pallet",
+          "tolerancia_m": 0.25,
+          "posicion": [
+            8.2,
+            0.0,
+            6.6
+          ]
+        },
+        {
+          "nodo": "DropZone_C",
+          "acepta": "pallet",
+          "tolerancia_m": 0.25,
+          "posicion": [
+            11.2,
+            0.0,
+            6.6
+          ]
+        },
+        {
+          "nodo": "RackSlot_A1_bajo",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            -4.805,
+            0.0,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_A2_medio",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            -4.805,
+            1.512,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_A3_alto",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            -4.805,
+            3.012,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_A4_bajo",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            -3.565,
+            0.0,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_A5_medio",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            -3.565,
+            1.512,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_A6_alto",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            -3.565,
+            3.012,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_B1_bajo",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            -2.015,
+            0.0,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_B2_medio",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            -2.015,
+            1.512,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_B3_alto",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            -2.015,
+            3.012,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_B4_bajo",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            -0.775,
+            0.0,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_B5_medio",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            -0.775,
+            1.512,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_B6_alto",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            -0.775,
+            3.012,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_C1_bajo",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            0.775,
+            0.0,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_C2_medio",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            0.775,
+            1.512,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_C3_alto",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            0.775,
+            3.012,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_C4_bajo",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            2.015,
+            0.0,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_C5_medio",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            2.015,
+            1.512,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_C6_alto",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            2.015,
+            3.012,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_D1_bajo",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            3.565,
+            0.0,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_D2_medio",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            3.565,
+            1.512,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_D3_alto",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            3.565,
+            3.012,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_D4_bajo",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            4.805,
+            0.0,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_D5_medio",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            4.805,
+            1.512,
+            -8.45
+          ]
+        },
+        {
+          "nodo": "RackSlot_D6_alto",
+          "acepta": "pallet",
+          "tolerancia_m": 0.1,
+          "posicion": [
+            4.805,
+            3.012,
+            -8.45
+          ]
+        }
+      ]
+    },
+    {
+      "id": "atlas-xr",
+      "proyecto": "atlas",
+      "nodo_raiz": "Atlas_Base",
+      "nombre": "Atlas XR: globo logístico",
+      "categoria": "Geografía logística",
+      "descripcion": "Globo terráqueo con 39 puertos y pasos estratégicos y las principales rutas marítimas, sobre su base.",
+      "origen": "quest-xr-pilotos · atlas-xr/modelo",
+      "archivos": {
+        "glb": "proyectos/atlas/atlas-xr.glb",
+        "usdz": "proyectos/atlas/atlas-xr.usdz"
+      },
+      "bytes": {
+        "glb": 1327468,
+        "usdz": 5696155
+      },
+      "medidas_m": [
+        0.5919,
+        0.612,
+        0.4634
+      ],
+      "triangulos": 9760,
+      "masa_kg": null,
+      "piezas": [
+        {
+          "nodo": "Globe_Sphere",
+          "nombre": "Globo",
+          "material": "Mapa pintado",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            0.1346,
+            0.0
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Logistics_Nodes_Group",
+          "nombre": "Puertos y pasos",
+          "material": "Marcadores",
+          "masa_kg": null,
+          "explotar": [
+            0.0734,
+            0.0,
+            0.0
+          ],
+          "padre": "Globe_Sphere"
+        },
+        {
+          "nodo": "Logistics_Routes",
+          "nombre": "Rutas marítimas",
+          "material": "Líneas",
+          "masa_kg": null,
+          "explotar": [
+            0.0717,
+            0.0158,
+            -0.0027
+          ],
+          "padre": "Globe_Sphere"
+        }
+      ],
+      "encajes": []
+    },
+    {
+      "id": "robot-6-ejes",
+      "proyecto": "robot",
+      "nodo_raiz": "Base_Mesh",
+      "nombre": "Brazo robótico de 6 ejes",
+      "categoria": "Automatización",
+      "descripcion": "Robot industrial articulado de la RA de mesa: base, hombro, brazo, codo y muñeca de 3 ejes.",
+      "origen": "quest-xr-pilotos · robot-6-ejes/modelo",
+      "archivos": {
+        "glb": "proyectos/robot/robot-6-ejes.glb",
+        "usdz": "proyectos/robot/robot-6-ejes.usdz"
+      },
+      "bytes": {
+        "glb": 964756,
+        "usdz": 6430032
+      },
+      "medidas_m": [
+        0.3768,
+        1.088,
+        0.296
+      ],
+      "triangulos": 8122,
+      "masa_kg": null,
+      "piezas": [
+        {
+          "nodo": "Shoulder_Joint",
+          "nombre": "Hombro (eje 1-2)",
+          "material": "Aluminio fundido",
+          "masa_kg": null,
+          "explotar": [
+            0.2148,
+            0.1048,
+            -0.0131
+          ],
+          "padre": null
+        },
+        {
+          "nodo": "Upper_Arm",
+          "nombre": "Brazo",
+          "material": "Aluminio fundido",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            0.1306,
+            0.0
+          ],
+          "padre": "Shoulder_Joint"
+        },
+        {
+          "nodo": "Elbow_Joint",
+          "nombre": "Codo (eje 3)",
+          "material": "Aluminio fundido",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            0.1306,
+            0.0
+          ],
+          "padre": "Upper_Arm"
+        },
+        {
+          "nodo": "Wrist_1",
+          "nombre": "Muñeca (eje 4)",
+          "material": "Aluminio",
+          "masa_kg": null,
+          "explotar": [
+            0.0046,
+            0.1238,
+            -0.0411
+          ],
+          "padre": "Elbow_Joint"
+        },
+        {
+          "nodo": "Wrist_2",
+          "nombre": "Muñeca (eje 5)",
+          "material": "Aluminio",
+          "masa_kg": null,
+          "explotar": [
+            0.0,
+            0.1306,
+            0.0
+          ],
+          "padre": "Wrist_1"
+        },
+        {
+          "nodo": "Wrist_3",
+          "nombre": "Brida de herramienta (eje 6)",
+          "material": "Acero",
+          "masa_kg": null,
+          "explotar": [
+            -0.0168,
+            0.0,
+            -0.1295
+          ],
+          "padre": "Wrist_2"
+        }
+      ],
+      "encajes": []
+    }
+  ]
+}
