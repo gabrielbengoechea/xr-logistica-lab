@@ -10,7 +10,7 @@ Laboratorio de realidad mixta para enseñar logística e ingeniería. Tiene tres
 
 | Carpeta | Qué es | Tecnología |
 |---|---|---|
-| `/models` | Activos 3D: montacargas, pallet, rack, sensor, motor y CubeSat, con piezas para la vista explotada y encajes, más `manifest.json` | Blender 5.2 (bpy): `.blend`, `.fbx` y `.glb` |
+| `/models` | Activos 3D: montacargas, pallet, rack, sensor, motor y CubeSat, con piezas para la vista explotada y encajes, más `manifest.json`; en `proyectos/`, los modelos del puerto, el juego del montacargas, Atlas XR y el brazo robótico | Blender 5.2 (bpy): `.blend`, `.fbx` y `.glb` |
 | `/backend` | API REST y WebSocket: inventario, telemetría de sesiones VR, manifest de modelos | Python 3.11+, FastAPI, Pydantic v2, SQLite |
 | `/web-dashboard` | Visor 3D de los modelos y panel del docente con métricas en vivo | React 18, TypeScript, Vite, Tailwind CSS, three.js y React Three Fiber |
 | `/vr-client` | App de realidad mixta: passthrough, manos, vista explotada, encajes y telemetría | Unity 6 (6000.0 LTS), C#, OpenXR, XR Interaction Toolkit 3, XR Hands, Meta OpenXR |
@@ -29,7 +29,8 @@ Quest (Unity) ──HTTP POST /api/v1/telemetry/session──▶ FastAPI ──W
 ```bash
 # Modelos (bpy 5.2 de pip o Blender 5.2)
 python3 models/tools/generar_modelos.py
-python3 models/tools/verificar_manifest.py
+python3 models/tools/verificar_manifest.py     # revisa los dos manifests
+python3 models/tools/importar_proyectos.py --quest ../quest-xr-pilotos --kit DIR   # trae los modelos de los otros proyectos
 
 # Backend
 cd backend && python3 -m pip install -r requirements-dev.txt
@@ -73,6 +74,7 @@ Unity -batchmode -quit -projectPath vr-client -executeMethod XRLab.Editor.BuildS
 - **Contrato de datos:** el backend es la fuente de verdad (`backend/app/schemas.py`). Si cambia un campo, se actualizan en el mismo PR `web-dashboard/src/api/types.ts` y `vr-client/Assets/Scripts/Telemetry/TelemetryModels.cs`.
 - **Modelos 3D:**
   - se generan solo con `generar_modelos.py`; nada a mano en `glb/`, `fbx/` ni `blend/`;
+  - los de `proyectos/` se copian solo con `importar_proyectos.py`;
   - metros y Y arriba en glTF;
   - piezas `Part_*` y encajes `Snap_*` (ver `models/README.md`).
 - **Git:**
@@ -88,5 +90,6 @@ Unity -batchmode -quit -projectPath vr-client -executeMethod XRLab.Editor.BuildS
 | Backend FastAPI: inventario, telemetría, manifest, WebSocket y pruebas | PR `feature/backend-init` |
 | Scripts Unity: vista explotada, encajes, telemetría y build batch | PR `feature/vr-scripts` |
 | Tablero web: visor 3D y panel docente | PR `feature/web-dashboard` |
+| Modelos de los otros proyectos en el catálogo y el visor (colecciones) | PR `feature/modelos-proyectos` |
 | Escenas Unity, prefabs y configuración XR del proyecto | Se arman en el editor de Unity a partir de los scripts (ver `vr-client/README.md`) |
 | Autenticación de docentes y despliegue en la nube | Pendiente |
