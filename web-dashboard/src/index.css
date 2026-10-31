@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Tokens del tablero (canales RGB para que Tailwind pueda aplicar opacidad).
+  Paleta de datos: serie = azul del método de visualización (validado contra estas superficies);
+  bien / alerta / crítico = paleta de estado, siempre con texto o ícono al lado (nunca solo color).
+*/
+:root {
+  color-scheme: light;
+  --plano: 249 249 247;
+  --superficie: 252 252 251;
+  --elevada: 255 255 255;
+  --borde: 225 224 217;
+  --rejilla: 225 224 217;
+  --tinta: 11 11 11;
+  --tenue: 82 81 78;
+  --apagada: 112 110 105;
+  --acento: 28 92 171;
+  --acento-tinta: 255 255 255;
+  --serie: 42 120 214;
+  --bien: 12 163 12;
+  --alerta: 250 178 25;
+  --critico: 208 59 59;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    color-scheme: dark;
+    --plano: 13 13 13;
+    --superficie: 26 26 25;
+    --elevada: 36 36 34;
+    --borde: 56 56 53;
+    --rejilla: 44 44 42;
+    --tinta: 240 239 236;
+    --tenue: 195 194 183;
+    --apagada: 150 148 141;
+    --acento: 57 135 229;
+    --acento-tinta: 255 255 255;
+    --serie: 57 135 229;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --plano: 13 13 13;
+  --superficie: 26 26 25;
+  --elevada: 36 36 34;
+  --borde: 56 56 53;
+  --rejilla: 44 44 42;
+  --tinta: 240 239 236;
+  --tenue: 195 194 183;
+  --apagada: 150 148 141;
+  --acento: 57 135 229;
+  --acento-tinta: 255 255 255;
+  --serie: 57 135 229;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-plano font-sans text-tinta antialiased;
+  font-feature-settings: 'tnum' 1;
+}
+
+:focus-visible {
+  @apply outline outline-2 outline-offset-2 outline-acento;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
