@@ -1,6 +1,8 @@
 # Tablero web (React · TypeScript · Tailwind · React Three Fiber)
 
-El tablero del docente y el visor 3D de los modelos del laboratorio.
+La portada de los estudiantes, el tablero del docente y el visor 3D de los modelos del laboratorio.
+
+**Portada de estudiantes** (`/`, sin `#`). Muestra los 8 simuladores WebXR del equipo agrupados en tres secciones: recorrer un lugar, practicar una tarea y explorar sobre la mesa. Cada tarjeta es la puerta de un contenedor con el color de su área y el modelo adelante, y abre el simulador publicado en GitHub Pages. El filtro «¿Con qué vas a entrar?» deja solo los que andan en el visor Quest, la compu o el celular. «Soy docente» lleva al tablero (`#panel`). La lista está en `src/estudiante/simuladores.ts`. Las imágenes de `public/simuladores/` son renders de los `.glb` del repositorio con fondo transparente; la del motor sale de la escena de `quest-xr-pilotos/motor-jet`.
 
 | Sección | Qué muestra | De dónde salen los datos |
 |---|---|---|
@@ -43,7 +45,7 @@ En ese caso, agregar el origen del tablero a `XRLAB_CORS_ORIGINS` en el backend.
 
 ## Diseño
 
-Tipografía IBM Plex, empaquetada en la app: funciona sin internet en el aula. Hay modo claro y oscuro, que siguen al sistema o se eligen arriba a la derecha.
+El tablero usa IBM Plex; la portada usa Barlow Condensed para los títulos (letra de cartel industrial) y Atkinson Hyperlegible para leer. Toda la tipografía va empaquetada en la app y funciona sin internet en el aula. Hay modo claro y oscuro, que siguen al sistema o se eligen arriba a la derecha.
 
 Los gráficos son barras de una sola serie, con la paleta validada de visualización. El valor va rotulado y hay tooltip al pasar el mouse o con el foco. Los mismos datos están en tabla.
 

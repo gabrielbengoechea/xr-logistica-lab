@@ -23,9 +23,12 @@ export default {
         bien: v('bien'),
         alerta: v('alerta'),
         critico: v('critico'),
+        niebla: v('niebla'),
       },
       fontFamily: {
         sans: ['"IBM Plex Sans"', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        rotulo: ['"Barlow Condensed"', '"Arial Narrow"', 'sans-serif'],
+        lectura: ['"Atkinson Hyperlegible"', 'system-ui', 'sans-serif'],
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
     },

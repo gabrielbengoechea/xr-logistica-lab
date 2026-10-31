@@ -20,8 +20,19 @@ describe('App', () => {
   })
   afterEach(() => vi.unstubAllGlobals())
 
-  it('arranca en el panel docente y cambia de sección con las pestañas', async () => {
+  it('sin hash abre la portada de estudiantes y «Soy docente» lleva al tablero', async () => {
     const user = userEvent.setup()
+    window.location.hash = ''
+    render(<App />)
+    expect(screen.getByRole('heading', { name: 'Elegí a qué simulador entrar' })).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Soy docente' }))
+    expect(await screen.findByText('Todavía no hay sesiones')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Panel docente' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('arranca en el panel docente con #panel y cambia de sección con las pestañas', async () => {
+    const user = userEvent.setup()
+    window.location.hash = '#panel'
     render(<App />)
     expect(await screen.findByText('Todavía no hay sesiones')).toBeInTheDocument()
     await user.click(screen.getByRole('tab', { name: 'Inventario' }))
@@ -51,7 +62,7 @@ describe('App: el panel sigue escuchando', () => {
 
   it('lo que llega mientras se mira el inventario aparece al volver al panel', async () => {
     const user = userEvent.setup()
-    window.location.hash = ''
+    window.location.hash = '#panel'
     render(<App />)
     await screen.findByText('Todavía no hay sesiones')
     await user.click(screen.getByRole('tab', { name: 'Inventario' }))
