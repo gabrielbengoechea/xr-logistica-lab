@@ -1,0 +1,1 @@
+{"items":[{"id":"cs-1u","model_id":"cubesat","name":"CubeSat 1U de práctica","category":"Satélites","sku":"SAT-CS-1U-EDU","quantity":2,"status":"available","location":{"zone":"Laboratorio espacial","position":[14.0,1.0,3.0],"rotation_y_deg":0.0}}],"total":1,"zones":["A-Racks","Laboratorio espacial","Muelle de carga","Pañol","Taller"]}
