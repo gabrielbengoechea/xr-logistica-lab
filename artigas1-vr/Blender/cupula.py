@@ -28,7 +28,7 @@ PANEL = 1           # cara lateral sin ventana: panel de equipos (estribor)
 EARTH_R = 1000.0    # radio de la Tierra en Unity (escala angular real a 400 km: altura 63 m)
 EARTH_ALT = EARTH_R * 400 / 6371
 NADIR = (-35.2, -55.9)  # justo al sureste de Montevideo: costa, Rio de la Plata y Punta del Este a la vista
-DET = (-45.0, -25.0, -66.0, -46.0)   # parche de detalle (lat0, lat1, lon0, lon1)
+RADIO_DETALLE = 5.5    # grados alrededor del nadir que cubre la textura de detalle (igual que tierra.py)
 
 SIGNS = [
     ("CÚPULA FARO · OBSERVACIÓN", (0, 56, 148), (255, 255, 255)),
@@ -309,72 +309,54 @@ def esfera_agua(mat, col):
     return p.finish("SM_Esfera_Agua", mat, col, smooth_angle=80)
 
 
-def tierra(col):
-    bm = bmesh.new()
-    bm.loops.layers.uv.new("UVMap")
-    bmesh.ops.create_uvsphere(bm, u_segments=96, v_segments=48, radius=EARTH_R, calc_uvs=True)
-    me = bpy.data.meshes.new("SM_Tierra")
-    bm.to_mesh(me)
-    bm.free()
-    for poly in me.polygons:
-        poly.use_smooth = True
-    m = img_material("M_Tierra", os.path.join(TEX, "T_Tierra_4K.png"), emis=0.0, rough=0.8)
-    me.materials.append(m)
-    ob = bpy.data.objects.new("SM_Tierra", me)
-    col.objects.link(ob)
-    return ob
-
-
-def geo_dir(lat, lon):
-    """Direccion en el espacio local de la esfera UV de Blender (lon 0 en +X, +90 en +Y)."""
-    la, lo = math.radians(lat), math.radians(lon)
-    return Vector((math.cos(la) * math.cos(lo), math.cos(la) * math.sin(lo), math.sin(la)))
-
-
-def tierra_matrix():
-    """Rotacion que pone NADIR arriba (+Z, hacia la estacion) y el norte hacia +Y."""
-    q = geo_dir(*NADIR).rotation_difference(Vector((0, 0, 1)))
-    n2 = q @ geo_dir(NADIR[0] + 2, NADIR[1])
-    rz = Matrix.Rotation(math.atan2(n2.x, n2.y), 4, "Z")
-    return rz @ q.to_matrix().to_4x4()
-
-
-def tierra_detalle(col, n=56):
-    """Casquete esferico 0,2 m por encima de la Tierra con la textura de 1 km/px."""
-    lat0, lat1, lon0, lon1 = DET
-    me = bpy.data.meshes.new("SM_Tierra_Detalle")
-    verts, faces = [], []
-    for i in range(n + 1):
-        for j in range(n + 1):
-            lat = lat0 + (lat1 - lat0) * i / n
-            lon = lon0 + (lon1 - lon0) * j / n
-            verts.append(tuple(geo_dir(lat, lon) * (EARTH_R + 0.2)))
-    for i in range(n):
-        for j in range(n):
-            a = i * (n + 1) + j
-            faces.append((a, a + 1, a + n + 2, a + n + 1))
-    me.from_pydata(verts, [], faces)
+def casquete(nombre, radio_grados, altura, anillos, gajos, textura, col):
+    """Casquete de la Tierra centrado en el nadir (+Z), con el norte hacia +Y y el este hacia +X.
+    Las UV son la proyeccion azimutal de Lambert de tierra.py: la textura calza sin deformarse."""
+    rmax = 2 * math.sin(math.radians(radio_grados) / 2)
+    R = EARTH_R + altura
+    verts, uvs, caras = [(0.0, 0.0, R)], [(0.5, 0.5)], []
+    for i in range(1, anillos + 1):
+        c = math.radians(radio_grados) * i / anillos
+        k = math.sqrt(2 / (1 + math.cos(c)))
+        for j in range(gajos):
+            a = 2 * math.pi * j / gajos
+            d = (math.sin(c) * math.cos(a), math.sin(c) * math.sin(a), math.cos(c))
+            verts.append((d[0] * R, d[1] * R, d[2] * R))
+            uvs.append((0.5 + k * d[0] / (2 * rmax), 0.5 + k * d[1] / (2 * rmax)))
+    for j in range(gajos):
+        caras.append((0, 1 + j, 1 + (j + 1) % gajos))
+    for i in range(1, anillos):
+        a0, a1 = 1 + (i - 1) * gajos, 1 + i * gajos
+        for j in range(gajos):
+            k2 = (j + 1) % gajos
+            caras.append((a0 + j, a1 + j, a1 + k2, a0 + k2))
+    me = bpy.data.meshes.new("SM_" + nombre)
+    me.from_pydata(verts, [], caras)
     uvl = me.uv_layers.new(name="UVMap")
     for poly in me.polygons:
         poly.use_smooth = True
         for li, vi in zip(poly.loop_indices, poly.vertices):
-            i, j = divmod(vi, n + 1)
-            uvl.data[li].uv = (j / n, i / n)
-    for poly in me.polygons:
-        if Vector(poly.normal).dot(Vector(poly.center)) < 0:
-            poly.flip()
+            uvl.data[li].uv = uvs[vi]
     me.update()
-    m = img_material("M_Tierra_Detalle", os.path.join(TEX, "T_Tierra_Detalle_Uruguay.png"), rough=0.8)
-    nt = m.node_tree
-    bsdf = next(nd for nd in nt.nodes if nd.type == "BSDF_PRINCIPLED")
-    tex = next(nd for nd in nt.nodes if nd.type == "TEX_IMAGE")
-    tex.extension = "EXTEND"
-    nt.links.new(tex.outputs["Alpha"], bsdf.inputs["Alpha"])
-    m.surface_render_method = "BLENDED"
+    m = img_material("M_" + nombre, os.path.join(TEX, textura), emis=0.0, rough=0.8)
+    for nd in m.node_tree.nodes:
+        if nd.type == "TEX_IMAGE":
+            nd.extension = "EXTEND"
     me.materials.append(m)
-    ob = bpy.data.objects.new("SM_Tierra_Detalle", me)
+    ob = bpy.data.objects.new("SM_" + nombre, me)
     col.objects.link(ob)
     return ob
+
+
+def tierra(col):
+    """Para Unity: casquete de 24 grados con la textura base. El recorrido web no usa esta malla
+    (calcula la esfera en el shader, ver js/entorno.js)."""
+    return casquete("Tierra", 24.0, 0.0, 64, 128, "T_Tierra_Base_Dia.png", col)
+
+
+def tierra_detalle(col):
+    """Casquete de detalle (Uruguay y el Rio de la Plata, 0,6 km/px), 0,5 m por encima del base."""
+    return casquete("Tierra_Detalle", RADIO_DETALLE, 0.5, 32, 96, "T_Tierra_Detalle_Dia.png", col)
 
 
 # ---------------------------------------------------------------- armado
@@ -450,7 +432,7 @@ def build(mat, P):
                                              (xax2.z, yax2.z, zax2.z, pos.z), (0, 0, 0, 1))))
     # la Tierra (en otra coleccion: no va en el FBX del modulo)
     tierra_col = collection("Layout_Tierra")
-    M = Matrix.Translation((0, 0, ZB - EARTH_ALT - EARTH_R)) @ tierra_matrix()
+    M = Matrix.Translation((0, 0, ZB - EARTH_ALT - EARTH_R))     # el casquete ya nace con el nadir hacia +Z
     te = bpy.data.objects.new("Tierra", ea.data)
     te.matrix_world = M
     tierra_col.objects.link(te)

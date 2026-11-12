@@ -91,6 +91,7 @@ namespace Artigas1.Editor
                 ("M_Artigas_Pantallas_Nodo", "T_Artigas_Nodo"),
                 ("M_Artigas_Pantallas_Cupula", "T_Artigas_Cupula"),
                 ("M_Artigas_Pantallas_Tacuarembo", "T_Artigas_Tacuarembo"),
+                ("M_Artigas_Pantallas_Sistemas", "T_Artigas_Sistemas"),
             })
             {
                 Material m = Mat(mat, unlit);
@@ -101,13 +102,16 @@ namespace Artigas1.Editor
             vidrio.SetColor("_BaseColor", new Color(0.7f, 0.85f, 0.95f, 0.10f));
             vidrio.SetFloat("_Smoothness", 0.95f);
             Transparente(vidrio);
+            // La Tierra son dos casquetes (base y detalle del Río de la Plata) con el terreno de día y las luces
+            // urbanas como emisión. El día y la noche los da la luz direccional del sol de la escena.
             Material tierra = Mat("M_Tierra", simple);
-            tierra.SetTexture("_BaseMap", Tex("T_Tierra_4K"));
+            tierra.SetTexture("_BaseMap", Tex("T_Tierra_Base_Dia"));
             tierra.SetColor("_BaseColor", Color.white);
+            Emision(tierra, Tex("T_Tierra_Base_Luces"), 1.2f);
             Material detalle = Mat("M_Tierra_Detalle", simple);
-            detalle.SetTexture("_BaseMap", Tex("T_Tierra_Detalle_Uruguay"));
+            detalle.SetTexture("_BaseMap", Tex("T_Tierra_Detalle_Dia"));
             detalle.SetColor("_BaseColor", Color.white);
-            Transparente(detalle);
+            Emision(detalle, Tex("T_Tierra_Detalle_Luces"), 1.2f);
 
             AssetDatabase.SaveAssets();
             // reimporta los modelos para que el importador use los materiales nuevos
@@ -303,6 +307,9 @@ namespace Artigas1.Editor
             new GameObject("Mundo 0G").AddComponent<ZeroGWorld>();
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.50f, 0.52f, 0.56f);
+
+            // ---- ambientación: equipamiento fijo y objetos sueltos del módulo (coordenadas de la estación)
+            Ambientar("Ambientacion/Ambientacion_Rivera");
 
             // ---- módulo
             var layout = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>($"{ArtigasImportador.Modelos}Layout/Layout_Modulo_Rivera.fbx"));
@@ -570,6 +577,36 @@ namespace Artigas1.Editor
                 BoxCollider bc = mf.gameObject.AddComponent<BoxCollider>();
                 bc.center = mf.sharedMesh.bounds.center;
                 bc.size = mf.sharedMesh.bounds.size;
+            }
+        }
+
+        /// <summary>
+        /// Instancia la ambientación de un módulo. Lo fijo queda estático (las bolsas y redes, con caja de colisión)
+        /// y cada objeto suelto recibe <see cref="ObjetoFlotante"/>.
+        /// </summary>
+        private static void Ambientar(string modelo)
+        {
+            var fbx = AssetDatabase.LoadAssetAtPath<GameObject>($"{ArtigasImportador.Modelos}{modelo}.fbx");
+            if (fbx == null)
+            {
+                Debug.LogWarning($"[Artigas1] No está el modelo {modelo}.fbx: la escena queda sin ambientación.");
+                return;
+            }
+            var raiz = (GameObject)PrefabUtility.InstantiatePrefab(fbx);
+            raiz.name = "Ambientacion";
+            PrefabUtility.UnpackPrefabInstance(raiz, PrefabUnpackMode.OutermostRoot, InteractionMode.AutomatedAction);
+            foreach (Transform hijo in raiz.transform.Cast<Transform>().ToList())
+            {
+                if (hijo.name.Contains("_Flot_"))
+                {
+                    hijo.gameObject.AddComponent<ObjetoFlotante>();
+                    continue;
+                }
+                if (hijo.name.Contains("_Bulto_") && hijo.GetComponent<MeshFilter>() != null)
+                {
+                    hijo.gameObject.AddComponent<BoxCollider>();
+                }
+                Estatico(hijo.gameObject);
             }
         }
 

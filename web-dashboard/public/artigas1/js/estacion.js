@@ -2,7 +2,8 @@
 //  - Visual: fusiona las mallas estáticas por módulo y material (de cientos de objetos a unas pocas
 //    llamadas de dibujo, conservando el descarte por módulo fuera de cámara).
 //  - Colisión: mallas para la estructura, cajas para la carga y el equipamiento; nada para carteles.
-//  - Interacción: barandas (segmentos), escotillas (puertas corredizas) y bolsas (para las etiquetas).
+//  - Interacción: barandas (segmentos), escotillas (puertas corredizas), bolsas (para las etiquetas) y
+//    objetos sueltos (mallas propias, para js/flotantes.js).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SistemaColisiones } from './colisiones.js';
@@ -12,7 +13,8 @@ const ES_PUERTA = /^[A-Z]_Escotilla_/;
 const PUERTA_FIJA = /Acople2/;                            // puerto de acople sin módulo: queda cerrado
 const ES_BARANDA = /Baranda/;
 const ES_CARGA = /^(R_Demo|C_Carga)_/;
-const SIN_COLISION = /Cartel|Placa_|Etiqueta|Pantalla|Marca_|Esfera_Reloj|Correas_|Aguja|Tablet|Esfera_Agua/;
+const ES_FLOTANTE = /_Flot_/;                             // objetos sueltos: los anima js/flotantes.js
+const SIN_COLISION = /_Det_|Cartel|Placa_|Etiqueta|Pantalla|Marca_|Esfera_Reloj|Correas_|Aguja|Tablet|Esfera_Agua/;
 const CON_MALLA = /Casco|Rack|Bahia|Anillo|Banco|Red_Cuarentena|Portal|Vidrios/;  // el resto: caja
 const RECORRIDO_PUERTA = 1.25;                            // m que corre la escotilla hacia su alojamiento
 const _v = new THREE.Vector3();
@@ -76,7 +78,8 @@ class Escotilla {
  * @param {object} gltf                     Resultado de GLTFLoader.
  * @param {(material: THREE.Material, uso: string) => THREE.Material} materialPara
  * @returns {{grupo: THREE.Group, colisiones: SistemaColisiones, barandas: Barandas, escotillas: Escotilla[],
- *            cargas: {nombre: string, matriz: THREE.Matrix4, grande: boolean}[], resumen: object}}
+ *            cargas: {nombre: string, matriz: THREE.Matrix4, grande: boolean}[], flotantes: THREE.Mesh[],
+ *            resumen: object}}
  */
 export function armarEstacion(gltf, materialPara) {
   gltf.scene.updateMatrixWorld(true);
@@ -86,6 +89,8 @@ export function armarEstacion(gltf, materialPara) {
   const barandas = new Barandas();
   const escotillas = [];
   const cargas = [];
+  const flotantes = [];
+  const centrados = new Map();      // geometría original -> { geometria centrada, centro, radio }
   const lotes = new Map();           // "modulo|material" -> { material, geometrias }
   const mallas = [];
   gltf.scene.traverse((o) => { if (o.isMesh) mallas.push(o); });
@@ -99,6 +104,27 @@ export function armarEstacion(gltf, materialPara) {
       puerta.updateMatrixWorld(true);
       grupo.add(puerta);
       escotillas.push(new Escotilla(puerta));
+      continue;
+    }
+    if (ES_FLOTANTE.test(nombre)) {
+      // objeto suelto: malla propia con el origen en su centro (gira sobre sí mismo) y sin colisión estática
+      let c = centrados.get(o.geometry);
+      if (!c) {
+        const g = o.geometry.clone();
+        g.computeBoundingBox();
+        const centro = g.boundingBox.getCenter(new THREE.Vector3());
+        g.translate(-centro.x, -centro.y, -centro.z);
+        g.computeBoundingSphere();
+        c = { geometria: g, centro, radio: THREE.MathUtils.clamp(g.boundingSphere.radius * 0.72, 0.03, 0.22) };
+        centrados.set(o.geometry, c);
+      }
+      const suelto = new THREE.Mesh(c.geometria, materialPara(o.material, 'general'));
+      suelto.name = nombre;
+      o.matrixWorld.decompose(suelto.position, suelto.quaternion, suelto.scale);
+      suelto.position.copy(c.centro).applyMatrix4(o.matrixWorld);
+      suelto.userData.radio = c.radio;
+      grupo.add(suelto);
+      flotantes.push(suelto);
       continue;
     }
     // --- colisión
@@ -145,7 +171,7 @@ export function armarEstacion(gltf, materialPara) {
 
   colisiones.construir();
   return {
-    grupo, colisiones, barandas, escotillas, cargas,
-    resumen: { objetosOriginales: mallas.length, lotes: lotes.size, triangulosColision: colisiones.cantidad, barandas: barandas.segmentos.length, escotillas: escotillas.length },
+    grupo, colisiones, barandas, escotillas, cargas, flotantes,
+    resumen: { flotantes: flotantes.length, objetosOriginales: mallas.length, lotes: lotes.size, triangulosColision: colisiones.cantidad, barandas: barandas.segmentos.length, escotillas: escotillas.length },
   };
 }

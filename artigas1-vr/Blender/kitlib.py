@@ -53,6 +53,7 @@ PALETTE = {
     "polimero":   ((0.30, 0.34, 0.38), 0.0, 0.58, None),   # contenedores: polimero tecnico reforzado
     "rack":       ((0.60, 0.62, 0.64), 0.80, 0.48, None),  # racks: metal gris industrial
     "vinilo_am":  ((0.98, 0.78, 0.00), 0.0, 0.50, None),   # amarillo de seguridad
+    "cable_gris": ((0.42, 0.43, 0.45), 0.0, 0.60, None),   # vaina de cable gris
 }
 NAMES = list(PALETTE)
 PID = {n: i for i, n in enumerate(NAMES)}
@@ -171,7 +172,8 @@ class Part:
         """Arco de tubo (asas, ganchos). Angulos en grados, en el plano dado."""
         tmp = bmesh.new()
         rings = []
-        for i in range(seg + 1):
+        completo = abs(a1 - a0) >= 359.9             # anillo cerrado: sin tapas, el ultimo tramo vuelve al primero
+        for i in range(seg if completo else seg + 1):
             a = math.radians(a0 + (a1 - a0) * i / seg)
             c = Vector((R * math.cos(a), 0, R * math.sin(a)))
             radial = Vector((math.cos(a), 0, math.sin(a)))
@@ -182,11 +184,13 @@ class Part:
                 ring.append(tmp.verts.new(c + radial * (r * math.cos(b)) + side * (r * math.sin(b))))
             rings.append(ring)
         for i in range(seg):
+            sig = rings[(i + 1) % len(rings)]
             for j in range(rseg):
                 k = (j + 1) % rseg
-                tmp.faces.new((rings[i][j], rings[i][k], rings[i + 1][k], rings[i + 1][j]))
-        for ring, flip in ((rings[0], True), (rings[-1], False)):
-            f = tmp.faces.new(ring)
+                tmp.faces.new((rings[i][j], rings[i][k], sig[k], sig[j]))
+        if not completo:
+            for ring in (rings[0], rings[-1]):
+                tmp.faces.new(ring)
         bmesh.ops.recalc_face_normals(tmp, faces=tmp.faces)
         if plane == "yz":
             bmesh.ops.transform(tmp, matrix=Matrix.Rotation(math.pi / 2, 4, "Z"), verts=tmp.verts)

@@ -123,8 +123,9 @@ export function crearVidrio(sol) {
  * Prepara los materiales del GLB. Devuelve una función que elige el material final de cada malla.
  * @param {THREE.Texture} entorno
  * @param {THREE.Vector3} sol Dirección hacia el sol (mundo).
+ * @param {THREE.Color} colorSol Color de la luz del sol que entra a la Cúpula.
  */
-export function crearBiblioteca(renderer, entorno, sol) {
+export function crearBiblioteca(renderer, entorno, sol, colorSol = new THREE.Color(1, 0.95, 0.85)) {
   const cache = new Map();
   const vidrio = crearVidrio(sol);
   const anisotropia = Math.min(4, renderer.capabilities.getMaxAnisotropy());
@@ -144,7 +145,7 @@ export function crearBiblioteca(renderer, entorno, sol) {
       original.envMap = entorno;
       original.envMapIntensity = 0.9;
       if (uso === 'estructura') m = conDetalle(original, { juntas: 1 });
-      else if (uso === 'cupula') m = conDetalle(original, { sol });
+      else if (uso === 'cupula') m = conDetalle(original, { sol, colorSol });
       else m = original;
       m.name = `${nombre}_${uso}`;
     } else {

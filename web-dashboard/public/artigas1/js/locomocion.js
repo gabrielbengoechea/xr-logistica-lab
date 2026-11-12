@@ -104,6 +104,12 @@ export class Locomocion0G {
     let agarres = 0;
     _delta.set(0, 0, 0);
     for (const m of manos) {
+      if (m.sostiene) {                // la mano lleva un objeto: no se agarra de la estación
+        m.cerca = null;
+        m.agarre = null;
+        m._yaCerrada = m.cerrada;
+        continue;
+      }
       const dB = this.barandas.masCercana(m.posicion, p.alcanceBaranda, _punto);
       const dA = dB === Infinity ? this.estructura.puntoMasCercano(m.posicion, p.alcanceApoyo, _punto) : Infinity;
       m.cerca = dB !== Infinity ? 'baranda' : dA !== Infinity ? 'apoyo' : null;
