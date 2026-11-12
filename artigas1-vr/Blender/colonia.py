@@ -310,12 +310,12 @@ def bahia_estiba(mat, col):
     p.box((0, D - 0.01, GH), (W, 0.02, H), "gris")
     xs = [-W / 2 + T / 2 + k * (cw + T) for k in range(5)]
     for x in xs:
-        p.box((x, (D - 0.02) / 2, GH), (T, D - 0.02, H), "panel", skip=("+y",))
+        p.box((x, (D - 0.02) / 2, GH), (T, D - 0.02, H), "rack", skip=("+y",))
     zs = [T / 2 + k * (ch + T) for k in range(4)]
     for z in zs:
         for k in range(4):
             xc = -W / 2 + T + cw / 2 + k * (cw + T)
-            p.box((xc, (D - 0.02) / 2, z), (cw, D - 0.02, T), "panel", skip=("+x", "-x", "+y"))
+            p.box((xc, (D - 0.02) / 2, z), (cw, D - 0.02, T), "rack", skip=("+x", "-x", "+y"))
     ob = p.finish("SM_Carguero_Bahia", mat, col, weld=False)
     for c in range(4):
         xc = -W / 2 + T + cw / 2 + c * (cw + T)

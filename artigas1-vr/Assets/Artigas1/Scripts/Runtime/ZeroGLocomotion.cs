@@ -28,6 +28,8 @@ namespace Artigas1
         [SerializeField] private float radioCuerpo = 0.25f;
         [SerializeField] private float piel = 0.02f;
         [SerializeField] private LayerMask capasChoque = ~0;
+        [Tooltip("Esfera (trigger) en la cabeza. Con ella se corrige la penetración cuando el jugador mete la cabeza en una pared moviéndose de verdad. La agrega el menú Artigas-1 al armar la escena.")]
+        [SerializeField] private SphereCollider cuerpo;
 
         [Header("Viñeta")]
         [Tooltip("Suavizado de la aceleración que maneja la viñeta (s).")]
@@ -35,6 +37,7 @@ namespace Artigas1
 
         private readonly List<Agarre> _agarres = new List<Agarre>(2);
         private readonly RaycastHit[] _hits = new RaycastHit[16];
+        private readonly Collider[] _solapes = new Collider[16];
         private VelocityBuffer _buffer = new VelocityBuffer(8);
         private ComfortProfile _perfil;
         private Vector3 _velocidad;
@@ -195,10 +198,50 @@ namespace Artigas1
                 }
             }
 
+            Depenetrar(_agarres.Count == 0);
+
             float a = (_velocidad - _velocidadAnterior).magnitude / dt;
             float k = suavizadoAceleracion > 0f ? 1f - Mathf.Exp(-dt / suavizadoAceleracion) : 1f;
             _aceleracion = Mathf.Lerp(_aceleracion, a, k);
             _velocidadAnterior = _velocidad;
+        }
+
+        /// <summary>
+        /// Corrige la penetración de la cabeza contra la geometría estática. El barrido de <see cref="Mover"/> evita
+        /// atravesar paredes al flotar; esto cubre el caso en que el jugador se inclina o camina de verdad hacia una
+        /// pared: el cuerpo entero se corre hacia atrás, así la cabeza nunca queda del otro lado.
+        /// </summary>
+        private void Depenetrar(bool flotando)
+        {
+            if (cuerpo == null)
+            {
+                return;
+            }
+            Transform t = cuerpo.transform;
+            Vector3 centro = t.TransformPoint(cuerpo.center);
+            int n = Physics.OverlapSphereNonAlloc(centro, cuerpo.radius, _solapes, capasChoque, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+            {
+                Collider otro = _solapes[i];
+                if (otro == null || otro == cuerpo || otro.transform.IsChildOf(rig))
+                {
+                    continue;
+                }
+                if (otro.attachedRigidbody != null && !otro.attachedRigidbody.isKinematic)
+                {
+                    continue; // carga suelta: la empuja la física, no frena al cuerpo
+                }
+                if (!Physics.ComputePenetration(cuerpo, t.position, t.rotation, otro, otro.transform.position, otro.transform.rotation,
+                        out Vector3 direccion, out float distancia))
+                {
+                    continue;
+                }
+                rig.position += direccion * distancia;
+                if (flotando)
+                {
+                    _velocidad = ZeroGMath.Collide(_velocidad, direccion, Perfil.rebote);
+                }
+            }
         }
 
         /// <summary>Mueve el rig hasta donde lo deje la geometría. Devuelve el desplazamiento real.</summary>

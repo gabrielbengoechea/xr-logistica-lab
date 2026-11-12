@@ -78,6 +78,7 @@ namespace Artigas1.Editor
                 ("M_Artigas_Senaletica_Nodo", "T_Artigas_Nodo"),
                 ("M_Artigas_Senaletica_Cupula", "T_Artigas_Cupula"),
                 ("M_Artigas_Senaletica_Tacuarembo", "T_Artigas_Tacuarembo"),
+                ("M_Artigas_Identidad", "T_Artigas_Identidad"),
             })
             {
                 Material m = Mat(mat, simple);
@@ -472,6 +473,14 @@ namespace Artigas1.Editor
             var sl = new SerializedObject(loco);
             sl.FindProperty("rig").objectReferenceValue = rig.transform;
             sl.FindProperty("cabeza").objectReferenceValue = cam != null ? cam.transform : null;
+            if (cam != null)
+            {
+                // esfera del cuerpo en la cabeza: trigger, solo para corregir la penetración (ZeroGLocomotion.Depenetrar)
+                SphereCollider esfera = cam.gameObject.AddComponent<SphereCollider>();
+                esfera.isTrigger = true;
+                esfera.radius = 0.2f;
+                sl.FindProperty("cuerpo").objectReferenceValue = esfera;
+            }
             sl.ApplyModifiedPropertiesWithoutUndo();
             ConfortVineta vin = rig.AddComponent<ConfortVineta>();
             var sv = new SerializedObject(vin);
