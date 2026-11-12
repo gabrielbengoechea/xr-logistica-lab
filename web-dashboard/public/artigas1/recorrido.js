@@ -10,6 +10,7 @@
 //   js/materiales.js   materiales PBR, reflejos, vidrio
 //   js/entorno.js      Tierra, atmósfera, sol y estrellas
 //   js/etiquetas.js    etiquetas logísticas de la carga
+//   js/flotantes.js    objetos sueltos en microgravedad
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
@@ -17,8 +18,9 @@ import { armarEstacion } from './js/estacion.js';
 import { Locomocion0G } from './js/locomocion.js';
 import { Manos } from './js/manos.js';
 import { crearBiblioteca, crearEntorno } from './js/materiales.js';
-import { crearEntornoOrbital, SOL } from './js/entorno.js';
+import { cargarTexturasTierra, crearEntornoOrbital, COLOR_SOL, SOL } from './js/entorno.js';
 import { crearEtiquetas } from './js/etiquetas.js';
+import { SistemaFlotantes } from './js/flotantes.js';
 
 const MODULOS = [
   { id: 'tacuarembo', nombre: 'Tacuarembó · taller', pos: [0.2, 0.1, 6.3], mira: [0.4, -0.1, -1] },
@@ -55,7 +57,7 @@ scene.add(rig);
 scene.add(new THREE.HemisphereLight(0xf2f6ff, 0x59606b, 1.9));
 const entorno = crearEntorno(renderer);
 scene.environment = entorno;
-const materialPara = crearBiblioteca(renderer, entorno, SOL);
+const materialPara = crearBiblioteca(renderer, entorno, SOL, COLOR_SOL);
 
 // ---- carga
 const pct = document.getElementById('pct');
@@ -69,26 +71,36 @@ const manos = new Manos(renderer, rig);
 let loco = null;
 let estacion = null;
 let orbital = null;
+/** @type {SistemaFlotantes | null} */
+let flotantes = null;
+// ejes de paso que los objetos sueltos dejan libres: el de la estación y el túnel de la Cúpula
+const PASILLOS = [
+  { a: new THREE.Vector3(0, 0, -11.4), b: new THREE.Vector3(0, 0, 6.7) },
+  { a: new THREE.Vector3(0, 0, 2.11), b: new THREE.Vector3(0, -2.5, 2.11) },
+];
 const sistemasActivos = [];
 
 function* colisionadores() {
   for (let i = 0; i < sistemasActivos.length; i++) if (sistemasActivos[i].activo) yield sistemasActivos[i];
 }
 
-Promise.all([loader.loadAsync('./estacion.glb'), loader.loadAsync('./tierra.glb')]).then(([gEstacion, gTierra]) => {
+const anisotropia = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, anisotropia)]).then(([gEstacion, texTierra]) => {
   estacion = armarEstacion(gEstacion, materialPara);
   scene.add(estacion.grupo);
   const etiquetas = crearEtiquetas(estacion.cargas, renderer);
   if (etiquetas.malla) scene.add(etiquetas.malla);
-  orbital = crearEntornoOrbital(gTierra);
+  orbital = crearEntornoOrbital(texTierra);
   scene.add(orbital.grupo);
 
   sistemasActivos.push(estacion.colisiones, ...estacion.escotillas.map((e) => e.colision));
   loco = new Locomocion0G({ rig, cabeza: camera, colisionadores, estructura: estacion.colisiones, barandas: estacion.barandas });
+  flotantes = new SistemaFlotantes({ colisionadores, pasillos: PASILLOS });
+  for (const malla of estacion.flotantes) flotantes.agregar(malla, malla.userData.radio);
   ir(INICIO, true);
   document.getElementById('cargando').remove();
   // para las pruebas automáticas y para depurar desde la consola
-  window.artigas1 = { THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, ir, manosDePrueba };
+  window.artigas1 = { THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, flotantes, ir, manosDePrueba };
 }).catch((e) => {
   pct.textContent = `error al cargar: ${e.message}`;
   console.error(e);
@@ -236,6 +248,10 @@ function entradaTeclado() {
 const manosDePrueba = [];
 
 // ---- bucle
+const cuerpo = [
+  { centro: new THREE.Vector3(), radio: 0.2 },   // cabeza
+  { centro: new THREE.Vector3(), radio: 0.2 },   // torso
+];
 const reloj = new THREE.Clock();
 function cuadro() {
   const dt = Math.min(reloj.getDelta(), 0.05);
@@ -246,7 +262,12 @@ function cuadro() {
     empuje.clampLength(0, 1.8);
     manos.leer();
     const todas = manosDePrueba.length ? manos.lista.concat(manosDePrueba) : manos.lista;
+    flotantes.gestionarManos(dt, todas, estacion.barandas, loco.p.alcanceBaranda);
     loco.actualizar(dt, todas, empuje, frenando);
+    camera.getWorldPosition(cabeza);
+    cuerpo[0].centro.copy(cabeza);
+    cuerpo[1].centro.copy(cabeza).y -= loco.p.alturaTorso;
+    flotantes.actualizar(dt, cabeza, cuerpo, loco.velocidad, todas);
     manos.mostrar();
     if (loco.ultimoChoque > 0.35) manos.vibrarTodas(Math.min(1, loco.ultimoChoque / 2), 30);
     camera.getWorldPosition(cabeza);

@@ -28,6 +28,13 @@ U(objects=["SM_Modulo_Tacuarembo_Casco","SM_Rack_Soporte_Vital","SM_Filtro_CO2",
 U(objects=[o.name for o in bpy.data.collections["Modulo_Tacuarembo"].objects if o.name.startswith(("SM_CartelT","SM_Pantalla","SM_Etiqueta_TAC"))], out=f"{E}/Unity/Modulo_Tacuarembo/SM_Senaletica_Tacuarembo.fbx")
 U(collection="Layout_Tacuarembo", out=f"{E}/Unity/Layout/Layout_Modulo_Tacuarembo.fbx")
 U(collection="Identidad", out=f"{E}/Unity/Identidad/SM_Placas_Identidad.fbx")
+# Ambientacion: un FBX por modulo (equipamiento fijo, bultos, pantallas y objetos sueltos), en coordenadas de la estacion
+est = bpy.data.collections["Layout_Estacion"].objects
+for letra, nombre in (("T", "Tacuarembo"), ("N", "Nodo"), ("R", "Rivera"), ("C", "Colonia_y_Carguero"), ("F", "Cupula")):
+    objs = [o.name for o in est if o.name.startswith((f"{letra}_Det_", f"{letra}_Bulto_", f"{letra}_Pantalla_Sistemas", f"{letra}_Flot_"))]
+    if objs:
+        U(objects=objs, out=f"{E}/Unity/Ambientacion/Ambientacion_{nombre}.fbx")
+U(collection="Flotantes", batch=True, out=f"{E}/Unity/Ambientacion/Flotantes/x.fbx")
 U(collection="Layout_Rivera", out=f"{E}/Unity/Layout/Layout_Modulo_Rivera.fbx")
 U(objects=[o.name for o in bpy.data.collections["Layout_Colonia"].objects]+[o.name for o in bpy.data.collections["Carga_Carguero"].objects], out=f"{E}/Unity/Layout/Layout_Colonia_y_Carguero.fbx")
 U(collection="Layout_Estacion", out=f"{E}/Unity/Layout/Layout_Estacion_Completa.fbx")

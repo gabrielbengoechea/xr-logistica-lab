@@ -5,7 +5,7 @@ SALIDA = _os.environ.get("ARTIGAS1_SALIDA", _os.path.join(_os.path.dirname(_os.p
 sys.path.insert(0, __import__("os").path.dirname(__import__("os").path.abspath(__file__)))
 import bpy
 from mathutils import Matrix, Vector
-import kitlib, props, modulo, colonia, nodo, cupula, tacuarembo, identidad
+import kitlib, props, modulo, colonia, nodo, cupula, tacuarembo, identidad, ambientacion
 kitlib.new_scene()
 mat = kitlib.palette_material(kitlib.write_palette_textures())
 obs = props.build(mat)
@@ -91,7 +91,9 @@ placas = identidad.build()
 n_placas = identidad.colocar(placas, link, est_col, TT, N, Matrix(), C, C @ Matrix.Translation((0, col["gy"], 0)), CU,
                              {"T": (0, tacuarembo.TL), "N": (0, nodo.NL), "R": (modulo.Y0, modulo.Y1), "C": (colonia.CY0, colonia.CY1), "G": (0, colonia.GY1)})
 print("placas de identidad:", n_placas)
+print("ambientacion (objetos, triangulos, pantallas por modulo):", ambientacion.build(mat, link, est_col))
 bpy.data.collections["Identidad"].hide_render = True
+bpy.data.collections["Flotantes"].hide_render = True
 for c in ("Props", "Modulo_Rivera", "Modulo_Colonia", "Carguero_Charrua", "Nodo_Montevideo", "Cupula_Faro", "Layout_Tierra", "Modulo_Tacuarembo"):
     bpy.data.collections[c].hide_render = True
 x = 0

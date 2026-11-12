@@ -33,7 +33,7 @@ export class Manos {
       const visual = mallaMano();
       agarre.add(visual);
       rig.add(agarre);
-      const mano = { indice: i, lado: 'none', objeto: agarre, visual, posicion: new THREE.Vector3(), cerrada: false, agarre: null, cerca: null, nuevoAgarre: false, conectada: false, fuente: null };
+      const mano = { indice: i, lado: 'none', objeto: agarre, visual, posicion: new THREE.Vector3(), cerrada: false, agarre: null, cerca: null, sostiene: null, cercaObjeto: false, nuevoAgarre: false, conectada: false, fuente: null };
       agarre.addEventListener('connected', (e) => {
         mano.lado = e.data.handedness;
         mano.fuente = e.data;
@@ -44,7 +44,7 @@ export class Manos {
       agarre.addEventListener('disconnected', () => {
         mano.conectada = false;
         mano.agarre = null;
-        mano.cerrada = false;
+        mano.cerrada = false;   // al quedar abierta, el sistema de flotantes suelta lo que tuviera
         this._rearmar();
       });
       this._porIndice.push(mano);
@@ -68,8 +68,9 @@ export class Manos {
   mostrar() {
     for (const m of this.lista) {
       const mat = m.visual.userData.material;
-      mat.color.copy(m.agarre ? COLOR_AGARRE : m.cerca ? COLOR_CERCA : COLOR_LIBRE);
-      mat.opacity = m.agarre ? 0.85 : 0.45;
+      const tomado = m.agarre || m.sostiene;
+      mat.color.copy(tomado ? COLOR_AGARRE : m.cerca || m.cercaObjeto ? COLOR_CERCA : COLOR_LIBRE);
+      mat.opacity = tomado ? 0.85 : 0.45;
       m.visual.userData.dedos.rotation.x = m.cerrada ? 1.1 : 0;
       m.visual.userData.dedos.position.y = m.cerrada ? -0.04 : -0.012;
       if (m.nuevoAgarre) {

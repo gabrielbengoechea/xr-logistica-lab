@@ -63,3 +63,4 @@ artigas1-vr/*.apk
 artigas1-vr/Tools/**/bin/
 artigas1-vr/Tools/**/obj/
 artigas1-vr/Blender/salida/
+artigas1-vr/Blender/geo/

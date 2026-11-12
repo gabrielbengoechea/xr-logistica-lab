@@ -1,6 +1,7 @@
 """Pruebas de física del recorrido web de Artigas-1 en un navegador sin interfaz (Playwright + Chrome).
 
-Corren sobre la estación real: paredes, racks, escotillas, inercia, barandas y 300 lanzamientos al azar.
+Corren sobre la estación real: paredes, racks, escotillas, inercia, barandas, 300 lanzamientos al azar,
+los objetos flotantes (deriva, choques, agarre y empuje) y el entorno orbital.
 
     cd web-dashboard/public && python3 -m http.server 8765 &
     pip install playwright && python3 artigas1-vr/Tools/pruebas-web/fisica.py
@@ -121,6 +122,60 @@ JS = r"""
   }
   ok(`fuzz: ${lanz} lanzamientos sin salir de la estación`, fugas === 0, fugas);
   ok('sin penetraciones persistentes', peorPen < 0.002, +peorPen.toFixed(5));
+  // 17. Objetos sueltos: un minuto de deriva en toda la estación
+  const F = A.flotantes, P = F.p;
+  const lejos = P.distanciaActiva; P.distanciaActiva = 1e3;       // para la prueba se calculan todos
+  cerrarPuertas();
+  const sistemas = () => [col, ...A.estacion.escotillas.map((e) => e.colision)].filter((x) => x.activo);
+  const inicio = F.objetos.map((f) => f.posicion.clone());
+  const giro0 = F.objetos.map((f) => f.malla.quaternion.clone());
+  let vMaxF = 0, fueraF = 0;
+  const tF = performance.now();
+  for (let i = 0; i < 60 * 72; i++) {
+    F.actualizar(1 / 72, cero, [], cero, []);
+    if (i % 72 === 0) for (const f of F.objetos) { vMaxF = Math.max(vMaxF, f.velocidad.length()); if (!adentro(f.posicion)) fueraF++; }
+  }
+  const msF = (performance.now() - tF) / (60 * 72);
+  const corrido2 = F.objetos.map((f, i) => f.posicion.distanceTo(inicio[i]));
+  ok(`flotantes: los ${F.objetos.length} siguen dentro de la estación`, fueraF === 0, fueraF);
+  ok('flotantes: deriva lenta (menos de 6 cm/s)', vMaxF < 0.06, +vMaxF.toFixed(4));
+  ok('flotantes: se mueven y giran', Math.min(...corrido2) > 0.002 && F.objetos.every((f, i) => f.malla.quaternion.angleTo(giro0[i]) > 0.02), +Math.min(...corrido2).toFixed(4));
+  ok('flotantes: no se alejan de su zona', Math.max(...corrido2) < 1.2, +Math.max(...corrido2).toFixed(3));
+  let peorF = 0; const cF = new T.Vector3();
+  for (const f of F.objetos) { cF.copy(f.posicion); for (const sis of sistemas()) sis.resolverEsfera(cF, f.radio); peorF = Math.max(peorF, cF.distanceTo(f.posicion)); }
+  ok('flotantes: ninguno queda metido en una pared', peorF < 0.002, +peorF.toFixed(5));
+  const enPasillo = F.objetos.filter((f) => Math.abs(f.posicion.y) < 1.3 && Math.hypot(f.posicion.x, f.posicion.y) < 0.3).length;
+  ok('flotantes: el eje de paso queda libre', enPasillo === 0, enPasillo);
+  // 18. Lanzar un objeto contra una pared de Colonia
+  const fl = F.objetos.find((f) => /C_Flot_Paquete/.test(f.malla.name));
+  fl.posicion.set(0.3, 0.72, -7.95); fl.velocidad.set(2.4, 0.0, 0.1); fl.libre = true;   // tramo de pared sin equipos
+  let xMaxF = -9; for (let i = 0; i < 3 * 72; i++) { F.actualizar(1 / 72, cero, [], cero, []); xMaxF = Math.max(xMaxF, fl.posicion.x); }
+  ok('flotantes: un objeto lanzado rebota en la pared', xMaxF <= 1.2 - fl.radio + 0.01 && xMaxF > 0.9, +xMaxF.toFixed(3));
+  // 19. Tomar con la mano, llevar y soltar
+  fl.posicion.set(0.3, 0.3, -6.5); fl.velocidad.set(0, 0, 0);
+  const mF = { posicion: fl.posicion.clone().add(new T.Vector3(0, 0, fl.radio + 0.05)), cerrada: false, agarre: null };
+  F.gestionarManos(1 / 72, [mF], A.estacion.barandas); mF.cerrada = true; F.gestionarManos(1 / 72, [mF], A.estacion.barandas);
+  ok('flotantes: la mano toma el objeto', mF.sostiene === fl, !!mF.sostiene);
+  paso(1 / 72, [mF]);
+  ok('flotantes: con un objeto en la mano no se agarra de la estación', !mF.agarre, !!mF.agarre);
+  for (let i = 0; i < 15; i++) { mF.posicion.y += 0.01; F.gestionarManos(1 / 72, [mF], A.estacion.barandas); F.actualizar(1 / 72, cero, [], cero, [mF]); }
+  mF.cerrada = false; F.gestionarManos(1 / 72, [mF], A.estacion.barandas);
+  ok('flotantes: al soltar sale con la velocidad de la mano', Math.abs(fl.velocidad.y - 0.72) < 0.1, +fl.velocidad.y.toFixed(3));
+  // 20. El cuerpo empuja los objetos
+  fl.posicion.set(0.0, 0.3, -6.0); fl.velocidad.set(0, 0, 0);
+  L.teletransportar(new T.Vector3(0, 0.3, -5.2)); L.velocidad.set(0, 0, -1);
+  const esf = [{ centro: new T.Vector3(), radio: r }];
+  for (let i = 0; i < 72; i++) { paso(1 / 72); esf[0].centro.copy(cabeza()); F.actualizar(1 / 72, cabeza(), esf, L.velocidad, []); }
+  ok('flotantes: el astronauta los empuja al pasar', fl.velocidad.z < -0.3 && fl.posicion.distanceTo(cabeza()) >= r + fl.radio - 1e-4, +fl.velocidad.z.toFixed(3));
+  P.distanciaActiva = lejos;
+  R.push({ nombre: `costo de los ${F.objetos.length} flotantes por cuadro, todos activos (ms, en esta PC sin GPU)`, pasa: true, dato: +msF.toFixed(4) });
+  // 21. Entorno orbital
+  const O = A.orbital, u = O.tierra.material.uniforms;
+  ok('Tierra: una sola malla y cuatro texturas cargadas', O.tierra.isMesh && [u.uBaseDia, u.uBaseNoche, u.uDetDia, u.uDetNoche].every((x) => x.value && x.value.image && x.value.image.width >= 1024), O.tierra.geometry.index.count / 3);
+  const d0 = O.deriva(); for (let i = 0; i < 72 * 60; i++) O.actualizar(1 / 72);
+  ok('Tierra: deriva lenta y acotada', O.deriva() - d0 > 0.25 && O.deriva() - d0 < 0.35, +(O.deriva() - d0).toFixed(3));
+  for (let i = 0; i < 4000; i++) O.actualizar(1);
+  ok('Tierra: la deriva se detiene a los 6°', Math.abs(O.deriva() - 6) < 1e-6, +O.deriva().toFixed(3));
   // 16. Costo de la física
   L.teletransportar(new T.Vector3(0.9, 0.3, -1.5)); L.velocidad.set(0.5, 0.3, 0.2);
   const t0 = performance.now(); for (let i = 0; i < 2000; i++) paso(1 / 72); 

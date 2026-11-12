@@ -32,6 +32,7 @@ Blender/               scripts que generan el kit 3D (ver Blender/README.md)
 | Archivo | Qué hace |
 |---|---|
 | `ZeroGWorld` | Gravedad cero y paso de física de 1/72 s |
+| `ObjetoFlotante` | Objeto suelto: arranca con deriva y giro lentos y lo mueve la física de Unity sin gravedad. Lo agrega el paso 3 del menú a los `*_Flot_*` de `Modelos/Ambientacion` |
 | `ZeroGLocomotion` | Corrige la penetración de la cabeza contra las paredes. «Mano sobre mano»: con la mano en una baranda el cuerpo se mueve al revés que la mano; al soltar hereda la velocidad promedio (con tope) y flota con amortiguación; se frena contra las paredes. Modos Confort y Realista (sección 1.1 del plan) |
 | `Agarradera` | Baranda tomable con el botón de agarre (grip); las dos manos pueden tomar la misma |
 | `ConfortVineta` | Viñeta que cierra la periferia solo cuando hay aceleración, a través del `TunnelingVignetteController` de XRI |
@@ -116,10 +117,11 @@ La estación completa se recorre en el navegador (compu o Quest, con WebXR) desd
 | `locomocion.js` | Gravedad cero con cuerpo sólido: inercia, empuje, freno, rebote amortiguado y agarre |
 | `barandas.js`, `manos.js` | Barandas como capa de interacción; controles y manos en VR |
 | `materiales.js` | Reflejos de entorno, juntas de panel, vidrio con Fresnel, sol en la Cúpula |
-| `entorno.js` | Tierra con día y noche, atmósfera, sol y estrellas |
+| `entorno.js` | Tierra al atardecer calculada por píxel (esfera exacta), geografía real, luces de Buenos Aires y Montevideo, atmósfera, sol y estrellas |
+| `flotantes.js` | Objetos sueltos en microgravedad: deriva, rebote, empuje y agarre con las manos |
 | `etiquetas.js` | Etiquetas logísticas de cada bolsa, en una sola llamada de dibujo |
 
-Pruebas: `cd web-dashboard && npm test` (10 de física) y `python3 artigas1-vr/Tools/pruebas-web/fisica.py` (26, sobre la estación real en Chrome). Qué se hizo, qué se midió y qué falta probar en el visor: [`INFORME-refactorizacion.md`](INFORME-refactorizacion.md).
+Pruebas: `cd web-dashboard && npm test` (18 de física y flotantes) y `python3 artigas1-vr/Tools/pruebas-web/fisica.py` (41, sobre la estación real en Chrome). Qué se hizo, qué se midió y qué falta probar en el visor: [`INFORME-refactorizacion.md`](INFORME-refactorizacion.md) (colisiones, cúpula, materiales) e [`INFORME-ambientacion.md`](INFORME-ambientacion.md) (Tierra al atardecer, interiores y objetos flotantes).
 
 ## Lo que sigue (fase 2)
 

@@ -1,4 +1,5 @@
-"""Exporta los GLB del recorrido web (web-dashboard/public/artigas1): la estacion armada y la Tierra.
+"""Exporta lo que usa el recorrido web (web-dashboard/public/artigas1): la estacion armada (GLB) y las
+texturas de la Tierra (WebP).
 Requiere haber corrido run_all2.py. ARTIGAS1_SKILLS apunta a la carpeta "blender" de blender-agent-skills."""
 import os
 import sys
@@ -19,12 +20,12 @@ for c in bpy.data.collections:
 est = [o.name for o in bpy.data.collections["Layout_Estacion"].objects]
 r1 = ex.run(preset="gltf", objects=est, out=f"{O}/estacion.glb", no_anim=True,
             set=["export_image_format=WEBP", "export_image_quality=88"])
-img = bpy.data.images.load(SALIDA + "/textures/T_Tierra_2K.png")     # para la web alcanza la Tierra de 2K
-for n in bpy.data.materials["M_Tierra"].node_tree.nodes:
-    if n.type == "TEX_IMAGE":
-        n.image = img
-r2 = ex.run(preset="gltf", objects=["Tierra_Estacion", "Tierra_Detalle_Estacion"], out=f"{O}/tierra.glb", no_anim=True,
-            set=["export_image_format=WEBP", "export_image_quality=85"])
-for r in (r1, r2):
+# La Tierra del recorrido no es una malla: el shader calcula la esfera y solo necesita las cuatro texturas.
+from PIL import Image  # noqa: E402
+for nombre, calidad in (("Base_Dia", 86), ("Detalle_Dia", 90), ("Base_Noche", 90), ("Detalle_Noche", 92)):
+    destino = f"{O}/tierra_{nombre.lower()}.webp"
+    Image.open(f"{SALIDA}/textures/T_Tierra_{nombre}.png").save(destino, quality=calidad, method=6)
+    print("OK", os.path.basename(destino), os.path.getsize(destino) // 1024)
+for r in (r1,):
     for f in r["files"]:
         print("OK", os.path.basename(f["file"]), f["kb"], f.get("summary"))
