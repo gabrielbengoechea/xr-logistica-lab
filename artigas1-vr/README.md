@@ -32,7 +32,7 @@ Blender/               scripts que generan el kit 3D (ver Blender/README.md)
 | Archivo | Qué hace |
 |---|---|
 | `ZeroGWorld` | Gravedad cero y paso de física de 1/72 s |
-| `ZeroGLocomotion` | «Mano sobre mano»: con la mano en una baranda el cuerpo se mueve al revés que la mano; al soltar hereda la velocidad promedio (con tope) y flota con amortiguación; se frena contra las paredes. Modos Confort y Realista (sección 1.1 del plan) |
+| `ZeroGLocomotion` | Corrige la penetración de la cabeza contra las paredes. «Mano sobre mano»: con la mano en una baranda el cuerpo se mueve al revés que la mano; al soltar hereda la velocidad promedio (con tope) y flota con amortiguación; se frena contra las paredes. Modos Confort y Realista (sección 1.1 del plan) |
 | `Agarradera` | Baranda tomable con el botón de agarre (grip); las dos manos pueden tomar la misma |
 | `ConfortVineta` | Viñeta que cierra la periferia solo cuando hay aceleración, a través del `TunnelingVignetteController` de XRI |
 | `CargoUnit` | Bolsa o contenedor con masa, categoría, talla y estado. Una carga pesada «llega tarde» a la mano; más de 30 kg pide las dos manos |
@@ -107,7 +107,19 @@ Las lecturas del escáner y del portal RFID, el amarre y las alarmas todavía no
 
 ## Recorrido web
 
-Mientras la app de Unity está en desarrollo, la estación completa se puede recorrer en el navegador (compu o Quest, con WebXR) desde la portada de estudiantes: `web-dashboard/public/artigas1/`, publicado en <https://gabrielbengoechea.github.io/xr-logistica-lab/artigas1/>. Usa los GLB del kit (estación y Tierra) con three.js 0.170: se flota con el teclado o el stick izquierdo y se salta entre módulos con los botones o con A/B.
+La estación completa se recorre en el navegador (compu o Quest, con WebXR) desde la portada de estudiantes: `web-dashboard/public/artigas1/`, publicado en <https://gabrielbengoechea.github.io/xr-logistica-lab/artigas1/>. Es three.js 0.170 sin dependencias extra y está partido en módulos (`js/`):
+
+| Módulo | Qué hace |
+|---|---|
+| `estacion.js` | Fusiona las mallas por módulo y material, arma los colliders, las barandas y las escotillas corredizas |
+| `colisiones.js` | Colisiones: triángulos en una grilla espacial, esfera contra triángulo |
+| `locomocion.js` | Gravedad cero con cuerpo sólido: inercia, empuje, freno, rebote amortiguado y agarre |
+| `barandas.js`, `manos.js` | Barandas como capa de interacción; controles y manos en VR |
+| `materiales.js` | Reflejos de entorno, juntas de panel, vidrio con Fresnel, sol en la Cúpula |
+| `entorno.js` | Tierra con día y noche, atmósfera, sol y estrellas |
+| `etiquetas.js` | Etiquetas logísticas de cada bolsa, en una sola llamada de dibujo |
+
+Pruebas: `cd web-dashboard && npm test` (10 de física) y `python3 artigas1-vr/Tools/pruebas-web/fisica.py` (26, sobre la estación real en Chrome). Qué se hizo, qué se midió y qué falta probar en el visor: [`INFORME-refactorizacion.md`](INFORME-refactorizacion.md).
 
 ## Lo que sigue (fase 2)
 

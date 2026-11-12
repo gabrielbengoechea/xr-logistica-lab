@@ -128,10 +128,10 @@ def rack(mat, col):
     H = 2 * HW
     p.box((0, D - 0.01, HW), (RW, 0.02, H), "gris")                        # fondo
     for x in (-RW / 2 + T / 2, RW / 2 - T / 2):                           # laterales
-        p.box((x, (D - 0.02) / 2, HW), (T, D - 0.02, H), "panel", skip=("+y",))
+        p.box((x, (D - 0.02) / 2, HW), (T, D - 0.02, H), "rack", skip=("+y",))
     inner = RW - 2 * T
-    p.box((0, (D - 0.02) / 2, H - HEAD / 2), (inner, D - 0.02, HEAD), "panel", skip=("+x", "-x", "+y"))
-    p.box((0, (D - 0.02) / 2, T / 2), (inner, D - 0.02, T), "panel", skip=("+x", "-x", "+y"))
+    p.box((0, (D - 0.02) / 2, H - HEAD / 2), (inner, D - 0.02, HEAD), "rack", skip=("+x", "-x", "+y"))
+    p.box((0, (D - 0.02) / 2, T / 2), (inner, D - 0.02, T), "rack", skip=("+x", "-x", "+y"))
     usable = H - HEAD - T
     row = (usable - 3 * T) / 4
     zc = []
@@ -140,12 +140,12 @@ def rack(mat, col):
         zc.append(z + row / 2)
         z += row
         if k < 3:
-            p.box((0, (D - 0.02) / 2, z + T / 2), (inner, D - 0.02, T), "panel",
+            p.box((0, (D - 0.02) / 2, z + T / 2), (inner, D - 0.02, T), "rack",
                   skip=("+x", "-x", "+y"))
             z += T
     zb = [T] + [T + (k + 1) * row + k * T + T for k in range(3)]       # base de cada nivel
     for k in range(4):                                                    # divisor central
-        p.box((0, (D - 0.02) / 2, zb[k] + row / 2), (T, D - 0.02, row), "panel",
+        p.box((0, (D - 0.02) / 2, zb[k] + row / 2), (T, D - 0.02, row), "rack",
               skip=("+z", "-z", "+y"))
     # etiquetas e-ink de cada hueco (en blanco: el texto va en Unity) sobre el frente del estante
     xs = {"A": -(T / 2 + (inner / 2 - T / 2) / 2), "B": (T / 2 + (inner / 2 - T / 2) / 2)}

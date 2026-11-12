@@ -5,7 +5,7 @@ SALIDA = _os.environ.get("ARTIGAS1_SALIDA", _os.path.join(_os.path.dirname(_os.p
 sys.path.insert(0, __import__("os").path.dirname(__import__("os").path.abspath(__file__)))
 import bpy
 from mathutils import Matrix, Vector
-import kitlib, props, modulo, colonia, nodo, cupula, tacuarembo
+import kitlib, props, modulo, colonia, nodo, cupula, tacuarembo, identidad
 kitlib.new_scene()
 mat = kitlib.palette_material(kitlib.write_palette_textures())
 obs = props.build(mat)
@@ -36,6 +36,8 @@ for code, b, e in plan:
     if (code, e.name) == vacio: continue
     src = especiales.get((code, e.name)) or ("SM_BTC_2" if random.random() < 0.3 else "SM_BTC_1")
     link(bpy.data.objects[src], f"Carga_{code}_{e.name[7:]}_{src[3:]}", b.matrix_world @ Matrix.Translation(e.matrix_local.translation), carga)
+    le = e.matrix_local.translation
+    link(bpy.data.objects["SM_Correas_Hueco"], f"Correas_{code}_{e.name[7:]}", b.matrix_world @ Matrix.Translation((le.x, 0, le.z)), carga)
 
 
 # ---- carga de ejemplo en los racks de Rivera (solo para la vista previa)
@@ -50,6 +52,8 @@ for o in sorted(bpy.data.collections["Layout_Rivera"].objects, key=lambda o: o.n
         src = "SM_BTC_1" if r < 0.45 else "SM_BTC_2" if r < 0.65 else None
         if src:
             link(bpy.data.objects[src], f"Demo_{o.name[5:]}_{e.name[5:]}", o.matrix_world @ Matrix.Translation(e.matrix_local.translation), demo)
+            le = e.matrix_local.translation
+            link(bpy.data.objects["SM_Correas_Hueco"], f"Correas_{o.name[5:]}_{e.name[5:]}", o.matrix_world @ Matrix.Translation((le.x, 0, le.z)), demo)
 
 # ---- estacion armada: Rivera + anillo + Colonia (+ carguero)
 est_col = bpy.data.collections.new("Layout_Estacion"); sc.collection.children.link(est_col)
@@ -83,6 +87,11 @@ link(bpy.data.objects["SM_Anillo_Acople"], "Anillo_Rivera_Colonia", Matrix.Trans
 C = Matrix.Translation((0, yC, 0))
 for o in list(col["lay"].objects) + list(carga.objects):
     link(o, "C_" + o.name, C @ o.matrix_world, est_col)
+placas = identidad.build()
+n_placas = identidad.colocar(placas, link, est_col, TT, N, Matrix(), C, C @ Matrix.Translation((0, col["gy"], 0)), CU,
+                             {"T": (0, tacuarembo.TL), "N": (0, nodo.NL), "R": (modulo.Y0, modulo.Y1), "C": (colonia.CY0, colonia.CY1), "G": (0, colonia.GY1)})
+print("placas de identidad:", n_placas)
+bpy.data.collections["Identidad"].hide_render = True
 for c in ("Props", "Modulo_Rivera", "Modulo_Colonia", "Carguero_Charrua", "Nodo_Montevideo", "Cupula_Faro", "Layout_Tierra", "Modulo_Tacuarembo"):
     bpy.data.collections[c].hide_render = True
 x = 0

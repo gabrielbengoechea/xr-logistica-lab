@@ -49,7 +49,7 @@ def paint(LAT, LON, px_km, fine=0.0, seed=9):
             tot += amp; amp *= 0.5
         n2 = n2 * (1 - fine) + (f / tot) * fine
     alat = np.abs(LAT)
-    green = np.array([0.20, 0.36, 0.16]); dry = np.array([0.62, 0.52, 0.34]); pampa = np.array([0.33, 0.45, 0.22])
+    green = np.array([0.17, 0.27, 0.15]); dry = np.array([0.58, 0.50, 0.36]); pampa = np.array([0.34, 0.38, 0.23])
     tundra = np.array([0.42, 0.42, 0.36]); ice = np.array([0.93, 0.95, 0.97])
     t_dry = np.clip(1 - np.abs(alat - 25) / 12, 0, 1) * np.clip(n1 * 1.6 - 0.3, 0, 1)
     col = green * (1 - t_dry[..., None]) + dry * t_dry[..., None]
@@ -57,12 +57,17 @@ def paint(LAT, LON, px_km, fine=0.0, seed=9):
     col = col * (1 - pam * 0.7) + pampa * pam * 0.7
     t_tun = np.clip((alat - 55) / 12, 0, 1)[..., None]
     col = col * (1 - t_tun) + tundra * t_tun
-    col *= (0.8 + 0.4 * n2)[..., None]
+    # parches de campo y monte: mezcla hacia un ocre y un verde oscuro segun el ruido fino
+    ocre = np.array([0.46, 0.42, 0.28]); monte = np.array([0.12, 0.20, 0.12])
+    k1 = np.clip((n2 - 0.52) * 4, 0, 1)[..., None]; k2 = np.clip((0.44 - n2) * 4, 0, 1)[..., None]
+    col = col * (1 - 0.55 * k1) + ocre * 0.55 * k1
+    col = col * (1 - 0.5 * k2) + monte * 0.5 * k2
+    col *= (0.85 + 0.3 * n1)[..., None]
     t_ice = np.maximum(np.clip((alat - 66) / 4, 0, 1), (LAT < -62) * 1.0)
     col = col * (1 - t_ice[..., None]) + ice * t_ice[..., None]
     dist = ndimage.distance_transform_edt(~land) * px_km           # km hasta la costa
     shallow = np.clip(1 - dist / 250, 0, 1) ** 2
-    deep = np.array([0.02, 0.09, 0.22]); shal = np.array([0.08, 0.30, 0.42])
+    deep = np.array([0.015, 0.06, 0.17]); shal = np.array([0.07, 0.24, 0.36])
     oc = deep * (1 - shallow[..., None]) + shal * shallow[..., None]
     oc *= (0.9 + 0.2 * n2)[..., None]
     rdlp = np.exp(-(((LAT + 34.9) / 0.9) ** 2 + ((LON + 57.4) / 1.5) ** 2)) * np.clip(1 - dist / 400, 0, 1)

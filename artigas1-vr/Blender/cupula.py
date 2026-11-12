@@ -21,8 +21,9 @@ ZT = -0.30          # techo de la cupula (fin del tunel)
 ZB = -1.05          # piso de la cupula (ventana central)
 R1, R2 = 1.25, 0.72  # apotema arriba y abajo
 RW = 0.40           # apotema de la ventana central
-FR = 0.09           # ancho de marco
-REV = 0.10          # profundidad del marco (hacia afuera)
+FR = 0.10           # ancho de marco
+REV = 0.16          # profundidad del marco hasta el vidrio (sensacion de espesor)
+BISEL = 0.03        # bisel del marco
 PANEL = 1           # cara lateral sin ventana: panel de equipos (estribor)
 EARTH_R = 1000.0    # radio de la Tierra en Unity (escala angular real a 400 km: altura 63 m)
 EARTH_ALT = EARTH_R * 400 / 6371
@@ -96,22 +97,26 @@ def img_material(name, path, emis=0.0, rough=0.6):
 
 # ---------------------------------------------------------------- casco
 def framed_opening(bm, outer, inner_scale_fn, normal, panel=False):
-    """Cara con marco y abertura. outer: 4 Vector en orden; devuelve vertices del vidrio."""
+    """Cara con marco grueso y abertura biselada. outer: 4 Vector en orden; devuelve vertices del vidrio.
+    El marco tiene tres tramos: cara interior (aleacion oscura), bisel a 45 grados y canto profundo hasta el vidrio."""
     c = sum(outer, Vector()) / len(outer)
     inner = [inner_scale_fn(v, c) for v in outer]
     ov = [bm.verts.new(v) for v in outer]
     if panel:
         f = bm.faces.new(ov)
         f.material_index = PID["panel"]
-        return None
+        return None, inner
     iv = [bm.verts.new(v) for v in inner]
-    rv = [bm.verts.new(v + normal * REV) for v in inner]
+    bis = [v + (c - v).normalized() * BISEL + normal * BISEL for v in inner]
+    bv = [bm.verts.new(v) for v in bis]
+    rv = [bm.verts.new(v + normal * (REV - BISEL)) for v in bis]
     n = len(outer)
     for i in range(n):
         j = (i + 1) % n
-        bm.faces.new((ov[i], ov[j], iv[j], iv[i])).material_index = PID["panel"]
-        bm.faces.new((iv[i], iv[j], rv[j], rv[i])).material_index = PID["gris"]
-    return [v.co.copy() for v in rv]
+        bm.faces.new((ov[i], ov[j], iv[j], iv[i])).material_index = PID["aleacion_oscura"]
+        bm.faces.new((iv[i], iv[j], bv[j], bv[i])).material_index = PID["aluminio"]
+        bm.faces.new((bv[i], bv[j], rv[j], rv[i])).material_index = PID["aleacion_oscura"]
+    return [v.co.copy() for v in rv], inner
 
 
 def casco(mat, col):
@@ -131,6 +136,8 @@ def casco(mat, col):
         j = (i + 1) % 8
         bm.faces.new((b[i], b[j], t[j], t[i])).material_index = PID["panel"]
     glass = []
+    detalles = []                       # (posicion, normal hacia adentro) de cada tornillo
+    costillas = []                      # aristas entre ventanas
     center = Vector((0, 0, (ZT + ZB) / 2))
     for i in range(8):
         j = (i + 1) % 8
@@ -141,27 +148,39 @@ def casco(mat, col):
         mid = sum(quad_, Vector()) / 4
         if nrm.dot(mid - center) < 0:
             nrm = -nrm
+        costillas.append((p0, q0))
 
         def shrink(v, c):
             d = c - v
             return v + d.normalized() * min(FR * 1.6, d.length * 0.4)
-        g = framed_opening(bm, quad_, shrink, nrm, panel=(i == PANEL))
+        g, inner = framed_opening(bm, quad_, shrink, nrm, panel=(i == PANEL))
         if g:
             glass.append(g)
-    # piso con ventana central
+            for k in range(4):          # tornillos: en cada esquina y dos por lado, sobre la cara del marco
+                va, vb = inner[k], inner[(k + 1) % 4]
+                for tt in (0.0, 0.33, 0.67):
+                    pos = va.lerp(vb, tt)
+                    pos = pos + (pos - mid).normalized() * 0.045
+                    detalles.append((pos, -nrm))
+    # piso con ventana central (marco biselado igual que las laterales)
     bv = [bm.verts.new((x, z, ZB)) for x, z in bot]
     wv = [bm.verts.new((x, z, ZB)) for x, z in reg_oct(RW)]
-    rv = [bm.verts.new((x, z, ZB - REV)) for x, z in reg_oct(RW)]
+    cv = [bm.verts.new((x, z, ZB - BISEL)) for x, z in reg_oct(RW - BISEL)]
+    rv = [bm.verts.new((x, z, ZB - REV)) for x, z in reg_oct(RW - BISEL)]
     for i in range(8):
         j = (i + 1) % 8
-        bm.faces.new((bv[i], bv[j], wv[j], wv[i])).material_index = PID["panel"]
-        bm.faces.new((wv[i], wv[j], rv[j], rv[i])).material_index = PID["gris"]
+        bm.faces.new((bv[i], bv[j], wv[j], wv[i])).material_index = PID["aleacion_oscura"]
+        bm.faces.new((wv[i], wv[j], cv[j], cv[i])).material_index = PID["aluminio"]
+        bm.faces.new((cv[i], cv[j], rv[j], rv[i])).material_index = PID["aleacion_oscura"]
     glass.append([v.co.copy() for v in rv])
+    for k in range(16):
+        a_ = k * math.pi / 8
+        detalles.append((Vector((math.cos(a_) * (RW + 0.06), math.sin(a_) * (RW + 0.06), ZB)), Vector((0, 0, 1))))
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     # malla conectada y con orientacion consistente: si en promedio mira hacia afuera, se da vuelta entera
     score = sum(f.normal.dot(center - f.calc_center_median()) * f.calc_area() for f in bm.faces
-                if f.material_index == PID["panel"])
+                if f.material_index in (PID["panel"], PID["aleacion_oscura"]))
     if score < 0:
         for f in bm.faces:
             f.normal_flip()
@@ -177,7 +196,23 @@ def casco(mat, col):
         m = Vector(((x + x2) / 2 * 0.86, (y + y2) / 2 * 0.86, ZT - 0.006))
         ang = math.atan2(m.y, m.x) + math.pi / 2
         p.box(m, (0.5, 0.06, 0.012), "luz", rot=Matrix.Rotation(ang, 4, "Z"), skip=("+z",))
-    ob = p.finish("SM_Cupula_Faro_Casco", mat, col)
+    # costillas estructurales entre ventanas (aluminio satinado, con refuerzo arriba y abajo)
+    for p0, q0 in costillas:
+        eje = (q0 - p0)
+        zax = eje.normalized()
+        medio = (p0 + q0) / 2
+        yax = (center - medio)
+        yax = (yax - zax * yax.dot(zax)).normalized()      # hacia adentro, perpendicular a la arista
+        xax = yax.cross(zax)
+        rot = Matrix(((xax.x, yax.x, zax.x, 0), (xax.y, yax.y, zax.y, 0), (xax.z, yax.z, zax.z, 0), (0, 0, 0, 1)))
+        p.box(medio + yax * 0.012, (0.07, 0.035, eje.length - 0.02), "aluminio", rot=rot)
+        for tt in (0.08, 0.92):
+            p.box(p0.lerp(q0, tt) + yax * 0.03, (0.10, 0.03, 0.06), "aleacion_oscura", rot=rot)
+    # tornilleria: cabezas hexagonales sobre los marcos
+    for pos, n_in in detalles:
+        rot = Vector((0, 0, 1)).rotation_difference(n_in).to_matrix().to_4x4()
+        p.cyl(pos + n_in * 0.004, 0.011, 0.010, "acero", seg=6, rot=rot)
+    ob = p.finish("SM_Cupula_Faro_Casco", mat, col, weld=False)
     # vidrios (material aparte, transparente en Unity)
     gm = bpy.data.materials.new("M_Artigas_Vidrio")
     gm.diffuse_color = (0.6, 0.75, 0.85, 0.15)

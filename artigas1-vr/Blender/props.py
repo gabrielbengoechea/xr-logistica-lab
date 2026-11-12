@@ -64,7 +64,9 @@ def btc(name, h, mat, col, handles_top=1, label=True, dano=False):
 def contenedor(name, mat, col):
     X, Y, Z = 0.60, 0.40, 0.40
     p = Part()
-    p.box((0, 0, 0), (X, Y, Z), "aluminio", bevel=0.012, seg=2)
+    p.box((0, 0, 0), (X, Y, Z), "polimero", bevel=0.012, seg=2)
+    for z in (-0.12, 0.0):                                               # nervaduras de refuerzo
+        p.box((0, 0, z), (X + 0.008, Y + 0.008, 0.02), "polimero")
     p.box((0, 0, 0.10), (X + 0.006, Y + 0.006, 0.012), "oscuro")         # junta de tapa
     for x in (-0.18, 0.18):                                              # cierres
         for y in (-Y / 2 - 0.005, Y / 2 + 0.005):
@@ -148,6 +150,21 @@ def punto_anclaje(name, mat, col):
     return ob
 
 
+def correas_hueco(name, mat, col, w=0.44, h=0.40):
+    """Dos correas verticales con hebilla que retienen la carga en un hueco, a los lados de la etiqueta.
+    Frente hacia -Y; las correas van 3 cm por delante del frente del rack."""
+    p = Part()
+    y = -0.032
+    for sx in (-1, 1):
+        x = sx * 0.155
+        p.box((x, y, 0), (0.028, 0.004, h), "correa")
+        p.box((x, y - 0.007, 0.11), (0.042, 0.012, 0.05), "acero", bevel=0.003)   # hebilla de trinquete
+        p.box((x, y - 0.014, 0.11), (0.024, 0.004, 0.02), "oscuro")
+        for sz in (-1, 1):                                                        # ganchos a los anclajes del rack
+            p.box((x, y / 2, sz * h / 2), (0.022, abs(y) + 0.004, 0.022), "acero")
+    return p.finish(name, mat, col, smooth_angle=40)
+
+
 def indicador(name, mat, col):
     p = Part()
     p.box((0, 0, 0), (0.06, 0.008, 0.012), "led_verde", skip=("+y",))
@@ -167,6 +184,7 @@ def build(mat):
         escaner("SM_Escaner", mat, col),
         *trinquete(mat, col),
         correa("SM_Correa_100", 1.0, mat, col),
+        correas_hueco("SM_Correas_Hueco", mat, col),
         gancho("SM_Correa_Gancho", mat, col),
         punto_anclaje("SM_Punto_Anclaje", mat, col),
         indicador("SM_Indicador_Hueco", mat, col),

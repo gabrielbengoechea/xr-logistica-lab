@@ -27,6 +27,7 @@ U(objects=["Tierra","Tierra_Detalle"], out=f"{E}/Unity/Entorno/Tierra_Uruguay_al
 U(objects=["SM_Modulo_Tacuarembo_Casco","SM_Rack_Soporte_Vital","SM_Filtro_CO2","SM_Banco_Trabajo","SM_Tablero_Sombras","SM_Llave_Inglesa","SM_Destornillador","SM_Multimetro"], batch=True, out=f"{E}/Unity/Modulo_Tacuarembo/x.fbx")
 U(objects=[o.name for o in bpy.data.collections["Modulo_Tacuarembo"].objects if o.name.startswith(("SM_CartelT","SM_Pantalla","SM_Etiqueta_TAC"))], out=f"{E}/Unity/Modulo_Tacuarembo/SM_Senaletica_Tacuarembo.fbx")
 U(collection="Layout_Tacuarembo", out=f"{E}/Unity/Layout/Layout_Modulo_Tacuarembo.fbx")
+U(collection="Identidad", out=f"{E}/Unity/Identidad/SM_Placas_Identidad.fbx")
 U(collection="Layout_Rivera", out=f"{E}/Unity/Layout/Layout_Modulo_Rivera.fbx")
 U(objects=[o.name for o in bpy.data.collections["Layout_Colonia"].objects]+[o.name for o in bpy.data.collections["Carga_Carguero"].objects], out=f"{E}/Unity/Layout/Layout_Colonia_y_Carguero.fbx")
 U(collection="Layout_Estacion", out=f"{E}/Unity/Layout/Layout_Estacion_Completa.fbx")

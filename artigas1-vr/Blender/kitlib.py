@@ -21,11 +21,11 @@ GRID = 8          # 8 x 8 celdas
 CELL = 32         # px por celda -> textura 256 x 256
 # nombre: (rgb lineal-ish en sRGB 0-1, metalico, rugosidad, emision rgb o None)
 PALETTE = {
-    "panel":      ((0.84, 0.84, 0.82), 0.0, 0.60, None),
-    "gris":       ((0.58, 0.59, 0.60), 0.0, 0.55, None),
-    "oscuro":     ((0.16, 0.17, 0.19), 0.0, 0.50, None),
-    "aluminio":   ((0.72, 0.74, 0.76), 0.0, 0.40, None),   # aluminio pintado
-    "baranda":    ((0.86, 0.66, 0.10), 0.0, 0.45, None),
+    "panel":      ((0.86, 0.86, 0.84), 0.0, 0.68, None),   # panel de pared blanco, pintura mate
+    "gris":       ((0.56, 0.58, 0.60), 0.65, 0.50, None),  # metal gris pintado (tuneles, marcos de equipo)
+    "oscuro":     ((0.14, 0.15, 0.17), 0.0, 0.42, None),   # material tecnico oscuro (paneles electronicos)
+    "aluminio":   ((0.78, 0.80, 0.82), 0.95, 0.42, None),  # aluminio tecnico satinado
+    "baranda":    ((0.92, 0.70, 0.12), 0.90, 0.36, None),  # pasamanos: aluminio anodizado amarillo, cepillado
     "tela":       ((0.86, 0.83, 0.74), 0.0, 0.90, None),
     "tela_osc":   ((0.62, 0.59, 0.52), 0.0, 0.90, None),
     "azul":       ((0.00, 0.22, 0.58), 0.0, 0.50, None),
@@ -33,22 +33,26 @@ PALETTE = {
     "led_verde":  ((0.10, 0.75, 0.30), 0.0, 0.40, (0.10, 0.90, 0.35)),
     "led_ambar":  ((1.00, 0.60, 0.05), 0.0, 0.40, (1.00, 0.55, 0.05)),
     "led_rojo":   ((0.85, 0.05, 0.05), 0.0, 0.40, (1.00, 0.05, 0.05)),
-    "pantalla":   ((0.03, 0.03, 0.04), 0.0, 0.20, None),
+    "pantalla":   ((0.03, 0.03, 0.04), 0.0, 0.10, None),   # vidrio de pantalla apagada
     "pantalla_on": ((0.20, 0.80, 0.90), 0.0, 0.20, (0.20, 0.80, 0.95)),
     "correa":     ((0.90, 0.38, 0.06), 0.0, 0.85, None),
     "velcro":     ((0.36, 0.36, 0.34), 0.0, 0.95, None),
-    "etiqueta":   ((0.95, 0.95, 0.93), 0.0, 0.70, None),
+    "etiqueta":   ((0.95, 0.95, 0.93), 0.0, 0.55, None),   # vinilo
     "piso_rivera": ((0.24, 0.46, 0.30), 0.0, 0.60, None),
     "piso_colonia": ((0.12, 0.30, 0.62), 0.0, 0.60, None),
     "luz":        ((0.95, 0.95, 0.90), 0.0, 0.30, (1.00, 0.97, 0.90)),
     "goma":       ((0.08, 0.08, 0.08), 0.0, 0.90, None),
-    "acero":      ((0.55, 0.56, 0.58), 0.6, 0.40, None),
+    "acero":      ((0.62, 0.63, 0.65), 1.0, 0.30, None),   # acero inoxidable
     "calabaza":   ((0.45, 0.28, 0.12), 0.0, 0.60, None),
     "cuero":      ((0.24, 0.14, 0.07), 0.0, 0.70, None),
     "agua":       ((0.55, 0.78, 0.95), 0.0, 0.05, None),
     "piso_tacuarembo": ((0.80, 0.40, 0.10), 0.0, 0.60, None),
     "luz_calida": ((1.00, 0.86, 0.66), 0.0, 0.30, (1.00, 0.80, 0.55)),
     "rojo_mango": ((0.70, 0.08, 0.06), 0.0, 0.50, None),
+    "aleacion_oscura": ((0.20, 0.21, 0.23), 0.90, 0.38, None),  # marcos de la cupula
+    "polimero":   ((0.30, 0.34, 0.38), 0.0, 0.58, None),   # contenedores: polimero tecnico reforzado
+    "rack":       ((0.60, 0.62, 0.64), 0.80, 0.48, None),  # racks: metal gris industrial
+    "vinilo_am":  ((0.98, 0.78, 0.00), 0.0, 0.50, None),   # amarillo de seguridad
 }
 NAMES = list(PALETTE)
 PID = {n: i for i, n in enumerate(NAMES)}
