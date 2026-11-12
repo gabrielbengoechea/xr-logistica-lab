@@ -1,0 +1,22 @@
+name: Artigas-1 VR
+
+on:
+  push:
+    branches: [main]
+    paths: ["artigas1-vr/**", ".github/workflows/artigas1-vr.yml"]
+  pull_request:
+    paths: ["artigas1-vr/**", ".github/workflows/artigas1-vr.yml"]
+
+jobs:
+  logica:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: artigas1-vr/Tools/pruebas-logica
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Pruebas de la lógica pura (locomoción 0G, huecos, manifiesto, balance)
+        run: dotnet run

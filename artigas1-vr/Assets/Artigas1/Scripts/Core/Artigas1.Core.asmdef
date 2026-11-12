@@ -1,0 +1,12 @@
+{
+    "name": "Artigas1.Core",
+    "rootNamespace": "Artigas1",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "noEngineReferences": false
+}

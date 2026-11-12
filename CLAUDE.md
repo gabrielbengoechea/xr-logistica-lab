@@ -10,10 +10,11 @@ Laboratorio de realidad mixta para enseñar logística e ingeniería. Tiene tres
 
 | Carpeta | Qué es | Tecnología |
 |---|---|---|
-| `/models` | Activos 3D: montacargas, pallet, rack, sensor, motor y CubeSat, con piezas para la vista explotada y encajes, más `manifest.json` | Blender 5.2 (bpy): `.blend`, `.fbx` y `.glb` |
+| `/models` | Activos 3D: montacargas, pallet, rack, sensor, motor y CubeSat, con piezas para la vista explotada y encajes, más `manifest.json`; en `proyectos/`, los modelos del puerto, el juego del montacargas, Atlas XR y el brazo robótico | Blender 5.2 (bpy): `.blend`, `.fbx` y `.glb` |
 | `/backend` | API REST y WebSocket: inventario, telemetría de sesiones VR, manifest de modelos | Python 3.11+, FastAPI, Pydantic v2, SQLite |
-| `/web-dashboard` | Visor 3D de los modelos y panel del docente con métricas en vivo | React 18, TypeScript, Vite, Tailwind CSS, three.js y React Three Fiber |
+| `/web-dashboard` | Portada para elegir simulador, visor 3D de los modelos y panel del docente con métricas en vivo | React 18, TypeScript, Vite, Tailwind CSS, three.js y React Three Fiber |
 | `/vr-client` | App de realidad mixta: passthrough, manos, vista explotada, encajes y telemetría | Unity 6 (6000.0 LTS), C#, OpenXR, XR Interaction Toolkit 3, XR Hands, Meta OpenXR |
+| `/artigas1-vr` | Artigas-1: estación logística en órbita, gravedad cero, para Quest 2 con controles; usa la telemetría de `vr-client` (copiada en `Assets/XRLab/Telemetry`) | Unity 6, C# (namespace `Artigas1`), XR Interaction Toolkit 3, OpenXR; kit 3D en `artigas1-vr/Blender` (bpy) |
 
 ```
 Quest (Unity) ──HTTP POST /api/v1/telemetry/session──▶ FastAPI ──WS /ws/telemetry──▶ Tablero web (React)
@@ -29,7 +30,8 @@ Quest (Unity) ──HTTP POST /api/v1/telemetry/session──▶ FastAPI ──W
 ```bash
 # Modelos (bpy 5.2 de pip o Blender 5.2)
 python3 models/tools/generar_modelos.py
-python3 models/tools/verificar_manifest.py
+python3 models/tools/verificar_manifest.py     # revisa los dos manifests
+python3 models/tools/importar_proyectos.py --quest ../quest-xr-pilotos --kit DIR   # trae los modelos de los otros proyectos
 
 # Backend
 cd backend && python3 -m pip install -r requirements-dev.txt
@@ -40,6 +42,8 @@ cd backend && uvicorn app.main:app --reload --port 8000        # http://localhos
 cd web-dashboard && npm ci
 cd web-dashboard && npm run dev       # http://localhost:5173 (proxy /api y /ws → :8000)
 cd web-dashboard && npm test && npm run build && npm run lint
+# Sitio estático para GitHub Pages (lo publica .github/workflows/pages.yml en cada push a main)
+cd web-dashboard && XRLAB_BASE=/xr-logistica-lab/ VITE_SITIO_ESTATICO=1 npx vite build && cd .. && python3 backend/tools/exportar_sitio.py web-dashboard/dist
 
 # Cliente VR
 # Compilación de los scripts fuera de Unity, contra firmas mínimas de la API de Unity (sin licencia):
@@ -48,6 +52,10 @@ cd vr-client/Tools/verificar-compilacion && dotnet build -warnaserror
 cd vr-client/Tools/verificar-compilacion && dotnet run --project ../pruebas-logica
 # APK para Quest en modo batch (Unity instalado con Android Build Support):
 Unity -batchmode -quit -projectPath vr-client -executeMethod XRLab.Editor.BuildScript.BuildQuest -logFile -
+
+# Artigas-1
+cd artigas1-vr/Tools/pruebas-logica && dotnet run              # lógica pura: locomoción 0G, huecos, manifiesto, balance
+Unity -batchmode -quit -projectPath artigas1-vr -executeMethod Artigas1.Editor.BuildScript.BuildQuest -logFile -
 ```
 
 ## Estándares de código
@@ -70,9 +78,10 @@ Unity -batchmode -quit -projectPath vr-client -executeMethod XRLab.Editor.BuildS
   - asincronía con `async`/`await` y `UnityWebRequest`;
   - la lógica pura va en clases sin `MonoBehaviour`, para probarla fuera de Unity;
   - los scripts de editor van en `Assets/Scripts/Editor` (ensamblado aparte).
-- **Contrato de datos:** el backend es la fuente de verdad (`backend/app/schemas.py`). Si cambia un campo, se actualizan en el mismo PR `web-dashboard/src/api/types.ts` y `vr-client/Assets/Scripts/Telemetry/TelemetryModels.cs`.
+- **Contrato de datos:** el backend es la fuente de verdad (`backend/app/schemas.py`). Si cambia un campo, se actualizan en el mismo PR `web-dashboard/src/api/types.ts`, `vr-client/Assets/Scripts/Telemetry/TelemetryModels.cs` y su copia en `artigas1-vr/Assets/XRLab/Telemetry/TelemetryModels.cs`.
 - **Modelos 3D:**
   - se generan solo con `generar_modelos.py`; nada a mano en `glb/`, `fbx/` ni `blend/`;
+  - los de `proyectos/` se copian solo con `importar_proyectos.py`;
   - metros y Y arriba en glTF;
   - piezas `Part_*` y encajes `Snap_*` (ver `models/README.md`).
 - **Git:**
@@ -88,5 +97,8 @@ Unity -batchmode -quit -projectPath vr-client -executeMethod XRLab.Editor.BuildS
 | Backend FastAPI: inventario, telemetría, manifest, WebSocket y pruebas | PR `feature/backend-init` |
 | Scripts Unity: vista explotada, encajes, telemetría y build batch | PR `feature/vr-scripts` |
 | Tablero web: visor 3D y panel docente | PR `feature/web-dashboard` |
+| Modelos de los otros proyectos en el catálogo y el visor (colecciones) | PR `feature/modelos-proyectos` |
+| Portada de estudiantes para elegir simulador y sitio en GitHub Pages | PR `feature/portal-estudiantes` |
 | Escenas Unity, prefabs y configuración XR del proyecto | Se arman en el editor de Unity a partir de los scripts (ver `vr-client/README.md`) |
-| Autenticación de docentes y despliegue en la nube | Pendiente |
+| Artigas-1: proyecto Unity (fase 1), kit 3D y recorrido web en la portada | PR `feature/artigas1` |
+| Autenticación de docentes y backend en la nube | Pendiente |

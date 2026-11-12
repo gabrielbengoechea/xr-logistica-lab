@@ -41,3 +41,24 @@ python3 models/tools/generar_modelos.py          # bpy de pip (Python 3.13)
 blender -b -P models/tools/generar_modelos.py    # o con Blender 5.2
 python3 models/tools/verificar_manifest.py       # el manifest coincide con los archivos
 ```
+
+## Modelos de los otros proyectos
+
+`proyectos/` trae los modelos de los otros proyectos del equipo, para verlos en el visor junto a los del laboratorio. No se generan acá: los copia `tools/importar_proyectos.py` desde los paquetes originales y escribe `proyectos/manifest.json` leyendo cada `.glb` (medidas, triángulos, piezas y encajes).
+
+| Colección | Activos | Origen |
+|---|---|---|
+| Terminal portuaria | grúa STS, grúa RTG, buque Panamax, contenedor de 40', tractor de terminal | kit portuario de Blender de Logística 3D |
+| Juego del montacargas | autoelevador y depósito con racks, pallets y zonas de descarga | quest-xr-pilotos (`autoelevador/`) |
+| Atlas XR | globo logístico con puertos y rutas (`.glb` y `.usdz` para RA) | quest-xr-pilotos (`atlas-xr/`) |
+| Brazo robótico (RA) | brazo de 6 ejes (`.glb` y `.usdz` para RA) | quest-xr-pilotos (`brazo-robotico/`) |
+
+Diferencias con los modelos del laboratorio:
+
+- las piezas conservan el nombre del nodo original (`Trolley`, `Wrist_1`, …) y el manifest dice cuál es la pieza padre;
+- no traen masa (`masa_kg: null`) ni desplazamiento de vista explotada: el visor separa cada pieza alejándola del centro de su pieza padre, sin bajarla del piso;
+- las mallas auxiliares del kit (`UCX_` de colisión, `ShadowCatcher` y los LOD 1 a 3) no cuentan para medidas ni triángulos y el visor las oculta.
+
+```bash
+python3 models/tools/importar_proyectos.py --quest ../quest-xr-pilotos --kit <salida del kit industrial> --kit <salida de buques y contenedores>
+```

@@ -1,0 +1,12 @@
+{
+    "name": "XRLab.Telemetry",
+    "rootNamespace": "XRLab",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "noEngineReferences": false
+}
