@@ -48,3 +48,18 @@ vr-client/Tools/pruebas-logica/obj/
 !.env.example
 .DS_Store
 Thumbs.db
+
+# --- Unity (artigas1-vr) ---
+artigas1-vr/[Ll]ibrary/
+artigas1-vr/[Tt]emp/
+artigas1-vr/[Oo]bj/
+artigas1-vr/[Bb]uild/
+artigas1-vr/[Bb]uilds/
+artigas1-vr/[Ll]ogs/
+artigas1-vr/[Uu]ser[Ss]ettings/
+artigas1-vr/*.csproj
+artigas1-vr/*.sln
+artigas1-vr/*.apk
+artigas1-vr/Tools/**/bin/
+artigas1-vr/Tools/**/obj/
+artigas1-vr/Blender/salida/

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Estación Artigas-1 · Recorrido</title>
+    <meta name="description" content="Recorré la Estación Artigas-1, la primera estación logística de Uruguay: almacén, recepción de carga, taller y la Cúpula con el Río de la Plata abajo." />
+    <link rel="icon" href="../icono.svg" />
+    <style>
+      html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      canvas { display: block; touch-action: none; }
+      #panel { position: fixed; left: 16px; top: 16px; max-width: 340px; padding: 16px 18px; border-radius: 12px;
+        background: rgba(12, 18, 28, 0.82); color: #e8eef6; line-height: 1.4; backdrop-filter: blur(6px); }
+      #panel h1 { margin: 0 0 4px; font-size: 20px; }
+      #panel p { margin: 6px 0; font-size: 14px; color: #b8c6d8; }
+      #modulos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 12px 0; }
+      #modulos button { padding: 8px 10px; border: 1px solid #3a6ea5; border-radius: 8px; background: #102236; color: #e8eef6;
+        font-size: 14px; cursor: pointer; text-align: left; }
+      #modulos button[aria-pressed="true"] { background: #0038a8; border-color: #74acdf; }
+      #ayuda { font-size: 13px; color: #9fb0c4; }
+      #ayuda kbd { padding: 1px 5px; border: 1px solid #5a6b80; border-radius: 4px; font-size: 12px; }
+      #panel a { color: #74acdf; font-size: 14px; }
+      #ocultar { position: absolute; right: 10px; top: 8px; background: none; border: 0; color: #9fb0c4; font-size: 18px; cursor: pointer; }
+      #cargando { position: fixed; inset: 0; display: grid; place-items: center; color: #e8eef6; font-size: 18px; background: #000; }
+      #fundido { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+      @media (max-width: 600px) { #panel { left: 8px; right: 8px; top: auto; bottom: 8px; max-width: none; } #ayuda { display: none; } }
+    </style>
+    <script type="importmap">
+      { "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
+    </script>
+  </head>
+  <body>
+    <div id="panel">
+      <button id="ocultar" type="button" aria-label="Ocultar el panel">×</button>
+      <h1>Estación Artigas-1</h1>
+      <p>La primera estación logística de Uruguay, en órbita. Recorré el almacén, la recepción de carga, el taller y la Cúpula, con el Río de la Plata abajo.</p>
+      <div id="modulos" role="group" aria-label="Ir a un módulo"></div>
+      <p id="ayuda">
+        <b>Compu:</b> arrastrá para mirar, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> para flotar, <kbd>Q</kbd>/<kbd>E</kbd> para bajar y subir, <kbd>Shift</kbd> más rápido.<br />
+        <b>Quest:</b> tocá «Enter VR». Stick izquierdo para flotar, derecho para girar de a 30°, <kbd>A</kbd>/<kbd>B</kbd> para cambiar de módulo.
+      </p>
+      <p><a href="../">← Volver a los simuladores</a></p>
+    </div>
+    <div id="cargando" role="status">Cargando la estación… <span id="pct"></span></div>
+    <div id="fundido"></div>
+    <script type="module" src="./recorrido.js"></script>
+  </body>
+</html>

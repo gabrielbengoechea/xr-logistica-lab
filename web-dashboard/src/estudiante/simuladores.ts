@@ -74,6 +74,15 @@ export const GRUPOS: GrupoSimuladores[] = [
         dispositivos: ['quest', 'compu', 'celular'],
         imagen: 'simuladores/estiba.webp',
       },
+      {
+        id: 'artigas1',
+        nombre: 'Estación Artigas-1',
+        descripcion: 'La primera estación logística de Uruguay, en órbita. Flotás por el almacén, la recepción de carga y el taller, y desde la Cúpula ves el Río de la Plata.',
+        url: 'https://gabrielbengoechea.github.io/xr-logistica-lab/artigas1/',
+        area: 'deposito',
+        dispositivos: ['quest', 'compu'],
+        imagen: 'simuladores/artigas1.webp',
+      },
     ],
   },
   {

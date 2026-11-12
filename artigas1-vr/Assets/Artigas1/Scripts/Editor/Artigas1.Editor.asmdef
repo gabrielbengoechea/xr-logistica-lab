@@ -1,0 +1,22 @@
+{
+    "name": "Artigas1.Editor",
+    "rootNamespace": "Artigas1.Editor",
+    "references": [
+        "Artigas1",
+        "Artigas1.Core",
+        "XRLab.Telemetry",
+        "Unity.XR.Interaction.Toolkit",
+        "Unity.XR.CoreUtils",
+        "Unity.XR.Management",
+        "Unity.XR.Management.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "noEngineReferences": false
+}

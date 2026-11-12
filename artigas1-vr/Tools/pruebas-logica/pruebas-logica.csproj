@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Pruebas de la lógica pura de Artigas-1 (sin Unity): locomoción en 0G, reglas de huecos, estados de carga,
+    manifiesto, balance de masa y estadísticas de cuadros. Corren sobre la matemática de Stubs/UnityMath.cs.
+      dotnet run
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <StartupObject>Artigas1.Pruebas.Corredor</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="*.cs" />
+    <Compile Include="../verificar-compilacion/Stubs/UnityMath.cs" LinkBase="Stubs" />
+    <Compile Include="../../Assets/Artigas1/Scripts/Core/*.cs" LinkBase="Scripts/Core" />
+  </ItemGroup>
+</Project>

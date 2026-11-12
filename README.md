@@ -17,5 +17,6 @@ Cada pieza se ve en vista explotada y encaja en su lugar. Mientras tanto, el vis
 | `backend/` | API FastAPI: inventario, telemetría de sesiones, manifest de modelos, WebSocket en vivo |
 | `web-dashboard/` | React, TypeScript, Tailwind y React Three Fiber: visor 3D y panel del docente |
 | `vr-client/` | Unity 6 con OpenXR: passthrough, manos, vista explotada, encajes y telemetría |
+| [`artigas1-vr/`](artigas1-vr/README.md) | Artigas-1: simulador de logística en una estación espacial uruguaya (Unity 6, gravedad cero), con su kit 3D de Blender y el recorrido web en `web-dashboard/public/artigas1/` |
 
 Las pautas de desarrollo, los comandos y el estado del proyecto están en [`CLAUDE.md`](CLAUDE.md).
