@@ -1,4 +1,6 @@
-// Mapa de la Estación Artigas-1: un panel flotante que se abre con el gatillo del índice izquierdo.
+// Mapa de la Estación Artigas-1: una tablet de navegación que el astronauta sostiene con la mano izquierda
+// mientras aprieta el gatillo del índice izquierdo; al soltarlo, la guarda. En la compu (tecla M) y desde la
+// tablet logística se abre como un panel flotante delante de la cabeza, igual que antes.
 // Dibuja la estación de costado, a escala (carguero a la izquierda, Tacuarembó a la derecha, la Cúpula abajo
 // del Nodo y los paneles solares, la antena y los radiadores por fuera). Muestra dónde está el astronauta,
 // qué módulos visitó y dónde hay actividades. Cada módulo se selecciona; desde ahí se pide la guía (flechas
@@ -23,6 +25,88 @@ const ICONOS = { esclusa: [2.11, 0.0], junta_solar: [-6.8, 3.15], antena: [2.11,
 
 const _v = new THREE.Vector3();
 const _p = new THREE.Vector3();
+const _m = new THREE.Matrix4();
+
+/** Medidas de la tablet de navegación (metros). La pantalla dibuja el mismo canvas de 1280 × 800. */
+export const TABLET_MAPA = { ancho: 0.330, alto: 0.222, espesor: 0.014, radio: 0.016, pantallaAncho: 0.300, pantallaAlto: 0.1875 };
+const PANEL_ANCHO = 0.96;                                    // ancho del panel en modo flotante (metros)
+
+/**
+ * Pose de la tablet en el marco «herramienta» de la mano izquierda (+Y hacia el pulgar, -Z hacia los nudillos,
+ * la palma mira a +X). La mano la toma por el borde izquierdo: el pulgar queda sobre el marco, del lado de la
+ * pantalla, y los dedos por detrás. La tablet se extiende hacia la palma (hacia el centro del cuerpo) y la
+ * pantalla mira hacia atrás y arriba, a los ojos, con el control sostenido de forma natural.
+ */
+export function poseTabletEnMano(inclinacion = -1.2, out = new THREE.Matrix4()) {
+  // inclinacion: giro de la pantalla alrededor del eje de la tablet; -1,2 rad la deja de frente a los ojos con el
+  // control sostenido delante del pecho (medido en tres posturas: de frente, con la mano alta y con la mano baja)
+  const x = new THREE.Vector3(1, 0, 0);
+  const z = new THREE.Vector3(0, Math.sin(inclinacion), Math.cos(inclinacion));
+  const y = new THREE.Vector3().crossVectors(z, x);
+  out.makeBasis(x, y, z);
+  // el borde izquierdo (x = -ancho/2) queda 2 cm adentro de la palma; el plano de la tablet pasa por la mano
+  const centro = new THREE.Vector3().addScaledVector(x, TABLET_MAPA.ancho / 2 - 0.018).addScaledVector(y, 0.012).addScaledVector(z, -0.004);
+  return out.setPosition(centro);
+}
+
+/** Cuerpo de la tablet: marco de bordes redondeados, bisel de la pantalla, empuñadura de goma y luces de estado. */
+function crearCuerpoTablet() {
+  const T = TABLET_MAPA;
+  const forma = new THREE.Shape();
+  const w = T.ancho / 2 - T.radio;
+  const h = T.alto / 2 - T.radio;
+  forma.moveTo(-w, -T.alto / 2);
+  forma.lineTo(w, -T.alto / 2);
+  forma.absarc(w, -h, T.radio, -Math.PI / 2, 0, false);
+  forma.lineTo(T.ancho / 2, h);
+  forma.absarc(w, h, T.radio, 0, Math.PI / 2, false);
+  forma.lineTo(-w, T.alto / 2);
+  forma.absarc(-w, h, T.radio, Math.PI / 2, Math.PI, false);
+  forma.lineTo(-T.ancho / 2, -h);
+  forma.absarc(-w, -h, T.radio, Math.PI, Math.PI * 1.5, false);
+  const bisel = 0.0025;
+  const marco = new THREE.ExtrudeGeometry(forma, { depth: T.espesor - 2 * bisel, bevelEnabled: true, bevelThickness: bisel, bevelSize: bisel, bevelSegments: 2, curveSegments: 6 });
+  marco.translate(0, 0, -(T.espesor - 2 * bisel) / 2);
+  const piezas = [{ g: marco, color: 0x3a4048 }];
+  const caja = (sx, sy, sz, x, y, z, color) => { const g = new THREE.BoxGeometry(sx, sy, sz); g.translate(x, y, z); piezas.push({ g, color }); };
+  const frente = T.espesor / 2;
+  // bisel negro alrededor de la pantalla
+  caja(T.pantallaAncho + 0.010, T.pantallaAlto + 0.010, 0.0012, 0.004, -0.006, frente + 0.0004, 0x0b0d10);
+  // empuñadura de goma en el borde izquierdo (donde la toma la mano) y en el derecho
+  caja(0.016, T.alto * 0.78, T.espesor + 0.004, -T.ancho / 2 + 0.006, 0, 0, 0x22262b);
+  caja(0.010, T.alto * 0.55, T.espesor + 0.003, T.ancho / 2 - 0.004, 0, 0, 0x22262b);
+  // franja superior: identificación y tres luces de estado
+  caja(0.120, 0.006, 0.0014, -0.070, T.alto / 2 - 0.0085, frente + 0.0005, 0xf2c200);
+  [[0.090, 0x3ddc84], [0.104, 0x74acdf], [0.118, 0xf2c200]].forEach(([x, c]) => caja(0.006, 0.006, 0.002, x, T.alto / 2 - 0.0085, frente + 0.0006, c));
+  // tapa trasera con refuerzo y correa de mano
+  caja(T.ancho * 0.62, T.alto * 0.55, 0.004, 0.02, 0, -frente - 0.0015, 0x2c3137);
+  caja(0.030, T.alto * 0.70, 0.006, -T.ancho / 2 + 0.050, 0, -frente - 0.004, 0x1c1f23);
+  const geos = piezas.map(({ g, color }) => {
+    const gg = g.index ? g.toNonIndexed() : g;
+    const c = new THREE.Color(color);
+    const n = gg.attributes.position.count;
+    const col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+    gg.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    if (gg.attributes.uv) gg.deleteAttribute('uv');
+    return gg;
+  });
+  // fusionar a mano (sin dependencias): todas no indexadas, mismos atributos
+  const total = geos.reduce((t, g) => t + g.attributes.position.count, 0);
+  const pos = new Float32Array(total * 3), nor = new Float32Array(total * 3), col = new Float32Array(total * 3);
+  let o = 0;
+  for (const g of geos) {
+    pos.set(g.attributes.position.array, o * 3);
+    nor.set(g.attributes.normal.array, o * 3);
+    col.set(g.attributes.color.array, o * 3);
+    o += g.attributes.position.count;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
+}
 
 export class MapaEstacion {
   /**
@@ -48,11 +132,65 @@ export class MapaEstacion {
     this._reloj = 0;
     this._cabeza = new THREE.Vector3();
     this._mira = new THREE.Vector3(0, 0, -1);
-    this.panel = new PanelVR({ ancho: 0.96, alto: 0.60, px: 1280, nombre: 'Mapa_Estacion', dibujar: (ctx, p) => this._dibujar(ctx, p) });
-    this.panel.malla.visible = false;
+    this.panel = new PanelVR({ ancho: PANEL_ANCHO, alto: 0.60, px: 1280, nombre: 'Mapa_Estacion', dibujar: (ctx, p) => this._dibujar(ctx, p) });
     this.panel.malla.renderOrder = 6;
-    escena.add(this.panel.malla);
+    // La pantalla va dentro de la tablet. En la mano se ve la tablet entera; flotando, solo la pantalla, del
+    // tamaño de siempre.
+    this.tablet = new THREE.Group();
+    this.tablet.name = 'Tablet_Mapa';
+    this.tablet.matrixAutoUpdate = false;
+    this.tablet.visible = false;
+    this.cuerpo = new THREE.Mesh(crearCuerpoTablet(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.25 }));
+    this.cuerpo.name = 'Tablet_Mapa_Cuerpo';
+    this.panel.malla.position.set(0.004, -0.006, TABLET_MAPA.espesor / 2 + 0.0011);
+    this.panel.malla.scale.setScalar(TABLET_MAPA.pantallaAncho / PANEL_ANCHO);
+    this.tablet.add(this.cuerpo, this.panel.malla);
+    escena.add(this.tablet);
     paneles.agregar(this.panel);
+    /** 'mano' (sostenida con la izquierda) o 'flotante'. */
+    this.modo = 'flotante';
+    /** Mano que sostiene la tablet (o null). */
+    this.mano = null;
+    this._flotante = new THREE.Matrix4();
+    /** Pose de la tablet respecto de la mano (ver poseTabletEnMano). */
+    this.poseEnMano = poseTabletEnMano();
+  }
+
+  /**
+   * Toma la tablet con una mano (la izquierda): queda sujeta a su marco de agarre y la mano no puede tomar otra
+   * cosa ni apuntar mientras la sostiene. Se guarda con `cerrar()` (al soltar el gatillo).
+   */
+  sostener(mano) {
+    if (this.mano && this.mano !== mano) this.mano.ocupada = false;
+    this.mano = mano;
+    mano.ocupada = true;
+    mano.sostieneMapa = true;
+    this.modo = 'mano';
+    this.cuerpo.visible = true;
+    this.panel.malla.scale.setScalar(TABLET_MAPA.pantallaAncho / PANEL_ANCHO);
+    this.panel.malla.position.set(0.004, -0.006, TABLET_MAPA.espesor / 2 + 0.0011);
+    this.abierto = true;
+    this._meta = 1;
+    this.seleccion = this.seleccion || this.navegacion.actual || 'rivera';
+    this.panel.sucio = true;
+    this._seguirMano();
+  }
+
+  /** Pone la tablet en la mano que la sostiene (cada cuadro, después de leer los controles). */
+  _seguirMano() {
+    const m = this.mano;
+    m.objeto.updateWorldMatrix(true, false);
+    _m.multiplyMatrices(m.objeto.matrixWorld, this.poseEnMano);
+    const s = this._escalaVisible();
+    if (s !== 1) _m.multiply(new THREE.Matrix4().makeScale(s, s, s));
+    this.tablet.matrix.copy(_m);
+    this.tablet.matrixWorldNeedsUpdate = true;
+    this.tablet.updateMatrixWorld(true);
+  }
+
+  _escalaVisible() {
+    const e = this._escala;
+    return Math.max(0.001, e * e * (3 - 2 * e));
   }
 
   /** Abre el mapa delante de la cabeza, a una distancia cómoda y sin meterlo en una pared. */
@@ -67,12 +205,22 @@ export class MapaEstacion {
         if (estructura.puntoMasCercano(_p, 0.3, new THREE.Vector3()) === Infinity) break;
       }
     }
-    const m = this.panel.malla;
-    m.position.copy(this._cabeza).addScaledVector(_v, distancia);
-    m.up.copy(camara.up).applyQuaternion(camara.getWorldQuaternion(new THREE.Quaternion()));
-    m.position.addScaledVector(m.up, -0.06);
-    m.lookAt(this._cabeza);
-    m.visible = true;
+    if (this.mano) { this.mano.ocupada = false; this.mano.sostieneMapa = false; this.mano = null; }
+    this.modo = 'flotante';
+    this.cuerpo.visible = false;
+    this.panel.malla.position.set(0, 0, 0);
+    this.panel.malla.scale.setScalar(1);
+    const o = new THREE.Object3D();
+    o.position.copy(this._cabeza).addScaledVector(_v, distancia);
+    o.up.copy(camara.up).applyQuaternion(camara.getWorldQuaternion(new THREE.Quaternion()));
+    o.position.addScaledVector(o.up, -0.06);
+    o.lookAt(this._cabeza);
+    o.updateMatrix();
+    this._flotante.copy(o.matrix);
+    this.tablet.matrix.copy(o.matrix);
+    this.tablet.matrixWorldNeedsUpdate = true;
+    this.tablet.updateMatrixWorld(true);
+    this.tablet.visible = true;
     this.abierto = true;
     this._meta = 1;
     this.seleccion = this.seleccion || this.navegacion.actual || 'rivera';
@@ -82,6 +230,7 @@ export class MapaEstacion {
   cerrar() {
     this.abierto = false;
     this._meta = 0;
+    if (this.mano) { this.mano.ocupada = false; this.mano.sostieneMapa = false; }
   }
 
   alternar(camara, estructura) {
@@ -95,17 +244,29 @@ export class MapaEstacion {
 
   /** @param {number} dt @param {THREE.Vector3} cabeza @param {THREE.Vector3} mira */
   actualizar(dt, cabeza, mira) {
-    const m = this.panel.malla;
     if (this._escala !== this._meta) {
       this._escala = THREE.MathUtils.clamp(this._escala + Math.sign(this._meta - this._escala) * dt / 0.18, 0, 1);
-      const s = this._escala * this._escala * (3 - 2 * this._escala);
-      m.scale.setScalar(Math.max(s, 0.001));
-      if (this._escala === 0) m.visible = false;
+      if (this._escala === 0) {
+        this.tablet.visible = false;
+        this.mano = null;
+      } else {
+        this.tablet.visible = true;
+      }
+    }
+    if (this.tablet.visible) {
+      if (this.modo === 'mano' && this.mano) this._seguirMano();
+      else {
+        const s = this._escalaVisible();
+        this.tablet.matrix.copy(this._flotante).multiply(_m.makeScale(s, s, s));
+        this.tablet.matrixWorldNeedsUpdate = true;
+        this.tablet.updateMatrixWorld(true);
+      }
     }
     if (!this.abierto) return;
     this._cabeza.copy(cabeza);
     this._mira.copy(mira);
-    if (m.position.distanceTo(cabeza) > 2.6) { this.cerrar(); return; }   // el astronauta se fue: se cierra solo
+    // flotante: si el astronauta se fue, se cierra solo (en la mano va con él)
+    if (this.modo === 'flotante' && _p.setFromMatrixPosition(this._flotante).distanceTo(cabeza) > 2.6) { this.cerrar(); return; }
     this._reloj += dt;
     if (this._reloj > 0.25) { this._reloj = 0; this.panel.sucio = true; }
   }

@@ -1,9 +1,15 @@
-// Manos del astronauta: lectura de los controles y un modelo de mano humana articulada por cada uno.
+// Manos del astronauta: lectura de los controles y un guante articulado por cada uno.
 //
-// Cada mano tiene palma, pulgar y cuatro dedos de tres falanges. No hay figuras de cajas: cada falange es una
-// cápsula y todas se dibujan en UNA llamada (InstancedMesh). Los dedos se mueven por cinemática directa hacia
-// una pose objetivo que depende de lo que hace la mano (libre, apuntar, puño, baranda, pistola, cilindro…).
-// Con controles no hay seguimiento de dedos: las poses salen del grip, el gatillo y lo que la mano sostiene.
+// Cada mano tiene palma, pulgar y cuatro dedos de tres falanges. Los dedos se mueven por cinemática directa
+// hacia una pose objetivo que depende de lo que hace la mano (libre, apuntar, puño, baranda, pistola, cilindro,
+// tablet…). Con controles no hay seguimiento de dedos: las poses salen del grip, el gatillo y lo que la mano
+// sostiene, y se mezclan de a poco (sin saltos).
+//
+// Lo que se ve es un guante de astronauta modelado en Blender (artigas1-vr/Blender/guante.py): una sola malla
+// cerrada por mano, con palma de goma, yemas, refuerzos en los nudillos, costuras y puño, que se deforma con 16
+// huesos (palma, 12 falanges y 3 del pulgar). Los huesos salen de las mismas matrices de la cinemática, así que
+// el guante coincide con las poses y los puntos de agarre. Mientras el guante no cargó (o si no carga) se ven
+// las cápsulas de antes.
 //
 // Las manos son las del traje y salen de un cuerpo que se ve en primera persona: guante, puño de aluminio,
 // antebrazo y brazo (cinemática inversa de dos huesos desde el hombro), y debajo de la cabeza el torso con la
@@ -15,6 +21,7 @@
 //     y la izquierda a +X. Los objetos tomados se acomodan en este marco (ver js/herramientas.js).
 //   - «modelo» de la mano derecha: dedos hacia -Z, palma hacia -Y, pulgar del lado -X. La izquierda es su espejo.
 import * as THREE from 'three';
+import { ManoGuante, cargarDatosGuante, geometriaGuante, materialGuante, rigida } from './guante.js';
 
 /** Curvatura de cada falange (radianes) de índice, medio, anular y meñique; abanico; y pulgar [abre, f1, f2, f3]. */
 export const POSES = {
@@ -31,6 +38,8 @@ export const POSES = {
   pinza: { dedos: [[0.62, 0.72, 0.42], [0.58, 0.66, 0.40], [0.66, 0.74, 0.46], [0.72, 0.78, 0.48]], abanico: 0.6, pulgar: [-0.05, 0.42, 0.40, 0.42] },
   plano: { dedos: [[0.30, 0.34, 0.22], [0.32, 0.36, 0.22], [0.34, 0.38, 0.24], [0.36, 0.40, 0.26]], abanico: 1.1, pulgar: [0.05, 0.36, 0.20, 0.25] },
   caja: { dedos: [[0.48, 0.52, 0.34], [0.50, 0.54, 0.34], [0.52, 0.56, 0.36], [0.54, 0.58, 0.38]], abanico: 1.4, pulgar: [0.35, 0.22, 0.26, 0.24] },
+  // tablet del mapa tomada por el borde: dedos por detrás, curvados alrededor del marco; pulgar apoyado adelante
+  tableta: { dedos: [[0.95, 0.55, 0.30], [1.00, 0.58, 0.32], [1.05, 0.60, 0.34], [1.10, 0.62, 0.36]], abanico: 0.55, pulgar: [0.10, 0.30, 0.20, 0.15] },
 };
 
 // Mano derecha en el marco «modelo» (metros). Medidas de una mano adulta media.
@@ -46,6 +55,7 @@ const PIEZAS_PALMA = [
   { pos: [-0.024, -0.008, 0.018], escala: [0.0165, 0.0140, 0.0105] }, // eminencia del pulgar
   { pos: [0.002, 0.001, 0.058], escala: [0.0290, 0.0190, 0.0110] },   // muñeca
 ];
+const PIEZAS_PALMA_N = 3;
 export const PIEZAS_POR_MANO = PIEZAS_PALMA.length + DEDOS.length * 3 + 3;   // 18
 /** Puño del guante, antebrazo y brazo. */
 export const PIEZAS_BRAZO = 3;
@@ -61,6 +71,18 @@ const COLOR_PUNO = 0x74acdf;        // aro del puño, celeste
 const COLOR_EQUIPO = 0x9aa0a6;
 const COLOR_BOTA = 0x4a4f57;
 const LARGO_BASE = 5;                                                          // la cápsula unitaria mide 5 de punta a punta
+/** Pieza de la cinemática que mueve cada hueso del guante: palma, 12 falanges y 3 del pulgar. */
+export const PIEZA_DE_HUESO = [0, ...Array.from({ length: 15 }, (_, i) => PIEZAS_PALMA_N + i)];
+/** Color, rugosidad y metalicidad de cada zona del guante (tela, goma, yema, refuerzo, puño). */
+export const ZONAS_GUANTE = [
+  { color: 0xeceae4, rugosidad: 0.92, metal: 0.0 },   // tela técnica blanca
+  { color: 0x5a6068, rugosidad: 0.96, metal: 0.0 },   // goma de agarre de la palma y los dedos
+  { color: 0x3d4248, rugosidad: 0.90, metal: 0.0 },   // yemas reforzadas
+  { color: 0x8e98a4, rugosidad: 0.58, metal: 0.35 },  // refuerzos aluminizados del dorso y los nudillos
+  { color: 0xc8ced4, rugosidad: 0.80, metal: 0.05 },  // puño
+];
+/** Cuánto se infla el guante presurizado de la caminata (metros, a lo largo de la normal). */
+const INFLADO_PRESURIZADO = 0.0022;
 
 /** Presets para acomodar el marco «herramienta» al espacio de agarre del control (se elige en la tablet). */
 export const CALIBRACIONES = [
@@ -189,6 +211,7 @@ function crearMano(indice) {
     indice, lado: indice === 0 ? 'left' : 'right', objeto, posicion: new THREE.Vector3(), punta: new THREE.Vector3(),
     cerrada: false, grip: 0, gatillo: 0, gatilloApretado: false, gatilloNuevo: false, ejes: [0, 0], botones: [false, false, false],
     agarre: null, cerca: null, sostiene: null, cercaObjeto: false, objetoCercano: null, nuevoAgarre: false, apunta: false,
+    ocupada: false, sostieneMapa: false,
     conectada: false, fuente: null, apuntador: null, virtual: false,
     muneca: new THREE.Vector3(), codo: new THREE.Vector3(), hombro: new THREE.Vector3(),
     pose: copiarPose(POSES.relajada), _matrices: Array.from({ length: PIEZAS_POR_MANO }, () => new THREE.Matrix4()),
@@ -267,6 +290,37 @@ export class Manos {
     this.usarEscritorio = true;
     this.calibrar(this._leerCalibracion());
     this._rearmar();
+    /** Guantes (uno por mano) cuando termina de cargar guante.bin; hasta entonces, las cápsulas. */
+    this.guantes = null;
+    this.escena = escena;
+  }
+
+  /**
+   * Carga el guante modelado en Blender y lo pone en las tres manos. Si falla, quedan las cápsulas.
+   * @param {string} base  Carpeta de guante.json y guante.bin (con la barra final).
+   * @param {THREE.Texture|null} entorno
+   */
+  async cargarGuante(base, entorno = null) {
+    const d = await cargarDatosGuante(base);
+    const pose = d.info.pose;
+    const mats = Array.from({ length: PIEZAS_POR_MANO }, () => new THREE.Matrix4());
+    cinematicaMano({ dedos: pose.dedos.map((x) => x.slice()), abanico: pose.abanico, pulgar: pose.pulgar.slice() }, mats, new THREE.Vector3(), 1);
+    const reposo = PIEZA_DE_HUESO.map((pieza) => rigida(new THREE.Matrix4(), mats[pieza]));
+    // el esqueleto del .bin tiene que ser el mismo que el de la cinemática
+    const desvio = Math.max(...reposo.map((m, i) => _v.setFromMatrixPosition(m).distanceTo(_w.fromArray(d.info.centros[i]))));
+    if (desvio > 0.0005) throw new Error(`guante: los huesos del modelo no coinciden con la cinemática (${(desvio * 1000).toFixed(2)} mm)`);
+    const geos = {
+      derecha: geometriaGuante(d, false, 0, ZONAS_GUANTE),
+      izquierda: geometriaGuante(d, true, 0, ZONAS_GUANTE),
+      derechaP: geometriaGuante(d, false, INFLADO_PRESURIZADO, ZONAS_GUANTE),
+      izquierdaP: geometriaGuante(d, true, INFLADO_PRESURIZADO, ZONAS_GUANTE),
+    };
+    const material = materialGuante(entorno);
+    this.guantes = [0, 1, 2].map(() => new ManoGuante(geos, reposo, material));
+    for (const g of this.guantes) this.escena.add(g.malla);
+    this.desvioGuante = desvio;
+    this.verticesGuante = d.info.vertices;
+    return this.guantes;
   }
 
   _leerCalibracion() {
@@ -305,7 +359,8 @@ export class Manos {
       const b = gp ? gp.buttons : [];
       m.gatillo = b[0] ? b[0].value : 0;
       m.grip = b[1] ? b[1].value : 0;
-      m.cerrada = !!b[1] && (b[1].pressed || b[1].value > 0.6);
+      // la mano que sostiene la tablet del mapa no toma nada más ni se agarra de la estación
+      m.cerrada = !m.ocupada && !!b[1] && (b[1].pressed || b[1].value > 0.6);
       m.ejes[0] = gp && gp.axes.length >= 4 ? gp.axes[2] : 0;
       m.ejes[1] = gp && gp.axes.length >= 4 ? gp.axes[3] : 0;
       m.botones[0] = !!b[4]?.pressed;             // A o X
@@ -321,6 +376,7 @@ export class Manos {
   }
 
   _poseObjetivo(m) {
+    if (m.sostieneMapa) return { meta: POSES.tableta };
     if (m.sostiene) {
       const pose = m.sostiene.agarre?.pose || (m.sostiene.radio > 0.07 ? 'caja' : 'pinza');
       if (pose === 'pistola') return { meta: POSES.pistola, indice: m.gatillo > 0.05 ? POSES.pistolaGatillo.dedos[0] : null, mezclaIndice: m.gatillo };
@@ -350,8 +406,10 @@ export class Manos {
     const g = 0.86 + 0.14 * this.grosor;          // mangas un poco más gruesas con el traje presurizado
     for (const m of [...this._porIndice, this.escritorio]) {
       const base = m.indice * PIEZAS_POR_LADO;
+      const guante = this.guantes ? this.guantes[m.indice] : null;
       if (!activas.has(m)) {
         if (m._visible !== false) { for (let i = 0; i < PIEZAS_POR_LADO; i++) this.malla.setMatrixAt(base + i, _cero); m._visible = false; }
+        if (guante) guante.malla.visible = false;
         continue;
       }
       m._visible = true;
@@ -372,14 +430,26 @@ export class Manos {
       for (let i = 0; i < PIEZAS_POR_MANO; i++) {
         _c.multiplyMatrices(_b, m._matrices[i]);
         if (!derecha) _c.premultiply(ESPEJO).multiply(ESPEJO);
-        this.malla.setMatrixAt(base + i, _c.premultiply(m.objeto.matrixWorld));
+        _c.premultiply(m.objeto.matrixWorld);
+        if (i === 2) m.muneca.setFromMatrixPosition(_c);
+        // con el guante cargado, las cápsulas de la mano no se dibujan (quedan el puño, los brazos y el cuerpo)
+        this.malla.setMatrixAt(base + i, guante ? _cero : _c);
+      }
+      if (guante) {
+        guante.usar(!derecha, this.grosor > 1.2);
+        guante.malla.visible = true;
+        for (let h = 0; h < PIEZA_DE_HUESO.length; h++) {
+          const hueso = guante.huesos[h];
+          rigida(_c, m._matrices[PIEZA_DE_HUESO[h]]).premultiply(_b);
+          if (!derecha) _c.premultiply(ESPEJO).multiply(ESPEJO);
+          hueso.matrixWorld.multiplyMatrices(m.objeto.matrixWorld, _c);
+        }
       }
       _v.copy(m._puntaLocal).applyMatrix4(_b);
       if (!derecha) _v.x = -_v.x;
       m.punta.copy(_v).applyMatrix4(m.objeto.matrixWorld);
       // --- puño, antebrazo y brazo: de la muñeca al hombro de ese lado
-      this.malla.getMatrixAt(base + 2, _c);
-      const muneca = m.muneca.setFromMatrixPosition(_c);
+      const muneca = m.muneca;
       const lado = derecha ? 1 : -1;
       const hombro = m.hombro.copy(ojos).addScaledVector(arriba, -CUERPO.hombroAbajo).addScaledVector(derechaCuerpo, lado * CUERPO.hombroAncho).addScaledVector(frente, -0.03);
       _polo.copy(arriba).multiplyScalar(-0.75).addScaledVector(derechaCuerpo, lado * 0.55).addScaledVector(frente, -0.35);

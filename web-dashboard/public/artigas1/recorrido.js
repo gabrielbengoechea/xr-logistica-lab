@@ -107,6 +107,8 @@ const loader = new GLTFLoader(manager);
 const sonido = new Sonido();
 const manos = new Manos(renderer, rig, scene, camera);
 manos.calibrar(ajustes.calibracionManos);
+// el guante de Blender llega aparte: mientras tanto (o si no llega) se ven las manos de cápsulas
+const guanteListo = manos.cargarGuante('./', entorno).catch((e) => { console.warn('guante:', e.message); return null; });
 const paneles = new SistemaPaneles(scene, sonido);
 const transicion = new StationTransitionManager(camera);
 const confort = new Confort(camera);
@@ -549,6 +551,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   document.getElementById('cargando').remove();
   // para las pruebas automáticas y para depurar desde la consola
   window.artigas1 = {
+    guanteListo,
     THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, flotantes, ir, manosDePrueba,
     inventario, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
     acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas }, aviso, panelInforme, teclas,
@@ -759,7 +762,7 @@ function enderezar() {
  *   stick izquierdo  mover hacia donde se mira y de costado      X / Y   bajar / subir
  *   stick derecho    girar 30° y mirar arriba o abajo 20°, con parpadeo a negro (o suave)
  *                                                                A       freno    B   enderezar
- *   gatillo izq.     mapa de la estación                          gatillo der.   usar la herramienta o apretar un botón
+ *   gatillo izq.     sostener la tablet del mapa (mientras se aprieta)   gatillo der.   usar la herramienta o apretar un botón
  *   grips            tomar y soltar
  */
 function entradaXR(dt) {
@@ -772,8 +775,10 @@ function entradaXR(dt) {
     if (Math.abs(y) > 0.15) empuje.addScaledVector(adelante, -y);
     if (izq.botones[1]) empuje.add(arribaRig);
     if (izq.botones[0]) empuje.sub(arribaRig);
-    // gatillo del índice izquierdo: mapa (salvo que esa mano lleve una herramienta o esté apretando un botón)
-    if (izq.gatilloNuevo && !izq.gatilloUsado && !izq.sostiene) mapa.alternar(camera, eva.afuera ? null : estacion.colisiones);
+    // gatillo del índice izquierdo: mientras se aprieta, la mano izquierda sostiene la tablet del mapa; al
+    // soltarlo, la guarda (salvo que esa mano lleve una herramienta o el gatillo haya sido para un botón)
+    if (izq.gatilloNuevo && !izq.gatilloUsado && !izq.sostiene) mapa.sostener(izq);
+    else if (mapa.mano === izq && mapa.abierto && !izq.gatilloApretado) mapa.cerrar();
   }
   if (der) {
     const [x, y] = der.ejes;

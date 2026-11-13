@@ -213,6 +213,7 @@ export class SistemaPaneles {
       let e = this._estado.get(m);
       if (!e) { e = { espera: 0, dentro: null }; this._estado.set(m, e); }
       e.espera = Math.max(0, e.espera - dt);
+      if (m.ocupada) continue;                                   // sostiene la tablet del mapa: ni toca ni apunta
       // --- toque con la punta del índice
       let tocado = null;
       if (m.punta) {
