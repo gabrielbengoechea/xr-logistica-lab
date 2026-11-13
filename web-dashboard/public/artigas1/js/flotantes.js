@@ -6,6 +6,10 @@
 //  - rebota contra la estación con el mismo sistema de colisiones que el astronauta;
 //  - el cuerpo y las manos lo empujan; con el grip cerrado se lo toma y al soltarlo sale con la velocidad
 //    de la mano;
+//  - agarre universal: el objeto más cercano dentro del alcance es el que se toma; si tiene un punto de agarre
+//    (js/herramientas.js) se acomoda solo en la mano; se pasa de una mano a la otra tomándolo con la mano libre;
+//    al soltarlo, `alSoltar` puede dejarlo fijo en un lugar (un hueco del rack, su soporte);
+//  - un objeto `fijo` no se mueve hasta que alguien lo toma (herramientas en su soporte, bultos asegurados);
 //  - la ventilación lo aparta del eje de paso de los módulos y una «correa» blanda lo mantiene en su zona,
 //    así que no tapa los pasillos ni se pierde en otro módulo. Un objeto lanzado queda libre hasta frenarse.
 //
@@ -26,8 +30,10 @@ export const PARAMETROS_FLOTANTES = {
   fuerzaCorrea: 0.03,        // 1/s²: aceleración por metro de exceso
   velocidadReposo: 0.03,     // m/s: por debajo, un objeto lanzado vuelve a tener zona propia
   velocidadMaxima: 2.5,      // m/s
-  alcanceMano: 0.10,         // m desde la superficie del objeto a la que la mano lo toma
+  alcanceMano: 0.12,         // m desde la superficie del objeto a la que la mano lo toma (tolerante)
+  tiempoAcomodo: 0.12,       // s que tarda el objeto en acomodarse al punto de agarre
   radioMano: 0.06,           // m: la mano abierta empuja como una esfera
+  velocidadGolpe: 0.6,       // m/s: una mano más lenta que esto se está acercando para tomar y no empuja
   distanciaActiva: 7.0,      // m: más lejos de la cabeza no se calcula ni se dibuja
 };
 
@@ -58,6 +64,15 @@ export class Flotante {
     this._fase = new THREE.Vector3(azar() * 6.28, azar() * 6.28, azar() * 6.28);
     this._local = new THREE.Vector3();
     this._qLocal = new THREE.Quaternion();
+    this._localMeta = new THREE.Vector3();
+    this._qMeta = new THREE.Quaternion();
+    this._acomodo = 1;           // 0 a 1: avance del acomodo al punto de agarre
+    this.tipo = '';              // 'escaner', 'tablet', 'contenedor', 'Guante'…
+    this.agarre = null;          // punto de agarre y pose de la mano (js/herramientas.js)
+    this.fijo = false;           // true: quieto en su lugar hasta que lo tomen
+    this.bloqueado = false;      // true: no se puede tomar
+    this.datos = null;           // lo que el juego necesite (código, destino, pantalla…)
+    this.reposo = { posicion: malla.position.clone(), giro: malla.quaternion.clone() };
   }
 }
 
@@ -81,20 +96,28 @@ export class SistemaFlotantes {
     this._azar = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
   }
 
-  /** @param {THREE.Object3D} malla @param {number} radio */
-  agregar(malla, radio) {
+  /**
+   * @param {THREE.Object3D} malla @param {number} radio
+   * @param {{tipo?: string, agarre?: object|null, fijo?: boolean, datos?: object|null}} [o]
+   */
+  agregar(malla, radio, o = {}) {
     const f = new Flotante(malla, radio, this._azar);
+    f.tipo = o.tipo || '';
+    f.agarre = o.agarre || null;
+    f.fijo = !!o.fijo;
+    f.datos = o.datos || null;
     f.velocidad.multiplyScalar(this.p.derivaInicial * (0.4 + 0.6 * this._azar()));
     f.giro.multiplyScalar(this.p.giroMinimo + (this.p.giroMaximo - this.p.giroMinimo) * this._azar());
     this.objetos.push(f);
     return f;
   }
 
-  _masCercano(punto, alcance) {
+  /** El objeto más cercano que esa mano puede tomar. Incluye lo que sostiene la otra mano (para pasarlo). */
+  _masCercano(punto, alcance, mano = null) {
     let mejor = null;
     let dMejor = Infinity;
     for (const f of this.objetos) {
-      if (f.mano) continue;
+      if (f.bloqueado || f.mano === mano || (f.mano && !mano) || !f.malla.visible) continue;
       const d = f.posicion.distanceTo(punto) - f.radio;
       if (d < alcance && d < dMejor) { mejor = f; dMejor = d; }
     }
@@ -125,19 +148,25 @@ export class SistemaFlotantes {
       }
       e.previa.copy(m.posicion);
       if (m.sostiene) {
+        m.objetoCercano = null;
         if (!m.cerrada) {
           const f = m.sostiene;
           f.velocidad.copy(e.alSoltar).clampLength(0, this.p.velocidadMaxima);
           f.mano = null;
           f.libre = true;
           m.sostiene = null;
+          if (this.alSoltar) this.alSoltar(f, m);      // puede dejarlo fijo en un hueco o en su soporte
         }
       } else {
-        const f = this._masCercano(m.posicion, this.p.alcanceMano);
+        const f = this._masCercano(m.posicion, this.p.alcanceMano, m);
         m.cercaObjeto = !!f;
+        m.objetoCercano = f;
         const hayBaranda = barandas ? barandas.masCercana(m.posicion, alcanceBaranda, _p) !== Infinity : false;
         if (f && m.cerrada && !e.yaCerrada && !m.agarre && !hayBaranda) {
+          if (f.mano) f.mano.sostiene = null;         // lo tenía la otra mano: pasa a esta
+          const estabaFijo = f.fijo;
           f.mano = m;
+          f.fijo = false;
           m.sostiene = f;
           m.nuevoAgarre = true;
           if (m.objeto) {
@@ -146,9 +175,17 @@ export class SistemaFlotantes {
             f._local.copy(f.posicion).applyMatrix4(_m);
             m.objeto.getWorldQuaternion(_q);
             f._qLocal.copy(_q).invert().multiply(f.malla.quaternion);
+            f._acomodo = 1;
+            if (f.agarre && !f.agarre.libre) {
+              // punto de agarre: el objeto se acomoda en la mano en unos cuadros
+              const g = m.lado === 'left' ? f.agarre.matrizIzquierda : f.agarre.matriz;
+              g.decompose(f._localMeta, f._qMeta, _v);
+              f._acomodo = 0;
+            }
           } else {
             f._local.subVectors(f.posicion, m.posicion);
           }
+          if (this.alTomar) this.alTomar(f, m, estabaFijo);
         }
       }
       e.yaCerrada = m.cerrada;
@@ -172,6 +209,13 @@ export class SistemaFlotantes {
       if (f.mano) {                                      // tomado: sigue a la mano
         const m = f.mano;
         if (m.objeto) {
+          if (f._acomodo < 1) {
+            const antes = f._acomodo;
+            f._acomodo = Math.min(1, f._acomodo + dt / p.tiempoAcomodo);
+            const k = (f._acomodo - antes) / (1 - antes);
+            f._local.lerp(f._localMeta, k);
+            f._qLocal.slerp(f._qMeta, k);
+          }
           m.objeto.updateWorldMatrix(true, false);
           f.posicion.copy(f._local).applyMatrix4(m.objeto.matrixWorld);
           m.objeto.getWorldQuaternion(_q);
@@ -184,8 +228,8 @@ export class SistemaFlotantes {
         continue;
       }
       const lejos = f.posicion.distanceToSquared(cabeza) > p.distanciaActiva * p.distanciaActiva;
-      f.malla.visible = !lejos;
-      if (lejos) continue;
+      f.malla.visible = !lejos && !f.oculto;
+      if (lejos || f.fijo || f.oculto) continue;
       this.activos++;
 
       // --- fuerzas suaves: brisa, pasillo y correa
@@ -246,8 +290,11 @@ export class SistemaFlotantes {
       for (const e of cuerpo) this._empujar(f, e.centro, e.radio, velocidadCuerpo);
       for (const m of manos) {
         if (m.sostiene) continue;
+        // Solo un manotazo empuja. Si la mano que se acerca despacio corriera el objeto, tomarlo sería una
+        // persecución: en 0G cualquier roce lo aleja.
         const em = this._manos.get(m);
-        this._empujar(f, m.posicion, p.radioMano, em ? em.velocidad : _v.set(0, 0, 0));
+        if (!em || em.velocidad.lengthSq() < p.velocidadGolpe * p.velocidadGolpe) continue;
+        this._empujar(f, m.posicion, p.radioMano, em.velocidad);
       }
 
       // --- giro
@@ -257,6 +304,17 @@ export class SistemaFlotantes {
         f.malla.quaternion.premultiply(_q);
       }
     }
+  }
+
+  /** Devuelve un objeto a su lugar de reposo y lo deja fijo (reunir las herramientas). */
+  guardar(f) {
+    if (f.mano) { f.mano.sostiene = null; f.mano = null; }
+    f.posicion.copy(f.reposo.posicion);
+    f.malla.quaternion.copy(f.reposo.giro);
+    f.casa.copy(f.reposo.posicion);
+    f.velocidad.set(0, 0, 0);
+    f.libre = false;
+    f.fijo = true;
   }
 
   /** Saca al objeto de adentro de una esfera que se mueve y le pasa su velocidad (masa del cuerpo: infinita). */

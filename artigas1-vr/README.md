@@ -115,13 +115,19 @@ La estación completa se recorre en el navegador (compu o Quest, con WebXR) desd
 | `estacion.js` | Fusiona las mallas por módulo y material, arma los colliders, las barandas y las escotillas corredizas |
 | `colisiones.js` | Colisiones: triángulos en una grilla espacial, esfera contra triángulo |
 | `locomocion.js` | Gravedad cero con cuerpo sólido: inercia, empuje, freno, rebote amortiguado y agarre |
-| `barandas.js`, `manos.js` | Barandas como capa de interacción; controles y manos en VR |
+| `barandas.js` | Barandas como capa de interacción |
 | `materiales.js` | Reflejos de entorno, juntas de panel, vidrio con Fresnel, sol en la Cúpula |
 | `entorno.js` | Tierra al atardecer calculada por píxel (esfera exacta), geografía real, luces de Buenos Aires y Montevideo, atmósfera, sol y estrellas |
-| `flotantes.js` | Objetos sueltos en microgravedad: deriva, rebote, empuje y agarre con las manos |
+| `flotantes.js` | Objetos sueltos en microgravedad y agarre universal: puntos de agarre, pasar de mano, soltar con inercia |
+| `manos.js` | Manos del traje con dedos articulados, brazos y cuerpo en primera persona; lectura de los controles |
+| `herramientas.js`, `escaner.js`, `tablet.js` | Herramientas con punto de agarre, pistola lectora y tablet logística |
+| `inventario.js` | Bultos, huecos del almacén y contenedores |
+| `actividades.js`, `misiones.js`, `inspeccion.js` | Gestor de actividades, las cinco actividades y los puntos de mantenimiento |
+| `paneles.js`, `mapa.js`, `navegacion.js` | Interfaz VR, mapa de la estación y guía entre módulos |
+| `exterior.js`, `eva.js` | Exterior con paneles solares y antenas; caminata espacial, cable y esclusa |
 | `etiquetas.js` | Etiquetas logísticas de cada bolsa, en una sola llamada de dibujo |
 
-Pruebas: `cd web-dashboard && npm test` (18 de física y flotantes) y `python3 artigas1-vr/Tools/pruebas-web/fisica.py` (41, sobre la estación real en Chrome). Qué se hizo, qué se midió y qué falta probar en el visor: [`INFORME-refactorizacion.md`](INFORME-refactorizacion.md) (colisiones, cúpula, materiales) e [`INFORME-ambientacion.md`](INFORME-ambientacion.md) (Tierra al atardecer, interiores y objetos flotantes).
+Pruebas: `cd web-dashboard && npm test` y, con el sitio servido en el puerto 8765, `python3 artigas1-vr/Tools/pruebas-web/juego.py` (159: el juego completo con los controles simulados) y `fisica.py` (41). Qué se hizo, qué se midió y qué falta probar en el visor: [`INFORME-gameplay.md`](INFORME-gameplay.md) (manos, herramientas, actividades, mapa, exterior y caminata), [`INFORME-ambientacion.md`](INFORME-ambientacion.md) e [`INFORME-refactorizacion.md`](INFORME-refactorizacion.md).
 
 ## Lo que sigue (fase 2)
 

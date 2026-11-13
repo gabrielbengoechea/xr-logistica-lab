@@ -124,27 +124,28 @@ JS = r"""
   ok('sin penetraciones persistentes', peorPen < 0.002, +peorPen.toFixed(5));
   // 17. Objetos sueltos: un minuto de deriva en toda la estación
   const F = A.flotantes, P = F.p;
+  const sueltos = F.objetos.filter((f) => !f.fijo);   // las herramientas guardadas en su soporte no derivan
   const lejos = P.distanciaActiva; P.distanciaActiva = 1e3;       // para la prueba se calculan todos
   cerrarPuertas();
   const sistemas = () => [col, ...A.estacion.escotillas.map((e) => e.colision)].filter((x) => x.activo);
-  const inicio = F.objetos.map((f) => f.posicion.clone());
-  const giro0 = F.objetos.map((f) => f.malla.quaternion.clone());
+  const inicio = sueltos.map((f) => f.posicion.clone());
+  const giro0 = sueltos.map((f) => f.malla.quaternion.clone());
   let vMaxF = 0, fueraF = 0;
   const tF = performance.now();
   for (let i = 0; i < 60 * 72; i++) {
     F.actualizar(1 / 72, cero, [], cero, []);
-    if (i % 72 === 0) for (const f of F.objetos) { vMaxF = Math.max(vMaxF, f.velocidad.length()); if (!adentro(f.posicion)) fueraF++; }
+    if (i % 72 === 0) for (const f of sueltos) { vMaxF = Math.max(vMaxF, f.velocidad.length()); if (!adentro(f.posicion)) fueraF++; }
   }
   const msF = (performance.now() - tF) / (60 * 72);
-  const corrido2 = F.objetos.map((f, i) => f.posicion.distanceTo(inicio[i]));
-  ok(`flotantes: los ${F.objetos.length} siguen dentro de la estación`, fueraF === 0, fueraF);
+  const corrido2 = sueltos.map((f, i) => f.posicion.distanceTo(inicio[i]));
+  ok(`flotantes: los ${sueltos.length} sueltos siguen dentro de la estación`, fueraF === 0, fueraF);
   ok('flotantes: deriva lenta (menos de 6 cm/s)', vMaxF < 0.06, +vMaxF.toFixed(4));
-  ok('flotantes: se mueven y giran', Math.min(...corrido2) > 0.002 && F.objetos.every((f, i) => f.malla.quaternion.angleTo(giro0[i]) > 0.02), +Math.min(...corrido2).toFixed(4));
+  ok('flotantes: se mueven y giran', Math.min(...corrido2) > 0.002 && sueltos.every((f, i) => f.malla.quaternion.angleTo(giro0[i]) > 0.02), +Math.min(...corrido2).toFixed(4));
   ok('flotantes: no se alejan de su zona', Math.max(...corrido2) < 1.2, +Math.max(...corrido2).toFixed(3));
   let peorF = 0; const cF = new T.Vector3();
-  for (const f of F.objetos) { cF.copy(f.posicion); for (const sis of sistemas()) sis.resolverEsfera(cF, f.radio); peorF = Math.max(peorF, cF.distanceTo(f.posicion)); }
+  for (const f of sueltos) { cF.copy(f.posicion); for (const sis of sistemas()) sis.resolverEsfera(cF, f.radio); peorF = Math.max(peorF, cF.distanceTo(f.posicion)); }
   ok('flotantes: ninguno queda metido en una pared', peorF < 0.002, +peorF.toFixed(5));
-  const enPasillo = F.objetos.filter((f) => Math.abs(f.posicion.y) < 1.3 && Math.hypot(f.posicion.x, f.posicion.y) < 0.3).length;
+  const enPasillo = sueltos.filter((f) => Math.abs(f.posicion.y) < 1.3 && Math.hypot(f.posicion.x, f.posicion.y) < 0.3).length;
   ok('flotantes: el eje de paso queda libre', enPasillo === 0, enPasillo);
   // 18. Lanzar un objeto contra una pared de Colonia
   const fl = F.objetos.find((f) => /C_Flot_Paquete/.test(f.malla.name));
