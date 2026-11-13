@@ -7,7 +7,7 @@ const FILAS = 16;
 const ANCHO = 256;
 const ALTO = 128;
 
-const CATEGORIAS = [
+export const CATEGORIAS = [
   { nombre: 'ALIMENTOS', color: '#2e7d32', items: ['Raciones liofilizadas', 'Yerba mate envasada', 'Agua potable 6 L', 'Fruta deshidratada'], aviso: 'CONSUMIR PRIMERO LO QUE VENCE' },
   { nombre: 'REPUESTOS', color: '#455a64', items: ['Filtros de CO₂', 'Kit de válvulas', 'Bomba de circulación', 'Juntas y sellos'], aviso: 'NO APILAR · PIEZA FRÁGIL' },
   { nombre: 'MÉDICO', color: '#c62828', items: ['Botiquín de a bordo', 'Insumos estériles', 'Medicación controlada'], aviso: 'MATERIAL CRÍTICO · MANTENER SELLADO' },

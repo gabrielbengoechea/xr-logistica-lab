@@ -78,7 +78,7 @@ class Escotilla {
  * @param {object} gltf                     Resultado de GLTFLoader.
  * @param {(material: THREE.Material, uso: string) => THREE.Material} materialPara
  * @returns {{grupo: THREE.Group, colisiones: SistemaColisiones, barandas: Barandas, escotillas: Escotilla[],
- *            cargas: {nombre: string, matriz: THREE.Matrix4, grande: boolean}[], flotantes: THREE.Mesh[],
+ *            cargas: {nombre: string, matriz: THREE.Matrix4, grande: boolean, legible: boolean, centro: THREE.Vector3, mitad: THREE.Vector3}[], flotantes: THREE.Mesh[],
  *            resumen: object}}
  */
 export function armarEstacion(gltf, materialPara) {
@@ -140,11 +140,12 @@ export function armarEstacion(gltf, materialPara) {
     }
     if (ES_CARGA.test(nombre)) {
       // las bolsas dañadas y sin etiqueta (discrepancias del carguero) no llevan etiqueta legible
-      if (!/SinEtiqueta|Danada/.test(nombre)) {
-        o.geometry.computeBoundingBox();
-        const alto = o.geometry.boundingBox.max.y - o.geometry.boundingBox.min.y;
-        cargas.push({ nombre, matriz: o.matrixWorld.clone(), grande: alto > 0.4 });
-      }
+      o.geometry.computeBoundingBox();
+      const caja = o.geometry.boundingBox;
+      cargas.push({
+        nombre, matriz: o.matrixWorld.clone(), grande: caja.max.y - caja.min.y > 0.4, legible: !/SinEtiqueta|Danada/.test(nombre),
+        centro: caja.getCenter(new THREE.Vector3()), mitad: caja.getSize(new THREE.Vector3()).multiplyScalar(0.5),
+      });
     }
     // --- visual: al lote de su módulo y material
     const modulo = moduloDe(nombre);
