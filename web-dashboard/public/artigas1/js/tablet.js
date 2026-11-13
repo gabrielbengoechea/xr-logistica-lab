@@ -18,7 +18,7 @@ export class TabletLogistica {
    * @param {object} o.ajustes        Ajustes de locomoción (los cambia la pantalla de ajustes).
    * @param {{iniciar: Function, pausar: Function, reanudar: Function, abandonar: Function, guiar: Function, abrirMapa: Function,
    *          ajuste: (clave: string, valor: any) => void, calibrarManos: () => number, reunir: () => void,
-   *          siguienteTunel: () => string}} o.acciones
+   *          siguienteTunel: () => string, siguienteInclinacion: () => void}} o.acciones
    */
   constructor({ pantalla, inventario, gestor, navegacion, ajustes, acciones }) {
     this.inventario = inventario;
@@ -189,32 +189,36 @@ export class TabletLogistica {
     this._cabecera(ctx, panel, 'AJUSTES');
     const a = this.ajustes;
     const fila = (i, titulo, valor) => {
-      const y = 86 + i * 76;
+      const y = 82 + i * 68;
       ctx.fillStyle = COLORES.blanco;
-      ctx.font = 'bold 24px sans-serif';
-      ctx.fillText(titulo, 28, y + 26);
+      ctx.font = 'bold 23px sans-serif';
+      ctx.fillText(titulo, 28, y + 24);
       ctx.fillStyle = COLORES.celeste;
-      ctx.font = '22px sans-serif';
-      ctx.fillText(valor, 28, y + 54);
+      ctx.font = '21px sans-serif';
+      ctx.fillText(valor, 28, y + 50);
       return y;
     };
+    const ALTO = 56;
     const TUNEL = { apagado: 'Apagado', suave: 'Suave', medio: 'Medio (recomendado)', fuerte: 'Fuerte' };
     let y = fila(0, 'Giro con el stick derecho', a.giro === 'suave' ? 'Suave (continuo · marea más)' : 'Por pasos con parpadeo (recomendado)');
-    panel.boton('giro', 640, y, 300, 60, 'CAMBIAR', () => this.acciones.ajuste('giro', a.giro === 'suave' ? 'pasos' : 'suave'));
-    y = fila(1, 'Túnel al moverse', TUNEL[a.tunel] || a.tunel);
-    panel.boton('tunel', 640, y, 300, 60, 'CAMBIAR', () => this.acciones.ajuste('tunel', this.acciones.siguienteTunel()));
-    y = fila(2, 'Sensibilidad del giro suave', `${Math.round(a.sensibilidad * 100)} %`);
-    panel.boton('sens-', 640, y, 144, 60, '−', () => this.acciones.ajuste('sensibilidad', a.sensibilidad - 0.25), { activo: a.giro === 'suave' && a.sensibilidad > 0.5 });
-    panel.boton('sens+', 796, y, 144, 60, '+', () => this.acciones.ajuste('sensibilidad', a.sensibilidad + 0.25), { activo: a.giro === 'suave' && a.sensibilidad < 2 });
-    y = fila(3, 'Velocidad del propulsor', `${Math.round(a.velocidad * 100)} %`);
-    panel.boton('vel-', 640, y, 144, 60, '−', () => this.acciones.ajuste('velocidad', a.velocidad - 0.25), { activo: a.velocidad > 0.5 });
-    panel.boton('vel+', 796, y, 144, 60, '+', () => this.acciones.ajuste('velocidad', a.velocidad + 0.25), { activo: a.velocidad < 1.5 });
-    y = fila(4, 'Mirar arriba y abajo con el stick', a.giroVertical ? 'Activado' : 'Desactivado (recomendado: mirá con la cabeza)');
-    panel.boton('vertical', 640, y, 300, 60, 'CAMBIAR', () => this.acciones.ajuste('giroVertical', !a.giroVertical));
-    y = fila(5, 'Frenado asistido al soltar el stick', a.frenoAsistido ? 'Activado (menos mareo)' : 'Desactivado (inercia real)');
-    panel.boton('freno', 640, y, 300, 60, 'CAMBIAR', () => this.acciones.ajuste('frenoAsistido', !a.frenoAsistido));
-    y = fila(6, 'Manos', `Posición ${a.calibracionManos + 1} de 8`);
-    panel.boton('manos', 640, y, 144, 60, 'GIRAR', () => { a.calibracionManos = this.acciones.calibrarManos(); this.panel.sucio = true; });
-    panel.boton('reunir', 796, y, 144, 60, 'REUNIR', () => this.acciones.reunir());
+    panel.boton('giro', 640, y, 300, ALTO, 'CAMBIAR', () => this.acciones.ajuste('giro', a.giro === 'suave' ? 'pasos' : 'suave'));
+    y = fila(1, 'Mirar arriba y abajo con el stick', a.giroVertical ? `Activado · hasta ${a.limiteInclinacion}° de inclinación` : 'Desactivado (solo con la cabeza)');
+    panel.boton('vertical', 640, y, 300, ALTO, 'CAMBIAR', () => this.acciones.siguienteInclinacion());
+    y = fila(2, 'Túnel al moverse', TUNEL[a.tunel] || a.tunel);
+    panel.boton('tunel', 640, y, 300, ALTO, 'CAMBIAR', () => this.acciones.ajuste('tunel', this.acciones.siguienteTunel()));
+    y = fila(3, 'Zona muerta del stick', `${Math.round(a.zonaMuerta * 100)} % del recorrido`);
+    panel.boton('zona-', 640, y, 144, ALTO, '−', () => this.acciones.ajuste('zonaMuerta', a.zonaMuerta - 0.05), { activo: a.zonaMuerta > 0.1 });
+    panel.boton('zona+', 796, y, 144, ALTO, '+', () => this.acciones.ajuste('zonaMuerta', a.zonaMuerta + 0.05), { activo: a.zonaMuerta < 0.4 });
+    y = fila(4, 'Sensibilidad del giro suave', `${Math.round(a.sensibilidad * 100)} %`);
+    panel.boton('sens-', 640, y, 144, ALTO, '−', () => this.acciones.ajuste('sensibilidad', a.sensibilidad - 0.25), { activo: a.giro === 'suave' && a.sensibilidad > 0.5 });
+    panel.boton('sens+', 796, y, 144, ALTO, '+', () => this.acciones.ajuste('sensibilidad', a.sensibilidad + 0.25), { activo: a.giro === 'suave' && a.sensibilidad < 2 });
+    y = fila(5, 'Velocidad del propulsor', `${Math.round(a.velocidad * 100)} %`);
+    panel.boton('vel-', 640, y, 144, ALTO, '−', () => this.acciones.ajuste('velocidad', a.velocidad - 0.25), { activo: a.velocidad > 0.5 });
+    panel.boton('vel+', 796, y, 144, ALTO, '+', () => this.acciones.ajuste('velocidad', a.velocidad + 0.25), { activo: a.velocidad < 1.5 });
+    y = fila(6, 'Frenado asistido al soltar el stick', a.frenoAsistido ? 'Activado (menos mareo)' : 'Desactivado (inercia real)');
+    panel.boton('freno', 640, y, 300, ALTO, 'CAMBIAR', () => this.acciones.ajuste('frenoAsistido', !a.frenoAsistido));
+    y = fila(7, 'Manos', `Posición ${a.calibracionManos + 1} de 8`);
+    panel.boton('manos', 640, y, 144, ALTO, 'GIRAR', () => { a.calibracionManos = this.acciones.calibrarManos(); this.panel.sucio = true; });
+    panel.boton('reunir', 796, y, 144, ALTO, 'REUNIR', () => this.acciones.reunir());
   }
 }

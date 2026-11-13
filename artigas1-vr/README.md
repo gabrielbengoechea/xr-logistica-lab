@@ -127,7 +127,7 @@ La estación completa se recorre en el navegador (compu o Quest, con WebXR) desd
 | `exterior.js`, `eva.js` | Exterior con paneles solares y antenas; caminata espacial, cable y esclusa |
 | `etiquetas.js` | Etiquetas logísticas de cada bolsa, en una sola llamada de dibujo |
 
-Pruebas: `cd web-dashboard && npm test` y, con el sitio servido en el puerto 8765, `python3 artigas1-vr/Tools/pruebas-web/juego.py` (159: el juego completo con los controles simulados) y `fisica.py` (41). Qué se hizo, qué se midió y qué falta probar en el visor: [`INFORME-gameplay.md`](INFORME-gameplay.md) (manos, herramientas, actividades, mapa, exterior y caminata), [`INFORME-ambientacion.md`](INFORME-ambientacion.md) e [`INFORME-refactorizacion.md`](INFORME-refactorizacion.md).
+Pruebas: `cd web-dashboard && npm test` y, con el sitio servido en el puerto 8765, `python3 artigas1-vr/Tools/pruebas-web/juego.py` (188: el juego completo con los controles simulados) y `fisica.py` (41) y `vision.py` (11: los dos ojos por separado, como en el visor, y la estabilidad de la luz en la caminata espacial). Qué se hizo, qué se midió y qué falta probar en el visor: [`INFORME-vision-eva.md`](INFORME-vision-eva.md) (ojo izquierdo, luz de la caminata y vista vertical), [`INFORME-gameplay.md`](INFORME-gameplay.md) (manos, herramientas, actividades, mapa, exterior y caminata), [`INFORME-ambientacion.md`](INFORME-ambientacion.md) e [`INFORME-refactorizacion.md`](INFORME-refactorizacion.md).
 
 ## Lo que sigue (fase 2)
 

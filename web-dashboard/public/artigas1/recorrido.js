@@ -37,24 +37,30 @@ import { LUGAR, Navegacion, rutaExterior, rutaInterior } from './js/navegacion.j
 import { MapaEstacion } from './js/mapa.js';
 import { TabletLogistica } from './js/tablet.js';
 import { ESCLUSA, PUNTOS_EXTERIORES, RUTAS_EXTERIORES, crearExterior } from './js/exterior.js';
-import { EVAController, StationTransitionManager } from './js/eva.js';
+import { CAPA_TERCERA_PERSONA, EVAController, StationTransitionManager } from './js/eva.js';
 import { Confort, ORDEN_TUNEL } from './js/confort.js';
 
 const INICIO = 'rivera';
 
 // ---- ajustes del jugador (se guardan en este navegador)
-// De fábrica, todo en el modo que menos marea (como Mission: ISS): giro por pasos con parpadeo a negro, sin mirar
-// arriba o abajo con el stick y con túnel al moverse. El giro suave queda como opción en la tablet.
-const VERSION_AJUSTES = 2;
-const AJUSTES_BASE = { version: VERSION_AJUSTES, giro: 'pasos', sensibilidad: 1, velocidad: 1, giroVertical: false, frenoAsistido: false, tunel: 'medio', calibracionManos: 0 };
+// De fábrica, todo en el modo que menos marea (como Mission: ISS): giro por pasos con parpadeo a negro, a los
+// costados (30°) y arriba o abajo (20°), con un límite de inclinación, y túnel al moverse. El giro suave queda
+// como opción en la tablet, con zona muerta, curva progresiva y velocidad máxima.
+const VERSION_AJUSTES = 3;
+const AJUSTES_BASE = {
+  version: VERSION_AJUSTES, giro: 'pasos', sensibilidad: 1, velocidad: 1, giroVertical: true, limiteInclinacion: 80,
+  zonaMuerta: 0.2, frenoAsistido: false, tunel: 'medio', calibracionManos: 0,
+};
+/** Límites de los ajustes numéricos que se cambian desde la tablet. */
+const RANGOS_AJUSTES = { sensibilidad: [0.5, 2], velocidad: [0.5, 1.5], zonaMuerta: [0.1, 0.4] };
+/** Opciones para mirar arriba y abajo con el stick: apagado o límite de inclinación en grados. */
+const LIMITES_INCLINACION = [0, 45, 60, 80];
 const ajustes = { ...AJUSTES_BASE };
 try {
   const guardados = JSON.parse(window.localStorage.getItem('artigas1.ajustes') || '{}');
-  if ((guardados.version || 1) < VERSION_AJUSTES) {
-    // ajustes de la versión anterior (giro suave de fábrica): se pasan al modo de confort y se conserva el resto
-    delete guardados.giro;
-    delete guardados.giroVertical;
-  }
+  const version = guardados.version || 1;
+  if (version < 2) delete guardados.giro;            // versión 1: giro suave de fábrica, pasa a giro por pasos
+  if (version < 3) delete guardados.giroVertical;    // versiones 1 y 2: mirar arriba y abajo con el stick, ahora de fábrica
   Object.assign(ajustes, guardados, { version: VERSION_AJUSTES });
 } catch { /* sin almacenamiento: valores de fábrica */ }
 function guardarAjustes() {
@@ -82,7 +88,7 @@ rig.add(camera);
 scene.add(rig);
 // cámara de observación (solo en la compu, tecla V): ve al astronauta con su traje desde afuera
 const camaraExterna = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.05, 2600);
-camaraExterna.layers.enable(1);
+camaraExterna.layers.enable(CAPA_TERCERA_PERSONA);              // el traje: ningún ojo del visor dibuja esta capa
 let terceraPersona = false;
 
 // ---- luz: una sola luz de hemisferio más los reflejos de entorno (sin luces puntuales por píxel).
@@ -391,7 +397,21 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
       const t = new TabletLogistica({ pantalla: h.pantalla, inventario, gestor, navegacion, ajustes, acciones: {
         iniciar: iniciarActividad, pausar: () => gestor.pausar(), reanudar: () => gestor.reanudar(), abandonar: () => gestor.abandonar(), guiar,
         abrirMapa: () => mapa.abrir(camera, eva.afuera ? null : estacion.colisiones),
-        ajuste: (clave, valor) => { ajustes[clave] = typeof valor === 'number' ? THREE.MathUtils.clamp(valor, 0.5, clave === 'velocidad' ? 1.5 : 2) : valor; guardarAjustes(); t.panel.sucio = true; },
+        ajuste: (clave, valor) => {
+          const r = RANGOS_AJUSTES[clave];
+          ajustes[clave] = typeof valor === 'number' && r ? Math.round(THREE.MathUtils.clamp(valor, r[0], r[1]) * 100) / 100 : valor;
+          guardarAjustes();
+          t.panel.sucio = true;
+        },
+        siguienteInclinacion: () => {
+          const actual = ajustes.giroVertical ? ajustes.limiteInclinacion : 0;
+          const i = LIMITES_INCLINACION.indexOf(actual);
+          const nuevo = LIMITES_INCLINACION[(i + 1) % LIMITES_INCLINACION.length];
+          ajustes.giroVertical = nuevo > 0;
+          if (nuevo > 0) ajustes.limiteInclinacion = nuevo;
+          guardarAjustes();
+          t.panel.sucio = true;
+        },
         siguienteTunel: () => ORDEN_TUNEL[(ORDEN_TUNEL.indexOf(ajustes.tunel) + 1) % ORDEN_TUNEL.length],
         calibrarManos: () => { manos.calibrar(manos.calibracion + 1); ajustes.calibracionManos = manos.calibracion; guardarAjustes(); return manos.calibracion; },
         reunir: reunirHerramientas,
@@ -530,7 +550,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   // para las pruebas automáticas y para depurar desde la consola
   window.artigas1 = {
     THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, flotantes, ir, manosDePrueba,
-    inventario, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes,
+    inventario, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
     acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas }, aviso, panelInforme, teclas,
     avanzar: (dt = 1 / 72, dibujar = false) => cuadro(0, null, dt, !dibujar),
   };
@@ -656,12 +676,70 @@ function ejes() {
   arribaRig.copy(ARRIBA).applyQuaternion(rig.quaternion);
 }
 
+/**
+ * Orientación con el stick derecho. Se mueve el rig (el cuerpo) alrededor de la cabeza; la cámara la maneja
+ * solo el visor, así que el seguimiento de la cabeza no se toca y se suma a lo que haga el stick.
+ *  - A los costados: giro alrededor del «arriba» de la estación.
+ *  - Arriba y abajo: giro alrededor del eje horizontal derecho de la mirada.
+ * Con esos dos ejes la vista nunca queda rolada (el horizonte de la estación no se inclina), por más giros que
+ * se combinen. La inclinación acumulada con el stick se limita con `limiteInclinacion`.
+ */
+const _ejeHorizontal = new THREE.Vector3();
+const _arribaPrueba = new THREE.Vector3();
+
+/**
+ * Eje horizontal derecho de la mirada: perpendicular a la dirección en que se mira y al arriba de la estación.
+ * Sale solo de la dirección de la mirada, no del roll de la cabeza: inclinar la vista alrededor de este eje no
+ * puede rolar la vista, aunque la cabeza esté girada respecto del cuerpo.
+ */
+function ejeInclinacion(out) {
+  camera.updateWorldMatrix(true, false);
+  camera.getWorldDirection(_v);
+  out.crossVectors(_v, ARRIBA);
+  if (out.lengthSq() < 1e-6) {
+    // mirando justo arriba o abajo: el derecho sale de la columna derecha de la cámara, sin su parte vertical
+    out.setFromMatrixColumn(camera.matrixWorld, 0);
+    out.addScaledVector(ARRIBA, -out.dot(ARRIBA));
+  }
+  return out.normalize();
+}
+
+/** Inclinación del cuerpo hecha con el stick (ángulo entre su arriba y el de la estación), en radianes. */
+function inclinacionDelCuerpo() {
+  return _arribaPrueba.copy(ARRIBA).applyQuaternion(rig.quaternion).angleTo(ARRIBA);
+}
+
+/**
+ * Cuánto se puede inclinar ahora hacia arriba (signo +) o hacia abajo (signo -) sin pasar el límite.
+ * Devuelve el ángulo permitido, con el signo de `angulo`.
+ */
+function inclinacionPermitida(eje, angulo) {
+  const limite = THREE.MathUtils.degToRad(ajustes.limiteInclinacion);
+  _q.setFromAxisAngle(eje, angulo);
+  const despues = _arribaPrueba.copy(ARRIBA).applyQuaternion(rig.quaternion).applyQuaternion(_q).angleTo(ARRIBA);
+  if (despues <= limite + 1e-4) return angulo;
+  // pasaría el límite: se permite solo lo que falta para llegar (si se está volviendo, todo)
+  const antes = inclinacionDelCuerpo();
+  if (despues < antes) return angulo;
+  const falta = Math.max(0, limite - antes);
+  return Math.sign(angulo) * Math.min(Math.abs(angulo), falta);
+}
+
 /** Gira el cuerpo alrededor de la cabeza: el seguimiento del visor no se toca. */
 function girarAlrededorDeLaCabeza(eje, angulo) {
   camera.getWorldPosition(cabeza);
   _q.setFromAxisAngle(eje, angulo);
   rig.position.sub(cabeza).applyQuaternion(_q).add(cabeza);
   rig.quaternion.premultiply(_q).normalize();
+}
+
+/** Respuesta del stick: zona muerta y curva progresiva (cuadrática). Devuelve -1…1. */
+function respuestaStick(v) {
+  const z = ajustes.zonaMuerta;
+  const a = Math.abs(v);
+  if (a <= z) return 0;
+  const u = Math.min(1, (a - z) / (1 - z));
+  return Math.sign(v) * u * u;
 }
 
 /** Endereza el cuerpo: deja solo el giro horizontal (botón B). */
@@ -679,7 +757,8 @@ function enderezar() {
 /**
  * Controles del visor:
  *   stick izquierdo  mover hacia donde se mira y de costado      X / Y   bajar / subir
- *   stick derecho    girar 30° con parpadeo a negro (o suave)     A       freno    B   enderezar
+ *   stick derecho    girar 30° y mirar arriba o abajo 20°, con parpadeo a negro (o suave)
+ *                                                                A       freno    B   enderezar
  *   gatillo izq.     mapa de la estación                          gatillo der.   usar la herramienta o apretar un botón
  *   grips            tomar y soltar
  */
@@ -699,30 +778,41 @@ function entradaXR(dt) {
   if (der) {
     const [x, y] = der.ejes;
     const s = ajustes.sensibilidad;
+    const z = ajustes.zonaMuerta;
     if (ajustes.giro === 'suave') {
-      // opcional: giro continuo, con el túnel cerrado mientras gira
-      const meta = Math.abs(x) > 0.2 ? -x * THREE.MathUtils.degToRad(95) * s : 0;
-      velGiro += (meta - velGiro) * (1 - Math.exp(-12 * dt));        // sin arranques ni frenadas bruscas
-      if (Math.abs(velGiro) > 1e-4) girarAlrededorDeLaCabeza(arribaRig, velGiro * dt);
-      const metaV = ajustes.giroVertical && Math.abs(y) > 0.25 ? -y * THREE.MathUtils.degToRad(55) * s : 0;
+      // opcional: giro continuo con zona muerta, curva progresiva, aceleración suave y velocidad máxima; el túnel
+      // se cierra mientras gira
+      const metaH = -respuestaStick(x) * THREE.MathUtils.degToRad(95) * s;
+      const metaV = ajustes.giroVertical ? -respuestaStick(y) * THREE.MathUtils.degToRad(55) * s : 0;
+      velGiro += (metaH - velGiro) * (1 - Math.exp(-12 * dt));        // sin arranques ni frenadas bruscas
       velInclinacion += (metaV - velInclinacion) * (1 - Math.exp(-12 * dt));
-      if (Math.abs(velInclinacion) > 1e-4) girarAlrededorDeLaCabeza(derecha, velInclinacion * dt);
+      if (Math.abs(velGiro) > 1e-4) girarAlrededorDeLaCabeza(ARRIBA, velGiro * dt);
+      if (Math.abs(velInclinacion) > 1e-4) {
+        const eje = ejeInclinacion(_ejeHorizontal);
+        const permitido = inclinacionPermitida(eje, velInclinacion * dt);
+        if (permitido !== velInclinacion * dt) velInclinacion = 0;     // tope: frena en seco solo el giro vertical
+        if (permitido !== 0) girarAlrededorDeLaCabeza(eje, permitido);
+      }
       girandoSuave = Math.abs(velGiro) > 0.05 || Math.abs(velInclinacion) > 0.05;
     } else {
-      // de fábrica: un giro de 30° por empujón, hecho con la vista en negro (parpadeo). Para el siguiente hay que
-      // soltar el stick. Mirar arriba o abajo con el stick (si se activa) va en saltos de 20°, igual.
+      // de fábrica: un salto por empujón, hecho con la vista en negro (parpadeo): 30° a los costados y 20° arriba
+      // o abajo. Para el siguiente hay que volver el stick al centro. La dirección que manda es la más empujada.
       velGiro = 0;
       velInclinacion = 0;
       const horizontal = Math.abs(x) >= Math.abs(y);
       if (giroListo && horizontal && Math.abs(x) > 0.7) {
-        const eje = arribaRig.clone();
         const angulo = x > 0 ? -Math.PI / 6 : Math.PI / 6;
-        if (confort.parpadear(() => girarAlrededorDeLaCabeza(eje, angulo))) giroListo = false;
+        if (confort.parpadear(() => girarAlrededorDeLaCabeza(ARRIBA, angulo))) giroListo = false;
       } else if (giroListo && !horizontal && ajustes.giroVertical && Math.abs(y) > 0.7) {
-        const eje = derecha.clone();
-        const angulo = y > 0 ? -Math.PI / 9 : Math.PI / 9;
-        if (confort.parpadear(() => girarAlrededorDeLaCabeza(eje, angulo))) giroListo = false;
-      } else if (Math.abs(x) < 0.3 && Math.abs(y) < 0.3) {
+        const eje = ejeInclinacion(_ejeHorizontal).clone();
+        const angulo = inclinacionPermitida(eje, y > 0 ? -Math.PI / 9 : Math.PI / 9);
+        if (Math.abs(angulo) < THREE.MathUtils.degToRad(1)) {
+          manos.vibrar(der, 0.25, 40);                                 // tope de inclinación: un toque, sin parpadeo
+          giroListo = false;
+        } else if (confort.parpadear(() => girarAlrededorDeLaCabeza(eje, angulo))) {
+          giroListo = false;
+        }
+      } else if (Math.abs(x) < Math.max(0.3, z + 0.1) && Math.abs(y) < Math.max(0.3, z + 0.1)) {
         giroListo = true;
       }
     }
