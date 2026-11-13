@@ -153,7 +153,8 @@ async () => {
   // Se mira justo el punto del casco del Nodo donde rebota el sol (el peor caso para el brillo especular).
   const sol = A.exterior.material.uniforms.uSol.value.clone().normalize();
   const radial = V(sol.x, sol.y, 0).normalize();
-  const pCasco = radial.clone().multiplyScalar(1.76).setZ(3.6);
+  // en el centro de un tramo del Nodo: sobre los aros abulonados el paralaje de los bulones movería la muestra
+  const pCasco = radial.clone().multiplyScalar(1.76).setZ(0.66 + 2.9 * 2.5 / 3);
   const reflejo = sol.clone().reflect(radial).negate();                      // dirección en que rebota la luz
   if (reflejo.dot(radial) < 0.25) reflejo.addScaledVector(radial, 0.6).normalize();
   const ojoBase = pCasco.clone().addScaledVector(reflejo, 0.9);
@@ -174,7 +175,19 @@ async () => {
   }
   const rango = Math.max(...muestras) - Math.min(...muestras);
   ok('luz: mirando el reflejo del sol, 6 cm de movimiento de cabeza cambian el brillo del casco menos de 15/255', rango <= 15, { rango: +rango.toFixed(1), brillo: muestras.map((x) => +x.toFixed(0)) });
-  ok('luz: el reflejo del sol en el casco no es una mancha blanca (brillo menor a 120/255)', Math.max(...muestras) < 120, +Math.max(...muestras).toFixed(0));
+  // el mismo punto visto desde otra dirección, fuera del reflejo: la luz difusa no depende de la vista, así que la
+  // diferencia es solo el brillo especular
+  const otro = radial.clone().multiplyScalar(0.7).add(V(0, 0, reflejo.z > 0 ? -0.7 : 0.7)).normalize();
+  const ojoOtro = pCasco.clone().addScaledVector(otro, 0.9);
+  A.rig.quaternion.setFromUnitVectors(V(0, 0, -1), pCasco.clone().sub(ojoOtro).normalize()); A.camera.position.set(0, 0, 0);
+  for (let r = 0; r < 2; r++) { L.teletransportar(ojoOtro.clone()); L.velocidad.set(0, 0, 0); pasos(1); }
+  const imO = dibujarOjo(ojoIzq);
+  const pvO = pCasco.clone().applyMatrix4(ojoIzq.matrixWorldInverse).applyMatrix4(ojoIzq.projectionMatrix);
+  const ox = Math.round((pvO.x * 0.5 + 0.5) * W), oy = Math.round((pvO.y * 0.5 + 0.5) * H);
+  let sO = 0, cO = 0;
+  for (let y = oy - 3; y <= oy + 3; y++) for (let x = ox - 3; x <= ox + 3; x++) if (x >= 0 && x < W && y >= 0 && y < H) { sO += imO.lum[y * W + x]; cO++; }
+  const fuera = sO / Math.max(1, cO), extra = muestras[5] - fuera;
+  ok('luz: el reflejo del sol en el casco no es una mancha blanca (suma menos de 25/255 al mismo casco visto de costado y no satura)', extra < 25 && Math.max(...muestras) < 245, { enElReflejo: +muestras[5].toFixed(0), deCostado: +fuera.toFixed(0) });
   A.camera.position.set(0, 0, 0); A.camera.rotation.set(0, 0, 0);
 
   // ---- el casco y el túnel quedan centrados en cada ojo

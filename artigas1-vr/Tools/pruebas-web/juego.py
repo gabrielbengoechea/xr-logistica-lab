@@ -120,8 +120,22 @@ JS = r"""
   ubicar(V(0.1, 0.1, -0.2)); pasos(3);
   const M = A.manos;
   ok('manos: dos manos con los controles conectados', M.lista.length === 2 && M.mano('left') && M.mano('right'), M.lista.map((m) => m.lado).join(','));
-  ok('manos: 18 piezas por mano (palma, pulgar y cuatro dedos de tres falanges), cápsulas y no cajas', M.malla.geometry.type === 'CapsuleGeometry' && M.malla.count === 3 * 21 + 9, M.malla.geometry.type);
-  ok('manos: las dos manos se dibujan en una llamada', M.malla.isInstancedMesh);
+  ok('manos: 18 piezas por mano (palma, pulgar y cuatro dedos de tres falanges); de respaldo, cápsulas y no cajas', M.malla.geometry.type === 'CapsuleGeometry' && M.malla.count === 3 * 21 + 9, M.malla.geometry.type);
+  ok('manos: puños, brazos y cuerpo se dibujan en una llamada', M.malla.isInstancedMesh);
+  ok('guante: cargó el modelo de Blender (una malla con piel de 16 huesos por mano, una llamada cada una)', M.guantes && M.guantes.length === 3 && M.guantes.every((g) => g.malla.isSkinnedMesh && g.huesos.length === 16) && M.verticesGuante > 2000, M.verticesGuante);
+  ok('guante: sus huesos coinciden con la cinemática de las manos (menos de 0,5 mm)', M.desvioGuante < 0.0005, M.desvioGuante);
+  const zonasG = (() => { const g = M.guantes[0].malla.geometry, c = g.attributes.color, vistos = new Set(); for (let i = 0; i < c.count; i += 7) vistos.add(`${c.getX(i).toFixed(2)},${c.getY(i).toFixed(2)},${c.getZ(i).toFixed(2)}`); return vistos.size; })();
+  ok('guante: tela, goma de la palma, yemas, refuerzos de nudillos y puño (zonas de material)', zonasG >= 5, zonasG);
+  const ponerPose = (h, nombre) => { const P = A.manosPoses; const meta = P[nombre]; h.mano.pose = { dedos: meta.dedos.map((x) => x.slice()), abanico: meta.abanico, pulgar: meta.pulgar.slice() }; };
+  const estiramiento = (h) => {
+    const gl = M.guantes[h.mano.indice]; gl.esqueleto.update(); const geo = gl.malla.geometry, n = geo.attributes.position.count, idx = geo.index.array;
+    const A0 = [], A1 = []; const v = new T.Vector3();
+    for (let i = 0; i < n; i++) { gl.malla.getVertexPosition(i, v); A1.push(v.clone()); A0.push(new T.Vector3().fromBufferAttribute(geo.attributes.position, i)); }
+    let peor = 0, lejos = 0; const palma = new T.Vector3().setFromMatrixPosition(gl.huesos[0].matrixWorld);
+    for (let t = 0; t < idx.length; t += 3) for (const [a, b] of [[idx[t], idx[t + 1]], [idx[t + 1], idx[t + 2]], [idx[t + 2], idx[t]]]) peor = Math.max(peor, A1[a].distanceTo(A1[b]) / Math.max(1e-6, A0[a].distanceTo(A0[b])));
+    for (const p of A1) lejos = Math.max(lejos, p.distanceTo(palma));
+    return { peor: +peor.toFixed(2), lejos: +lejos.toFixed(3) };
+  };
   const relajada = der.mano.pose.dedos.map((d) => d[0]);
   der.grip(1); seg(0.4);
   const senala = der.mano.pose.dedos.map((d) => +d[0].toFixed(2));
@@ -134,8 +148,15 @@ JS = r"""
   der.gatillo(0); seg(0.4);
   ok('manos: al soltar vuelven a la pose relajada', Math.abs(der.mano.pose.dedos[1][0] - 0.28) < 0.03, +der.mano.pose.dedos[1][0].toFixed(2));
   const pi = new T.Vector3(), pd = new T.Vector3(), mm = new T.Matrix4();
-  M.malla.getMatrixAt(0, mm); pi.setFromMatrixPosition(mm); M.malla.getMatrixAt(21, mm); pd.setFromMatrixPosition(mm);
-  ok('manos: cada palma está en su control', pi.distanceTo(izq.mano.posicion) < 0.06 && pd.distanceTo(der.mano.posicion) < 0.06, +pd.distanceTo(der.mano.posicion).toFixed(3));
+  const gi = M.guantes[izq.mano.indice], gd = M.guantes[der.mano.indice];
+  pi.setFromMatrixPosition(gi.huesos[0].matrixWorld); pd.setFromMatrixPosition(gd.huesos[0].matrixWorld);
+  ok('manos: cada palma del guante está en su control', gi.malla.visible && gd.malla.visible && pi.distanceTo(izq.mano.posicion) < 0.06 && pd.distanceTo(der.mano.posicion) < 0.06, [+pi.distanceTo(izq.mano.posicion).toFixed(3), +pd.distanceTo(der.mano.posicion).toFixed(3)]);
+  // deformación: en cada pose, ningún triángulo se estira de más y la malla sigue entera alrededor de la palma
+  const deform = {};
+  for (const nombre of ['abierta', 'relajada', 'puno', 'senalar', 'tableta']) { ponerPose(der, nombre); A.manos._poseObjetivo = () => ({ meta: A.manosPoses[nombre] }); A.manos.mostrar(0); deform[nombre] = estiramiento(der); }
+  delete A.manos._poseObjetivo;
+  ok('guante: se deforma sin romperse en las poses abierta, relajada, puño, señalar y tablet', Object.values(deform).every((d) => d.peor < 6.5 && d.lejos < 0.16), deform);
+  pasos(2);
 
   // ---- brazos y cuerpo en primera persona
   ubicar(V(0.1, 0.1, -0.2)); pasos(2);
@@ -473,29 +494,52 @@ JS = r"""
   der.grip(0); pasos(2);
   ok('barandas: tirar de la mano mueve el cuerpo al revés y al soltar queda el impulso', corrido.z < -0.05 && L.velocidad.z < -0.3, [+corrido.z.toFixed(3), +L.velocidad.z.toFixed(3)]);
 
-  // ---- mapa
+  // ---- mapa: tablet en la mano izquierda mientras se aprieta el gatillo
   ubicar(V(0.1, 0.1, -2.0)); A.navegacion.cancelar(); pasos(2);
+  const qNatural = new T.Quaternion().setFromEuler(new T.Euler(-0.35, 0.15, 0, 'YXZ'));
+  izq.g.quaternion.copy(qNatural); izq.a.quaternion.copy(qNatural); izq.en(cabeza().add(V(-0.16, -0.30, -0.34))); pasos(1);
   izq.gatillo(0.4); pasos(3);
   ok('mapa: una presión leve del gatillo izquierdo no lo abre', !A.mapa.abierto);
-  izq.gatillo(1); pasos(2); izq.gatillo(0); seg(0.4);
-  const pm = A.mapa.panel.malla, dMapa = pm.position.distanceTo(cabeza());
-  ok('mapa: el gatillo del índice izquierdo lo abre', A.mapa.abierto && pm.visible);
-  ok('mapa: aparece delante, entre 50 cm y 1 m, mirando al usuario', dMapa > 0.45 && dMapa < 1.0 && pm.position.clone().sub(cabeza()).normalize().dot(A.camera.getWorldDirection(new T.Vector3())) > 0.95 && V(0, 0, 1).transformDirection(pm.matrixWorld).dot(cabeza().sub(pm.position).normalize()) > 0.95, +dMapa.toFixed(2));
-  ok('mapa: no queda metido en una pared', A.estacion.colisiones.puntoMasCercano(pm.position.clone(), 0.2, new T.Vector3()) === Infinity);
-  const p0 = pm.position.clone(); izq.stick(0.3, 0); seg(0.3); izq.stick(0, 0); der.boton(4, 1); seg(0.5); der.boton(4, 0);
-  ok('mapa: queda quieto en el espacio (no va pegado a la cabeza)', pm.position.distanceTo(p0) < 1e-9 && cabeza().distanceTo(V(0.1, 0.1, -2.0)) > 0.02);
+  izq.gatillo(1); seg(0.4);
+  const pm = A.mapa.panel.malla, tablet = A.mapa.tablet;
+  const centroTab = () => { tablet.updateWorldMatrix(true, true); return new T.Vector3().setFromMatrixPosition(tablet.matrixWorld); };
+  const normalTab = () => V(0, 0, 1).transformDirection(tablet.matrixWorld);
+  ok('mapa: mientras se aprieta el gatillo izquierdo aparece como tablet en esa mano', A.mapa.abierto && A.mapa.modo === 'mano' && A.mapa.mano === izq.mano && pm.visible && tablet.visible && A.mapa.cuerpo.visible);
+  const dMano = centroTab().distanceTo(izq.mano.posicion), dCab = centroTab().distanceTo(cabeza());
+  ok('mapa: la tablet está en la mano (a menos de 25 cm del control) y a distancia de lectura', dMano < 0.25 && dCab > 0.3 && dCab < 0.8, [+dMano.toFixed(3), +dCab.toFixed(2)]);
+  const mira = normalTab().dot(cabeza().sub(centroTab()).normalize());
+  ok('mapa: la pantalla mira a los ojos', mira > 0.6, +mira.toFixed(2));
+  A.mapa.cuerpo.geometry.computeBoundingBox(); const tam = A.mapa.cuerpo.geometry.boundingBox.getSize(new T.Vector3());
+  ok('mapa: tablet de tamaño de mano (unos 33 × 22 cm, delgada)', Math.max(tam.x, tam.y, tam.z) < 0.4 && Math.min(tam.x, tam.y, tam.z) < 0.04, tam.toArray().map((x) => +x.toFixed(3)));
+  ok('mapa: la mano izquierda toma la pose de sostener la tablet y no agarra ni señala', izq.mano.sostieneMapa && izq.mano.ocupada && !izq.mano.cerrada && !izq.mano.apunta);
+  // sigue a la mano en el mismo cuadro, sin retraso
+  const cTab0 = centroTab(); const haciaTab = V(0.05, 0.04, -0.03);
+  izq.en(izq.mano.posicion.clone().add(haciaTab)); pasos(1);
+  const corridaTab = centroTab().sub(cTab0);
+  ok('mapa: sigue al control en el mismo cuadro (sin retraso ni temblor)', corridaTab.distanceTo(haciaTab) < 0.002, corridaTab.toArray().map((x) => +x.toFixed(4)));
+  const qMuneca = new T.Quaternion().setFromEuler(new T.Euler(-0.15, 0.35, 0.1, 'YXZ'));
+  izq.g.quaternion.copy(qMuneca); izq.a.quaternion.copy(qMuneca); pasos(1);
+  const relativa = new T.Matrix4().copy(izq.mano.objeto.matrixWorld).invert().multiply(tablet.matrixWorld);
+  izq.g.quaternion.copy(qNatural); izq.a.quaternion.copy(qNatural); pasos(1);
+  const relativa2 = new T.Matrix4().copy(izq.mano.objeto.matrixWorld).invert().multiply(tablet.matrixWorld);
+  ok('mapa: gira con la muñeca y mantiene la misma pose en la mano', relativa.elements.every((x, i) => Math.abs(x - relativa2.elements[i]) < 1e-4));
+  ok('mapa: no queda metido en una pared', A.estacion.colisiones.puntoMasCercano(centroTab(), 0.12, new T.Vector3()) === Infinity);
   ok('mapa: marca el módulo actual', A.navegacion.actual === 'rivera' && A.mapa._estadoDe('rivera') === 'actual', A.navegacion.actual);
   const lugares = A.mapa.panel.botones.filter((b) => b.id.startsWith('lugar:')).map((b) => b.id.slice(6));
   ok('mapa: tiene los seis módulos, la esclusa y los tres puntos del exterior', ['carguero', 'colonia', 'rivera', 'nodo', 'tacuarembo', 'cupula', 'esclusa', 'junta_solar', 'antena', 'conector_radiador'].every((x) => lugares.includes(x)), lugares);
-  der.en(cabeza().add(V(0.25, -0.2, -0.2))); pasos(1);
+  der.en(cabeza().add(V(0.2, -0.22, -0.25))); pasos(1);
   const elegidos = [];
   for (const id of ['colonia', 'cupula', 'antena', 'tacuarembo']) { apretar(der, A.mapa.panel, `lugar:${id}`); if (A.mapa.seleccion === id) elegidos.push(id); }
   ok('mapa: los módulos se seleccionan con el rayo de la mano derecha', elegidos.length === 4, elegidos);
   ok('mapa: el gatillo derecho sobre el mapa no lo cierra', A.mapa.abierto);
   apretar(der, A.mapa.panel, 'lugar:colonia');
   ok('mapa: «guiarme» arma la ruta física', apretar(der, A.mapa.panel, 'guiar') && A.navegacion.destino === 'colonia' && A.navegacion.distancia > 2, +A.navegacion.distancia.toFixed(2));
-  izq.gatillo(1); pasos(2); izq.gatillo(0); seg(0.4);
-  ok('mapa: el gatillo izquierdo lo cierra', !A.mapa.abierto && !pm.visible);
+  izq.gatillo(0); pasos(2); seg(0.4);
+  ok('mapa: al soltar el gatillo izquierdo se guarda', !A.mapa.abierto && !tablet.visible);
+  ok('mapa: al guardarlo la mano queda libre otra vez', !izq.mano.ocupada && !izq.mano.sostieneMapa);
+  izq.gatillo(1); seg(0.2);
+  izq.gatillo(0); pasos(2);
+  izq.g.quaternion.identity(); izq.a.quaternion.identity();
   // seguir la guía volando con el stick
   let llego = ''; const alLlegar = A.navegacion.alLlegar; A.navegacion.alLlegar = (id) => { llego = id; alLlegar(id); };
   const dist0 = A.navegacion.distancia;
@@ -512,12 +556,14 @@ JS = r"""
   ok('mapa: registra los módulos visitados', A.navegacion.visitados.has('rivera') && A.navegacion.visitados.has('colonia'), [...A.navegacion.visitados]);
   A.navegacion.alLlegar = alLlegar;
   // traslado con fundido
-  izq.gatillo(1); pasos(2); izq.gatillo(0); seg(0.4);
-  der.en(cabeza().add(V(0.25, -0.2, -0.2))); pasos(1);
+  izq.en(cabeza().add(V(-0.16, -0.30, -0.34))); izq.g.quaternion.copy(qNatural); izq.a.quaternion.copy(qNatural); izq.gatillo(1); seg(0.4);
+  der.en(cabeza().add(V(0.2, -0.22, -0.25))); pasos(1);
   apretar(der, A.mapa.panel, 'lugar:tacuarembo'); apretar(der, A.mapa.panel, 'ir');
   ok('traslado: hay un fundido antes de mover', A.transicion.activa && A.navegacion.actual === 'colonia');
   seg(2.5);
   ok('traslado: deja en el módulo elegido y cierra el mapa', A.navegacion.actual === 'tacuarembo' && !A.transicion.activa && !A.mapa.abierto, A.navegacion.actual);
+  izq.gatillo(0); izq.g.quaternion.identity(); izq.a.quaternion.identity(); pasos(2);
+  ok('traslado: con el gatillo todavía apretado el mapa no se vuelve a abrir solo', !A.mapa.abierto);
   A.rig.quaternion.identity();
 
   // =========================================================================================== FASE 3
@@ -608,8 +654,10 @@ JS = r"""
   cerrarInforme();
 
   // ---- INVENTARIO: se inicia desde el mapa
+  // con una herramienta en la mano derecha, el mapa se abre flotante (tecla M o botón de la tablet de muñeca)
   ubicar(V(0.1, 0.1, -2.0)); izq.en(V(-0.2, -0.3, -2.2)); pasos(2);
-  izq.gatillo(1); pasos(2); izq.gatillo(0); seg(0.4);
+  A.mapa.abrir(A.camera, A.estacion.colisiones); seg(0.4);
+  ok('mapa: también se abre flotante delante, mirando al usuario, entre 50 cm y 1 m', A.mapa.modo === 'flotante' && !A.mapa.cuerpo.visible && (() => { const c = new T.Vector3().setFromMatrixPosition(A.mapa.panel.malla.matrixWorld), d = c.distanceTo(cabeza()); return d > 0.45 && d < 1.0 && V(0, 0, 1).transformDirection(A.mapa.panel.malla.matrixWorld).dot(cabeza().sub(c).normalize()) > 0.95; })());
   ok('mapa: la mano que lleva una herramienta no apunta a los paneles (su gatillo es de la herramienta)', (() => { der.en(cabeza().add(V(0.25, -0.2, -0.2))); const antes = esc.lecturas; apretar(der, A.mapa.panel, 'lugar:colonia'); return A.mapa.seleccion !== 'colonia' && esc.lecturas === antes + 1; })());
   izq.en(cabeza().add(V(-0.25, -0.2, -0.2))); apretar(izq, A.mapa.panel, 'lugar:rivera');
   ok('inventario: se inicia desde el mapa con la mano izquierda (actividad del módulo seleccionado)', apretar(izq, A.mapa.panel, 'act:inventario') && E('inventario') === 'ACTIVA' && !A.mapa.abierto);
@@ -678,6 +726,12 @@ JS = r"""
   let tri = 0; X.grupo.traverse((o) => { if (o.isMesh && o.geometry) tri += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1); });
   let mallas = 0; X.grupo.traverse((o) => { if (o.isMesh) mallas++; });
   ok('exterior: modelo completo en pocas mallas', mallas <= 12 && tri > 5000, `${mallas} mallas, ${Math.round(tri)} triángulos`);
+  ok('exterior: detalle con presupuesto de Quest 2 (entre 20.000 y 60.000 triángulos, sin luces de escena)', tri > 20000 && tri < 60000 && X.material.isShaderMaterial, Math.round(tri));
+  const tiposX = new Set(); X.grupo.traverse((o) => { if (o.isMesh && o.geometry.attributes.aTipo) { const t = o.geometry.attributes.aTipo; for (let i = 0; i < t.count; i += 3) tiposX.add(t.getX(i)); } });
+  ok('exterior: materiales diferenciados (manta térmica, metal, radiador, vidrio, celdas solares, señales, luces y balizas)', [1, 2, 3, 4, 5, 6, 7, 8].every((t) => tiposX.has(t)), [...tiposX].sort());
+  ok('exterior: la señalética es un atlas de una sola textura con mipmaps', X.atlas && X.atlas.image.width === 2048 && X.atlas.generateMipmaps && X.material.uniforms.uAtlas.value === X.atlas);
+  ok('exterior: puntos de anclaje numerados (A1 en la esclusa y cinco más en la ruta)', X.anclajes.length >= 6 && X.anclajes[0].distanceTo(A.ESCLUSA ? A.ESCLUSA.ancla : X.anclajes[0]) < 1e-6, X.anclajes.length);
+  ok('exterior: las alas solares conservan su giro y su detalle (mástil reticulado, bisagras, cajas)', X.paneles.alas.every((a) => a.geometry.attributes.position.count / 3 > 2000), X.paneles.alas.map((a) => Math.round(a.geometry.attributes.position.count / 3)));
   const caja = new T.Box3().setFromObject(A.estacion.grupo), cajaX = new T.Box3().setFromObject(X.grupo);
   ok('exterior: envuelve al interior (los cascos cubren los seis módulos)', cajaX.min.z <= caja.min.z + 0.3 && cajaX.max.z >= caja.max.z - 0.3 && cajaX.max.x > 2 && cajaX.max.y > 2, [cajaX.min, cajaX.max].map((v) => v.toArray().map((x) => +x.toFixed(1))));
   ok('paneles solares: dos alas sobre su mástil', X.paneles.alas.length >= 2, X.paneles.alas.length);
@@ -809,6 +863,7 @@ async def main():
         pg.on("pageerror", lambda e: errs.append(str(e)))
         await pg.goto(os.environ.get("URL", "http://localhost:8765/artigas1/"))
         await pg.wait_for_function("!!window.artigas1", timeout=120000)
+        await pg.evaluate("window.artigas1.guanteListo")
         try:
             res = await pg.evaluate(JS)
         except Exception as e:  # noqa: BLE001

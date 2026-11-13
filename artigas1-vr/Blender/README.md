@@ -14,6 +14,7 @@ Scripts de Python que generan todos los modelos del kit (v0.5) con Blender 5.x, 
 | `identidad.py` | Placas institucionales y señalética logística (ESTACIÓN ARTIGAS-1, identificadores de módulo, seguridad) |
 | `ambientacion.py` | Equipamiento que hace habitada la estación: cables y bandejas, paneles de control, tableros, rejillas, bolsas y redes, mecanismos de escotilla, pantallas de sistemas y los objetos sueltos que flotan |
 | `tierra.py` | Texturas de la Tierra con geografía real: terreno de día y luces urbanas de noche, en dos capas centradas en el nadir (ver abajo) |
+| `guante.py` | Guante de astronauta para las manos del recorrido: malla con dedos, pulgar articulado, palma, nudillos y puño, pesos para los 16 huesos de la cinemática y zonas de material → `guante.bin` y `guante.json` en `web-dashboard/public/artigas1` |
 | `run_all2.py` | Arma todo y la estación completa en `salida/Artigas1_Kit.blend` |
 | `export_web.py` | Exporta `estacion.glb` y las cuatro texturas de la Tierra (WebP) al recorrido web |
 | `export_all2.py` | Exporta FBX para Unity y GLB para la web (usa los scripts de exportación de blender-agent-skills) |
@@ -25,6 +26,7 @@ python3 run_all2.py        # modelos y estación → salida/Artigas1_Kit.blend
 export ARTIGAS1_SKILLS=/ruta/a/blender-agent-skills/blender
 python3 export_web.py       # GLB del recorrido → web-dashboard/public/artigas1
 python3 export_all2.py      # FBX para Unity → salida/export (copiar a Assets/Artigas1)
+python3 guante.py           # guante de las manos → web-dashboard/public/artigas1/guante.{bin,json} (1 s)
 ```
 
 La carpeta de salida se cambia con `ARTIGAS1_SALIDA`. Convenciones: 1 unidad = 1 m, Z arriba en Blender (Y arriba en Unity y glTF), prefijo `SM_` para mallas y empties `SNAP_`, `ANCLA_`, `ETIQUETA_`, etc. como puntos de enganche (ver el README del proyecto Unity).

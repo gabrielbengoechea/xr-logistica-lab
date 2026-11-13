@@ -20,7 +20,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { armarEstacion } from './js/estacion.js';
 import { Locomocion0G } from './js/locomocion.js';
-import { Manos } from './js/manos.js';
+import { Manos, POSES } from './js/manos.js';
 import { crearBiblioteca, crearEntorno } from './js/materiales.js';
 import { cargarTexturasTierra, crearEntornoOrbital, COLOR_SOL, SOL } from './js/entorno.js';
 import { CATEGORIAS, crearEtiquetas } from './js/etiquetas.js';
@@ -551,7 +551,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   document.getElementById('cargando').remove();
   // para las pruebas automáticas y para depurar desde la consola
   window.artigas1 = {
-    guanteListo,
+    guanteListo, manosPoses: POSES,
     THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, flotantes, ir, manosDePrueba,
     inventario, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
     acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas }, aviso, panelInforme, teclas,
