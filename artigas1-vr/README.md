@@ -119,15 +119,15 @@ La estación completa se recorre en el navegador (compu o Quest, con WebXR) desd
 | `materiales.js` | Reflejos de entorno, juntas de panel, vidrio con Fresnel, sol en la Cúpula |
 | `entorno.js` | Tierra al atardecer calculada por píxel (esfera exacta), geografía real, luces de Buenos Aires y Montevideo, atmósfera, sol y estrellas |
 | `flotantes.js` | Objetos sueltos en microgravedad y agarre universal: puntos de agarre, pasar de mano, soltar con inercia |
-| `manos.js` | Manos del traje con dedos articulados, brazos y cuerpo en primera persona; lectura de los controles |
+| `manos.js`, `guante.js` | Manos del traje: guante modelado en Blender con piel de 16 huesos sobre la cinemática de los dedos, poses por control, brazos y cuerpo en primera persona |
 | `herramientas.js`, `escaner.js`, `tablet.js` | Herramientas con punto de agarre, pistola lectora y tablet logística |
 | `inventario.js` | Bultos, huecos del almacén y contenedores |
 | `actividades.js`, `misiones.js`, `inspeccion.js` | Gestor de actividades, las cinco actividades y los puntos de mantenimiento |
-| `paneles.js`, `mapa.js`, `navegacion.js` | Interfaz VR, mapa de la estación y guía entre módulos |
-| `exterior.js`, `eva.js` | Exterior con paneles solares y antenas; caminata espacial, cable y esclusa |
+| `paneles.js`, `mapa.js`, `navegacion.js` | Interfaz VR, mapa de la estación (tablet en la mano izquierda mientras se aprieta el gatillo) y guía entre módulos |
+| `exterior.js`, `eva.js` | Exterior detallado (mantas térmicas, aros abulonados, escudos, conductos, alas solares reticuladas, radiadores, antenas, cámaras, señalética en atlas) en una malla fija; caminata espacial, cable y esclusa |
 | `etiquetas.js` | Etiquetas logísticas de cada bolsa, en una sola llamada de dibujo |
 
-Pruebas: `cd web-dashboard && npm test` y, con el sitio servido en el puerto 8765, `python3 artigas1-vr/Tools/pruebas-web/juego.py` (188: el juego completo con los controles simulados) y `fisica.py` (41) y `vision.py` (11: los dos ojos por separado, como en el visor, y la estabilidad de la luz en la caminata espacial). Qué se hizo, qué se midió y qué falta probar en el visor: [`INFORME-vision-eva.md`](INFORME-vision-eva.md) (ojo izquierdo, luz de la caminata y vista vertical), [`INFORME-gameplay.md`](INFORME-gameplay.md) (manos, herramientas, actividades, mapa, exterior y caminata), [`INFORME-ambientacion.md`](INFORME-ambientacion.md) e [`INFORME-refactorizacion.md`](INFORME-refactorizacion.md).
+Pruebas: `cd web-dashboard && npm test` y, con el sitio servido en el puerto 8765, `python3 artigas1-vr/Tools/pruebas-web/juego.py` (204: el juego completo con los controles simulados) y `fisica.py` (41) y `vision.py` (11: los dos ojos por separado, como en el visor, y la estabilidad de la luz en la caminata espacial). Qué se hizo, qué se midió y qué falta probar en el visor: [`INFORME-exterior-manos.md`](INFORME-exterior-manos.md) (exterior, tablet del mapa y guantes), [`INFORME-vision-eva.md`](INFORME-vision-eva.md) (ojo izquierdo, luz de la caminata y vista vertical), [`INFORME-gameplay.md`](INFORME-gameplay.md) (manos, herramientas, actividades, mapa, exterior y caminata), [`INFORME-ambientacion.md`](INFORME-ambientacion.md) e [`INFORME-refactorizacion.md`](INFORME-refactorizacion.md).
 
 ## Lo que sigue (fase 2)
 
