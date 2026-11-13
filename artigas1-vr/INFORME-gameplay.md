@@ -215,3 +215,18 @@ Costo medido en esta PC: 0,07 ms de lógica por cuadro. Llamadas de dibujo: Tacu
 - **Sin telemetría:** la versión web no manda las sesiones al backend. El contrato de datos no cambió.
 - **Unity:** no tiene nada de esto. Portarlo es un trabajo aparte.
 - **Sin seguimiento de manos**, por decisión de la Beta.
+
+## 16. Confort contra el mareo (corrección del 12/11/2026)
+
+En la primera prueba con el visor, **el giro continuo con el stick derecho mareó mucho**. Se pasó al sistema de *Mission: ISS*, y ahora es lo de fábrica:
+
+- **Giro por pasos con parpadeo.** Cada empujón del stick derecho gira 30°. La vista se funde a negro en 60 ms, el cuerpo gira con la pantalla tapada y la vista vuelve en 90 ms (190 ms en total). Nunca se ve la rotación. Para el siguiente giro hay que soltar el stick.
+- **Arriba y abajo se mira con la cabeza.** El stick ya no inclina la vista. Si se activa en la tablet, también va por saltos de 20° con parpadeo.
+- **Túnel al moverse.** Con el stick izquierdo, la periferia se oscurece y queda una ventana al frente. Se cierra con la velocidad y desaparece al quedarse quieto. Cuatro niveles en la tablet: apagado, suave, medio (de fábrica) y fuerte.
+- **Ajustes viejos.** Quien ya tenía guardado el giro suave en el navegador pasa solo al modo de confort; se conservan la velocidad y la orientación de las manos.
+- El giro suave sigue como opción, ahora con el túnel cerrado mientras gira.
+- Si sigue mareando: túnel fuerte, frenado asistido activado y velocidad del propulsor al 50 %.
+
+Código: `js/confort.js` (nuevo), `recorrido.js` y `js/tablet.js`. Se agregaron 15 pruebas a `juego.py` (173 en total), que verifican que el giro ocurre entero con la pantalla al 100 % de negro.
+
+**Pendiente de visor:** si el parpadeo y el túnel alcanzan para quien se mareó. Es lo primero que hay que probar.

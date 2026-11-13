@@ -306,6 +306,9 @@ JS = r"""
   const giroAntes = A.ajustes.giro; apretar(der, tab.panel, 'giro');
   ok('tablet: los ajustes cambian (giro suave / por pasos)', A.ajustes.giro !== giroAntes, A.ajustes.giro);
   apretar(der, tab.panel, 'giro');
+  const tunelAntes = A.ajustes.tunel; apretar(der, tab.panel, 'tunel');
+  ok('tablet: el túnel se elige en los ajustes (apagado, suave, medio, fuerte)', A.ajustes.tunel !== tunelAntes, `${tunelAntes} → ${A.ajustes.tunel}`);
+  for (let i = 0; i < 3; i++) apretar(der, tab.panel, 'tunel');
   // con el dedo
   apretar(der, tab.panel, 'volver'); pasos(2);
   const cb = centroBoton(tab.panel, 'ir:modulos') || centroBoton(tab.panel, `ir:${paginas[0]}`);
@@ -322,6 +325,7 @@ JS = r"""
 
   // =========================================================================================== FASE 2
   fase('FASE 2 · Locomoción con los dos sticks, mapa y guía');
+  ok('confort: de fábrica, giro por pasos con parpadeo, sin inclinar con el stick y con túnel medio', JSON.stringify([A.ajustes.giro, A.ajustes.giroVertical, A.ajustes.tunel]) === JSON.stringify(['pasos', false, 'medio']), [A.ajustes.giro, A.ajustes.giroVertical, A.ajustes.tunel]);
   A.ajustes.giro = 'suave'; A.ajustes.sensibilidad = 1; A.ajustes.velocidad = 1; A.ajustes.giroVertical = true; A.ajustes.frenoAsistido = false;
   ubicar(V(0, 0, -2.0)); der.g.quaternion.identity(); der.a.quaternion.identity(); pasos(2);
   izq.stick(0, -1); pasos(1);
@@ -357,11 +361,41 @@ JS = r"""
   ok('stick derecho: mira hacia arriba', A.camera.getWorldDirection(new T.Vector3()).y > dirA.y + 0.4 && cabeza().distanceTo(c0) < 0.003, +A.camera.getWorldDirection(new T.Vector3()).y.toFixed(2));
   der.boton(5, 1); pasos(2); der.boton(5, 0); pasos(2);
   ok('botón B: endereza el cuerpo', Math.abs(V(0, 1, 0).applyQuaternion(A.rig.quaternion).y - 1) < 1e-4 && cabeza().distanceTo(c0) < 0.003);
-  A.ajustes.giro = 'pasos'; const dB = A.camera.getWorldDirection(new T.Vector3());
-  der.stick(1, 0); pasos(3); const paso1 = A.camera.getWorldDirection(new T.Vector3()).angleTo(dB); seg(0.5);
-  const paso2 = A.camera.getWorldDirection(new T.Vector3()).angleTo(dB); der.stick(0, 0); pasos(3);
+  // ---- confort (como Mission: ISS): giro por pasos con parpadeo a negro y túnel al moverse
+  const C = A.confort, velo = C._velo.material, tunel = C._tunel.material.uniforms.uFuerza;
+  A.ajustes.giro = 'pasos'; seg(0.3); const dB = A.camera.getWorldDirection(new T.Vector3()); const c0b = cabeza();
+  der.stick(1, 0); pasos(1);
+  const nada = A.camera.getWorldDirection(new T.Vector3()).angleTo(dB), opa1 = velo.opacity;
+  const historia = [];
+  for (let i = 0; i < 30; i++) { pasos(1); historia.push([+velo.opacity.toFixed(2), +A.camera.getWorldDirection(new T.Vector3()).angleTo(dB).toFixed(3)]); }
+  const paso1 = A.camera.getWorldDirection(new T.Vector3()).angleTo(dB);
+  seg(0.5); const paso2 = A.camera.getWorldDirection(new T.Vector3()).angleTo(dB); der.stick(0, 0); pasos(3);
   ok('giro por pasos: 30° por empujón, uno solo hasta soltar el stick', Math.abs(paso1 - Math.PI / 6) < 0.01 && Math.abs(paso2 - Math.PI / 6) < 0.01, [+(paso1 * 57.3).toFixed(1), +(paso2 * 57.3).toFixed(1)]);
-  A.ajustes.giro = 'suave';
+  ok('confort: al empujar el stick la vista empieza a fundirse a negro y todavía no gira', nada < 1e-6 && opa1 > 0 && opa1 < 1, [nada, +opa1.toFixed(2)]);
+  const vistoGirando = historia.filter(([o, ang]) => ang > 1e-4 && ang < Math.PI / 6 - 1e-3);
+  ok('confort: el giro se hace entero con la pantalla en negro (nunca se ve rotar)', C.opacidadAlGirar === 1 && vistoGirando.length === 0 && historia.filter(([o, ang]) => ang > 0.01).every(([o], i, arr) => i > 0 || o === 1), C.opacidadAlGirar);
+  const tParpadeo = (C.p.cierre + C.p.negro + C.p.apertura) * 1000;
+  ok('confort: el parpadeo dura menos de un quinto de segundo y la vista vuelve sola', tParpadeo <= 200 && velo.opacity === 0 && !C._velo.visible, `${tParpadeo.toFixed(0)} ms`);
+  ok('confort: el parpadeo no mueve la cabeza', cabeza().distanceTo(c0b) < 0.002, +cabeza().distanceTo(c0b).toFixed(4));
+  const girosAntes = C.giros; der.stick(1, 0); pasos(1); der.stick(0, 0); pasos(1); der.stick(1, 0); pasos(1); der.stick(0, 0); seg(0.5);
+  ok('confort: empujones muy seguidos no encadenan giros durante el parpadeo', C.giros === girosAntes + 1, C.giros - girosAntes);
+  A.ajustes.giroVertical = false; const dV = A.camera.getWorldDirection(new T.Vector3()); der.stick(0, -1); seg(0.6); der.stick(0, 0); seg(0.3);
+  ok('confort: de fábrica el stick no inclina la vista arriba o abajo (se mira con la cabeza)', A.camera.getWorldDirection(new T.Vector3()).angleTo(dV) < 1e-6);
+  A.ajustes.giroVertical = true; der.stick(0, -1); seg(0.6); der.stick(0, 0); seg(0.3);
+  const incl = A.camera.getWorldDirection(new T.Vector3()).angleTo(dV);
+  ok('confort: si se activa, también va por saltos de 20° con parpadeo', Math.abs(incl - Math.PI / 9) < 0.01, +(incl * 57.3).toFixed(1));
+  der.boton(5, 1); pasos(2); der.boton(5, 0); pasos(2);
+  A.ajustes.tunel = 'medio'; ubicar(V(0, 0, -2.0)); seg(0.5);
+  ok('túnel: quieto no hay túnel', tunel.value === 0 && !C._tunel.visible);
+  izq.stick(0, -1); seg(1.5);
+  const fMov = tunel.value;
+  ok('túnel: moviéndose se cierra la periferia', C._tunel.visible && fMov > 0.6 && fMov <= 0.8 + 1e-6, +fMov.toFixed(2));
+  izq.stick(0, 0); der.boton(4, 1); seg(2.5); der.boton(4, 0); seg(2.5);
+  ok('túnel: al frenar se vuelve a abrir', tunel.value === 0 && !C._tunel.visible, +tunel.value.toFixed(3));
+  A.ajustes.tunel = 'apagado'; ubicar(V(0, 0, -2.0)); izq.stick(0, -1); seg(1.5); izq.stick(0, 0);
+  ok('túnel: se puede apagar desde los ajustes', tunel.value === 0 && !C._tunel.visible);
+  der.boton(4, 1); seg(2.5); der.boton(4, 0);
+  A.ajustes.tunel = 'medio'; A.ajustes.giro = 'suave'; A.ajustes.giroVertical = true;
   A.ajustes.sensibilidad = 2; const dC = A.camera.getWorldDirection(new T.Vector3()); der.stick(1, 0); seg(0.5); der.stick(0, 0); const rapido = A.camera.getWorldDirection(new T.Vector3()).angleTo(dC); seg(0.6);
   A.ajustes.sensibilidad = 0.5; const dD = A.camera.getWorldDirection(new T.Vector3()); der.stick(1, 0); seg(0.5); der.stick(0, 0); const lento = A.camera.getWorldDirection(new T.Vector3()).angleTo(dD); seg(0.6);
   ok('sensibilidad de giro ajustable', rapido > lento * 2.5, [+rapido.toFixed(2), +lento.toFixed(2)]);
@@ -726,6 +760,15 @@ async def main():
             print("ERROR EN LAS PRUEBAS:", str(e)[:3000])
             await b.close()
             raise SystemExit(2)
+        # quien ya había jugado la versión anterior (giro suave guardado en el navegador) pasa al modo de confort
+        pg2 = await b.new_page(viewport={"width": 320, "height": 180})
+        await pg2.add_init_script("window.localStorage.setItem('artigas1.ajustes', JSON.stringify({ giro: 'suave', giroVertical: true, velocidad: 1.25, calibracionManos: 3 }))")
+        await pg2.goto(os.environ.get("URL", "http://localhost:8765/artigas1/"))
+        await pg2.wait_for_function("!!window.artigas1", timeout=120000)
+        aj = await pg2.evaluate("(() => { const a = window.artigas1.ajustes; return [a.giro, a.giroVertical, a.tunel, a.velocidad, a.calibracionManos, a.version]; })()")
+        res["R"].append({"fase": "Ajustes guardados de la versión anterior"})
+        res["R"].append({"nombre": "confort: el giro suave guardado pasa a pasos con parpadeo y se conservan velocidad y manos", "pasa": aj == ["pasos", False, "medio", 1.25, 3, 2], "dato": aj})
+        await pg2.close()
         mal = total = 0
         for r in res["R"]:
             if "fase" in r:
