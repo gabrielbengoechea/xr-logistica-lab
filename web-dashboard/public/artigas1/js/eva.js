@@ -3,8 +3,12 @@
 // orientación del astronauta se conserva al cruzarla.
 import * as THREE from 'three';
 import { COLORES, PanelVR } from './paneles.js';
+import { crearMascaraOcular } from './confort.js';
 import { formatoTiempo } from './actividades.js';
 import { ESCLUSA } from './exterior.js';
+
+/** Capa del traje de la vista en tercera persona. No usar 1 ni 2: son las de cada ojo en WebXR. */
+export const CAPA_TERCERA_PERSONA = 3;
 
 export const PARAMETROS_EVA = {
   cable: 14.0,              // m: largo del cable de seguridad
@@ -189,9 +193,11 @@ export class EVAController {
     this.cable = new TetherSystem(escena, ESCLUSA.ancla, this.p);
     this._avisoReloj = 0;
     this._hudReloj = 0;
-    // borde del casco: un aro oscuro en la periferia de la vista
-    this.casco = new THREE.Mesh(new THREE.RingGeometry(0.128, 0.7, 40), new THREE.MeshBasicMaterial({ color: 0x0c0e12 }));
-    this.casco.position.z = -0.115;
+    // borde del casco: oscurece la periferia por ángulo desde el eje de cada ojo (igual en los dos ojos)
+    this.casco = crearMascaraOcular('Borde_Casco', 0x0c0e12);
+    this.casco.material.uniforms.uInterior.value = THREE.MathUtils.degToRad(47);
+    this.casco.material.uniforms.uExterior.value = THREE.MathUtils.degToRad(55);
+    this.casco.renderOrder = 997;
     this.casco.visible = false;
     this.hud = new PanelVR({ ancho: 0.56, alto: 0.105, px: 960, nombre: 'Indicadores_Casco', dibujar: (ctx) => this._dibujarHud(ctx) });
     this.hud.interactivo = false;
@@ -201,8 +207,11 @@ export class EVAController {
     this.hud.malla.rotation.x = -0.32;
     this.hud.malla.visible = false;
     camara.add(this.casco, this.hud.malla);
-    // traje para la vista en tercera persona: en la capa 1, que la cámara del astronauta no dibuja
-    exterior.traje.layers.set(1);
+    // Traje completo para la vista en tercera persona (tecla V en la compu). Va en su propia capa: ni la cámara
+    // de la compu (capa 0) ni los ojos del visor la dibujan. OJO: en WebXR three.js le da la capa 1 al ojo
+    // izquierdo y la 2 al derecho; un objeto en la capa 1 se ve solo con el ojo izquierdo. Antes el traje estaba
+    // en la capa 1 y, pegado a la cámara, le tapaba el ojo izquierdo al astronauta durante toda la caminata.
+    exterior.traje.layers.set(CAPA_TERCERA_PERSONA);
     exterior.traje.visible = false;
     camara.add(exterior.traje);
     exterior.grupo.visible = false;

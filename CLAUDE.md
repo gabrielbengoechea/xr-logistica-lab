@@ -56,7 +56,7 @@ Unity -batchmode -quit -projectPath vr-client -executeMethod XRLab.Editor.BuildS
 # Artigas-1
 cd artigas1-vr/Tools/pruebas-logica && dotnet run              # lógica pura: locomoción 0G, huecos, manifiesto, balance
 # Recorrido web (web-dashboard/public/artigas1): la física se prueba con npm test y, sobre la estación real, en Chrome:
-cd web-dashboard/public && python3 -m http.server 8765 & python3 artigas1-vr/Tools/pruebas-web/fisica.py && python3 artigas1-vr/Tools/pruebas-web/juego.py
+cd web-dashboard/public && python3 -m http.server 8765 & python3 artigas1-vr/Tools/pruebas-web/fisica.py && python3 artigas1-vr/Tools/pruebas-web/juego.py && python3 artigas1-vr/Tools/pruebas-web/vision.py
 Unity -batchmode -quit -projectPath artigas1-vr -executeMethod Artigas1.Editor.BuildScript.BuildQuest -logFile -
 ```
 

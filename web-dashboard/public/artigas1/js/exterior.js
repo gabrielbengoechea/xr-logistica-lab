@@ -119,19 +119,33 @@ function crearMaterial(sol, colorSol) {
         vec3 base = vC;
         float celda = step(2.5, vT) * step(vT, 3.5);
         if (celda > 0.5) {
+          // Grilla de celdas con antialias: el borde de cada línea se suaviza en un píxel (fwidth) y, cuando las
+          // celdas quedan más chicas que unos pocos píxeles, la grilla se funde en su color promedio. Con step()
+          // las líneas finas titilaban al girar el panel (aliasing), sobre todo de canto.
           vec2 g = fract(vUv);
-          float adentro = step(0.05, g.x) * step(0.05, g.y);
+          vec2 w = max(fwidth(vUv), vec2(1e-4));
+          vec2 dentro = smoothstep(vec2(0.05) - w, vec2(0.05) + w, g);
+          float adentro = dentro.x * dentro.y;
+          float detalle = clamp(1.6 - 9.0 * max(w.x, w.y), 0.0, 1.0);
+          adentro = mix(0.9, adentro, detalle);
           base = mix(vec3(0.42, 0.40, 0.34), vec3(0.015, 0.03, 0.12), adentro);
         }
-        float d = max(dot(n, uSol), 0.0);
-        float tierra = max(-n.y, 0.0);                                  // resplandor de la Tierra, desde abajo
-        vec3 luz = uSolColor * d * 1.7 + vec3(0.10, 0.17, 0.32) * tierra * 0.6 + vec3(0.03, 0.035, 0.045);
+        // Luz estable para la caminata: solo depende de la posición de la superficie y del sol, salvo un brillo
+        // especular chico. Nada cambia de golpe al mover la cabeza ni entre un ojo y el otro.
+        float ns = dot(n, uSol);
+        float d = smoothstep(-0.05, 0.25, ns) * max(ns, 0.0) + smoothstep(-0.05, 0.25, ns) * 0.04;   // terminador suave
+        float tierra = max(-n.y, 0.0) * 0.5 + 0.25;                    // resplandor de la Tierra, de abajo y de los costados
+        vec3 luz = uSolColor * d * 1.35 + vec3(0.10, 0.16, 0.28) * tierra * 0.55 + vec3(0.045, 0.05, 0.06);
         vec3 c = base * luz;
+        // Especular ancho y débil: las mantas térmicas son mates; las celdas solares, un poco más brillantes.
+        // Con exponente 48 el brillo era una mancha chica que se deslizaba por las caras de los cilindros al
+        // mover la cabeza, distinta en cada ojo.
         vec3 v = normalize(cameraPosition - vW);
-        float brillo = pow(max(dot(n, normalize(v + uSol)), 0.0), 48.0) * step(0.0, dot(n, uSol));
-        c += uSolColor * brillo * mix(0.18, 0.9, celda);
-        if (vT > 0.5 && vT < 1.5) c = vC * 2.2;                          // luz fija
-        if (vT > 1.5 && vT < 2.5) c = vC * (0.15 + 2.6 * step(0.82, fract(uTiempo * 0.55)));   // baliza
+        float brillo = pow(max(dot(n, normalize(v + uSol)), 0.0), 12.0) * smoothstep(0.0, 0.2, ns);
+        c += uSolColor * brillo * mix(0.04, 0.16, celda);
+        if (vT > 0.5 && vT < 1.5) c = vC * 1.6;                          // luz fija
+        // baliza: pulso suave cada 3,6 s en lugar de un destello on/off (los destellos en la periferia marean)
+        if (vT > 1.5 && vT < 2.5) c = vC * (0.25 + 1.1 * pow(0.5 + 0.5 * sin(uTiempo * 1.75), 4.0));
         gl_FragColor = vec4(c, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>

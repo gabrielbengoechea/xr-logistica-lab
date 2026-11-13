@@ -10,7 +10,42 @@
 //
 // Las dos cosas son planos negros pegados a la cámara, sin luces ni texturas: cuestan dos llamadas de dibujo
 // solo cuando se ven.
+//
+// Estéreo: todo lo que va pegado a la cámara se dibuja en los dos ojos (capa 0). El túnel y el borde del casco
+// no se calculan sobre el plano sino por el ángulo de cada píxel respecto del eje de SU ojo, así el hueco queda
+// centrado e igual en los dos ojos (un plano a 12 cm, medido desde el centro de la cabeza, queda corrido 3 cm
+// para cada ojo y los dos ojos verían bordes distintos).
 import * as THREE from 'three';
+
+/**
+ * Máscara pegada a la cámara que oscurece por ángulo desde el eje de cada ojo.
+ * El shader recibe el ángulo interior (transparente) y el exterior (opaco), en radianes.
+ * @param {string} nombre @param {number} color  Hex.
+ */
+export function crearMascaraOcular(nombre, color = 0x000000) {
+  const c = new THREE.Color(color);
+  const m = new THREE.Mesh(
+    // a 10 cm, 0,7 m de lado: cubre hasta ~72° desde el eje de cada ojo, más que el campo visual del Quest 2
+    new THREE.PlaneGeometry(0.7, 0.7),
+    new THREE.ShaderMaterial({
+      uniforms: { uInterior: { value: 1.2 }, uExterior: { value: 1.4 }, uOpacidad: { value: 1 }, uColor: { value: new THREE.Vector3(c.r, c.g, c.b) } },
+      vertexShader: 'varying vec3 vVista; void main() { vec4 v = modelViewMatrix * vec4(position, 1.0); vVista = v.xyz; gl_Position = projectionMatrix * v; }',
+      fragmentShader: `
+        uniform float uInterior; uniform float uExterior; uniform float uOpacidad; uniform vec3 uColor;
+        varying vec3 vVista;
+        void main() {
+          float angulo = acos(clamp(-normalize(vVista).z, -1.0, 1.0));   // desde el eje del ojo que dibuja
+          float a = smoothstep(uInterior, uExterior, angulo) * uOpacidad;
+          gl_FragColor = vec4(uColor, a);
+        }`,
+      transparent: true, depthTest: false, depthWrite: false,
+    }),
+  );
+  m.name = nombre;
+  m.position.z = -0.1;
+  m.frustumCulled = false;
+  return m;
+}
 
 /** Fuerza máxima del túnel según el ajuste del jugador. */
 export const NIVELES_TUNEL = { apagado: 0, suave: 0.55, medio: 0.8, fuerte: 1 };
@@ -26,17 +61,10 @@ export const PARAMETROS_CONFORT = {
   bajada: 2.5,           // 1/s: qué tan rápido se abre al frenar
 };
 
-const VERT = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
-// Radio en unidades del plano: 1 es el borde del plano; el campo visual del Quest 2 llega a ~0,7.
-const FRAG_TUNEL = `
-  uniform float uFuerza;
-  varying vec2 vUv;
-  void main() {
-    float r = length(vUv - 0.5) * 2.0;
-    float interior = mix(0.95, 0.30, uFuerza);     // con fuerza 1 queda una ventana de ~30 % del alto
-    float a = smoothstep(interior, interior + 0.22, r) * min(1.0, uFuerza * 3.0);
-    gl_FragColor = vec4(0.0, 0.0, 0.0, a);
-  }`;
+/** Ventana del túnel: ángulo (grados) donde empieza a oscurecer, sin túnel y con el túnel al máximo. */
+const TUNEL_ABIERTO = 62;
+const TUNEL_CERRADO = 20;
+const TUNEL_BORDE = 16;
 
 export class Confort {
   /** @param {THREE.Camera} camara @param {typeof PARAMETROS_CONFORT} p */
@@ -44,14 +72,8 @@ export class Confort {
     this.p = p;
     this.nivelTunel = 'medio';
     this.fuerza = 0;
-    this._tunel = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.36, 0.36),                  // a 12 cm: el borde queda a ~56° del centro, justo afuera de la vista
-      new THREE.ShaderMaterial({ uniforms: { uFuerza: { value: 0 } }, vertexShader: VERT, fragmentShader: FRAG_TUNEL, transparent: true, depthTest: false, depthWrite: false }),
-    );
-    this._tunel.name = 'Tunel_Confort';
-    this._tunel.position.z = -0.12;
+    this._tunel = crearMascaraOcular('Tunel_Confort');
     this._tunel.renderOrder = 998;
-    this._tunel.frustumCulled = false;
     this._tunel.visible = false;
     this._velo = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
@@ -123,7 +145,10 @@ export class Confort {
     const k = 1 - Math.exp(-(meta > this.fuerza ? this.p.subida : this.p.bajada) * dt);
     this.fuerza += (meta - this.fuerza) * k;
     if (this.fuerza < 0.005 && meta === 0) this.fuerza = 0;
-    this._tunel.material.uniforms.uFuerza.value = this.fuerza;
+    const u = this._tunel.material.uniforms;
+    u.uInterior.value = THREE.MathUtils.degToRad(THREE.MathUtils.lerp(TUNEL_ABIERTO, TUNEL_CERRADO, this.fuerza));
+    u.uExterior.value = u.uInterior.value + THREE.MathUtils.degToRad(TUNEL_BORDE);
+    u.uOpacidad.value = Math.min(1, this.fuerza * 3);
     this._tunel.visible = this.fuerza > 0;
   }
 }
