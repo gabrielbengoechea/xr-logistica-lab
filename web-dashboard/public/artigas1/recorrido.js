@@ -38,13 +38,25 @@ import { MapaEstacion } from './js/mapa.js';
 import { TabletLogistica } from './js/tablet.js';
 import { ESCLUSA, PUNTOS_EXTERIORES, RUTAS_EXTERIORES, crearExterior } from './js/exterior.js';
 import { EVAController, StationTransitionManager } from './js/eva.js';
+import { Confort, ORDEN_TUNEL } from './js/confort.js';
 
 const INICIO = 'rivera';
 
 // ---- ajustes del jugador (se guardan en este navegador)
-const AJUSTES_BASE = { giro: 'suave', sensibilidad: 1, velocidad: 1, giroVertical: true, frenoAsistido: false, calibracionManos: 0 };
+// De fábrica, todo en el modo que menos marea (como Mission: ISS): giro por pasos con parpadeo a negro, sin mirar
+// arriba o abajo con el stick y con túnel al moverse. El giro suave queda como opción en la tablet.
+const VERSION_AJUSTES = 2;
+const AJUSTES_BASE = { version: VERSION_AJUSTES, giro: 'pasos', sensibilidad: 1, velocidad: 1, giroVertical: false, frenoAsistido: false, tunel: 'medio', calibracionManos: 0 };
 const ajustes = { ...AJUSTES_BASE };
-try { Object.assign(ajustes, JSON.parse(window.localStorage.getItem('artigas1.ajustes') || '{}')); } catch { /* sin almacenamiento: valores de fábrica */ }
+try {
+  const guardados = JSON.parse(window.localStorage.getItem('artigas1.ajustes') || '{}');
+  if ((guardados.version || 1) < VERSION_AJUSTES) {
+    // ajustes de la versión anterior (giro suave de fábrica): se pasan al modo de confort y se conserva el resto
+    delete guardados.giro;
+    delete guardados.giroVertical;
+  }
+  Object.assign(ajustes, guardados, { version: VERSION_AJUSTES });
+} catch { /* sin almacenamiento: valores de fábrica */ }
 function guardarAjustes() {
   try { window.localStorage.setItem('artigas1.ajustes', JSON.stringify(ajustes)); } catch { /* no se guarda */ }
 }
@@ -91,6 +103,7 @@ const manos = new Manos(renderer, rig, scene, camera);
 manos.calibrar(ajustes.calibracionManos);
 const paneles = new SistemaPaneles(scene, sonido);
 const transicion = new StationTransitionManager(camera);
+const confort = new Confort(camera);
 const gestor = new GestorActividades();
 const navegacion = new Navegacion(scene);
 const fabrica = new FabricaHerramientas(entorno);
@@ -379,6 +392,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
         iniciar: iniciarActividad, pausar: () => gestor.pausar(), reanudar: () => gestor.reanudar(), abandonar: () => gestor.abandonar(), guiar,
         abrirMapa: () => mapa.abrir(camera, eva.afuera ? null : estacion.colisiones),
         ajuste: (clave, valor) => { ajustes[clave] = typeof valor === 'number' ? THREE.MathUtils.clamp(valor, 0.5, clave === 'velocidad' ? 1.5 : 2) : valor; guardarAjustes(); t.panel.sucio = true; },
+        siguienteTunel: () => ORDEN_TUNEL[(ORDEN_TUNEL.indexOf(ajustes.tunel) + 1) % ORDEN_TUNEL.length],
         calibrarManos: () => { manos.calibrar(manos.calibracion + 1); ajustes.calibracionManos = manos.calibracion; guardarAjustes(); return manos.calibracion; },
         reunir: reunirHerramientas,
       } });
@@ -516,7 +530,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   // para las pruebas automáticas y para depurar desde la consola
   window.artigas1 = {
     THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, flotantes, ir, manosDePrueba,
-    inventario, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, sonido, ajustes,
+    inventario, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes,
     acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas }, aviso, panelInforme, teclas,
     avanzar: (dt = 1 / 72, dibujar = false) => cuadro(0, null, dt, !dibujar),
   };
@@ -627,6 +641,7 @@ let frenando = false;
 let giroListo = true;
 let velGiro = 0;
 let velInclinacion = 0;
+let girandoSuave = false;
 const previos = new Map();
 
 function botonNuevo(clave, apretado) {
@@ -664,7 +679,7 @@ function enderezar() {
 /**
  * Controles del visor:
  *   stick izquierdo  mover hacia donde se mira y de costado      X / Y   bajar / subir
- *   stick derecho    girar y mirar arriba o abajo                 A       freno    B   enderezar
+ *   stick derecho    girar 30° con parpadeo a negro (o suave)     A       freno    B   enderezar
  *   gatillo izq.     mapa de la estación                          gatillo der.   usar la herramienta o apretar un botón
  *   grips            tomar y soltar
  */
@@ -685,18 +700,32 @@ function entradaXR(dt) {
     const [x, y] = der.ejes;
     const s = ajustes.sensibilidad;
     if (ajustes.giro === 'suave') {
+      // opcional: giro continuo, con el túnel cerrado mientras gira
       const meta = Math.abs(x) > 0.2 ? -x * THREE.MathUtils.degToRad(95) * s : 0;
       velGiro += (meta - velGiro) * (1 - Math.exp(-12 * dt));        // sin arranques ni frenadas bruscas
       if (Math.abs(velGiro) > 1e-4) girarAlrededorDeLaCabeza(arribaRig, velGiro * dt);
-    } else if (Math.abs(x) > 0.7 && giroListo) {
-      girarAlrededorDeLaCabeza(arribaRig, x > 0 ? -Math.PI / 6 : Math.PI / 6);
-      giroListo = false;
-    } else if (Math.abs(x) < 0.3) {
-      giroListo = true;
+      const metaV = ajustes.giroVertical && Math.abs(y) > 0.25 ? -y * THREE.MathUtils.degToRad(55) * s : 0;
+      velInclinacion += (metaV - velInclinacion) * (1 - Math.exp(-12 * dt));
+      if (Math.abs(velInclinacion) > 1e-4) girarAlrededorDeLaCabeza(derecha, velInclinacion * dt);
+      girandoSuave = Math.abs(velGiro) > 0.05 || Math.abs(velInclinacion) > 0.05;
+    } else {
+      // de fábrica: un giro de 30° por empujón, hecho con la vista en negro (parpadeo). Para el siguiente hay que
+      // soltar el stick. Mirar arriba o abajo con el stick (si se activa) va en saltos de 20°, igual.
+      velGiro = 0;
+      velInclinacion = 0;
+      const horizontal = Math.abs(x) >= Math.abs(y);
+      if (giroListo && horizontal && Math.abs(x) > 0.7) {
+        const eje = arribaRig.clone();
+        const angulo = x > 0 ? -Math.PI / 6 : Math.PI / 6;
+        if (confort.parpadear(() => girarAlrededorDeLaCabeza(eje, angulo))) giroListo = false;
+      } else if (giroListo && !horizontal && ajustes.giroVertical && Math.abs(y) > 0.7) {
+        const eje = derecha.clone();
+        const angulo = y > 0 ? -Math.PI / 9 : Math.PI / 9;
+        if (confort.parpadear(() => girarAlrededorDeLaCabeza(eje, angulo))) giroListo = false;
+      } else if (Math.abs(x) < 0.3 && Math.abs(y) < 0.3) {
+        giroListo = true;
+      }
     }
-    const metaV = ajustes.giroVertical && Math.abs(y) > 0.25 ? -y * THREE.MathUtils.degToRad(55) * s : 0;
-    velInclinacion += (metaV - velInclinacion) * (1 - Math.exp(-12 * dt));
-    if (Math.abs(velInclinacion) > 1e-4) girarAlrededorDeLaCabeza(derecha, velInclinacion * dt);
     if (der.botones[0]) frenando = true;
     if (botonNuevo('B', der.botones[1])) enderezar();
   }
@@ -801,6 +830,9 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     loco.p.friccionLibre = ajustes.frenoAsistido && empuje.lengthSq() < 1e-6 ? 0.9 : 0.04;
     if (transicion.activa) { empuje.set(0, 0, 0); frenando = true; }
     loco.actualizar(dt, todasLasManos, empuje, frenando);
+    confort.nivelTunel = ajustes.tunel;
+    confort.actualizar(dt, loco.velocidad.length(), girandoSuave);
+    girandoSuave = false;
     camera.getWorldPosition(cabeza);
     camera.getWorldDirection(mirada);
     eva.actualizar(dt, cabeza, navegacion.actual === 'cupula');
