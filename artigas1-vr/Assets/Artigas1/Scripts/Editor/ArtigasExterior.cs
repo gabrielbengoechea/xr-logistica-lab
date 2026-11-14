@@ -80,9 +80,10 @@ namespace Artigas1.Editor
             Vector3 haciaSol = new Vector3(1f, 0.15f, 0.3f).normalized;
             sol.transform.rotation = Quaternion.LookRotation(-haciaSol);
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.06f, 0.07f, 0.10f);
-            RenderSettings.ambientEquatorColor = new Color(0.14f, 0.18f, 0.26f);
-            RenderSettings.ambientGroundColor = new Color(0.20f, 0.30f, 0.45f);
+            // relleno: el cielo negro casi no ilumina; desde abajo llega el reflejo azulado de la Tierra
+            RenderSettings.ambientSkyColor = new Color(0.16f, 0.17f, 0.20f);
+            RenderSettings.ambientEquatorColor = new Color(0.20f, 0.24f, 0.32f);
+            RenderSettings.ambientGroundColor = new Color(0.26f, 0.36f, 0.52f);
             RenderSettings.skybox = Cielo();
             RenderSettings.sun = sol;
 
