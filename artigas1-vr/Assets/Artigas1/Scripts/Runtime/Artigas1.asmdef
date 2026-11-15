@@ -6,7 +6,9 @@
         "XRLab.Telemetry",
         "Unity.XR.Interaction.Toolkit",
         "Unity.XR.CoreUtils",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -170,9 +170,9 @@ namespace Artigas1
             {
                 for (int i = 0; i < _agarres.Count; i++)
                 {
-                    Agarre a = _agarres[i];
-                    a.ancla = a.mano.position;
-                    _agarres[i] = a;
+                    Agarre ag = _agarres[i];
+                    ag.ancla = ag.mano.position;
+                    _agarres[i] = ag;
                 }
                 _rotacionAnterior = rig.rotation;
             }

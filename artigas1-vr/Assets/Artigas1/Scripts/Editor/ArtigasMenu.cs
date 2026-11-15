@@ -436,7 +436,7 @@ namespace Artigas1.Editor
         }
 
         /// <summary>Saca la locomoción con gravedad del rig de XRI y le pone la de 0G, la viñeta y los botones de prueba.</summary>
-        private static void AjustarRig(GameObject rig)
+        internal static void AjustarRig(GameObject rig)
         {
             var apagar = new HashSet<string>
             {
@@ -489,6 +489,7 @@ namespace Artigas1.Editor
                 sl.FindProperty("cuerpo").objectReferenceValue = esfera;
             }
             sl.ApplyModifiedPropertiesWithoutUndo();
+            AsegurarVineta(cam);
             ConfortVineta vin = rig.AddComponent<ConfortVineta>();
             var sv = new SerializedObject(vin);
             sv.FindProperty("controlador").objectReferenceValue = rig.GetComponentInChildren<TunnelingVignetteController>(true);
@@ -501,6 +502,31 @@ namespace Artigas1.Editor
             rig.AddComponent<ControlesBeta>();
         }
 
+        /// <summary>
+        /// Pone el prefab «TunnelingVignette» de los Starter Assets debajo de la cámara si el rig no tiene
+        /// <see cref="TunnelingVignetteController"/>. En XRI 3.x el prefab vive en Starter Assets/TunnelingVignette.
+        /// </summary>
+        private static void AsegurarVineta(Camera cam)
+        {
+            if (cam == null || cam.GetComponentInChildren<TunnelingVignetteController>(true) != null)
+            {
+                return;
+            }
+            string ruta = AssetDatabase.FindAssets("TunnelingVignette t:Prefab")
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .FirstOrDefault(r => r.Contains("Starter Assets") && r.EndsWith("TunnelingVignette.prefab"));
+            if (ruta == null)
+            {
+                return;
+            }
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ruta);
+            var vineta = (GameObject)PrefabUtility.InstantiatePrefab(prefab, cam.transform);
+            vineta.transform.localPosition = Vector3.zero;
+            vineta.transform.localRotation = Quaternion.identity;
+            vineta.transform.localScale = Vector3.one;
+            Debug.Log($"[Artigas1] Viñeta de confort agregada debajo de la cámara ({ruta}).");
+        }
+
         // ------------------------------------------------------------------------------------------------ ayudas
         private static void Carpeta(string nombre)
         {
@@ -510,7 +536,7 @@ namespace Artigas1.Editor
             }
         }
 
-        private static GameObject BuscarRigXri()
+        internal static GameObject BuscarRigXri()
         {
             foreach (string guid in AssetDatabase.FindAssets("\"XR Origin (XR Rig)\" t:Prefab"))
             {
@@ -541,7 +567,7 @@ namespace Artigas1.Editor
             return p;
         }
 
-        private static GameObject Prefab(string nombre) => AssetDatabase.LoadAssetAtPath<GameObject>($"{Prefabs}{nombre}.prefab");
+        internal static GameObject Prefab(string nombre) => AssetDatabase.LoadAssetAtPath<GameObject>($"{Prefabs}{nombre}.prefab");
 
         private static CargoUnit NuevaCarga(string prefab, Transform padre, CargoSpec spec)
         {
