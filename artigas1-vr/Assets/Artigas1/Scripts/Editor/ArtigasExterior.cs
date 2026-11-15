@@ -365,7 +365,7 @@ namespace Artigas1.Editor
             return m;
         }
 
-        private static Material Cielo()
+        internal static Material Cielo()
         {
             string ruta = $"{Generado}Materiales/M_Cielo_Estrellas.mat";
             var m = AssetDatabase.LoadAssetAtPath<Material>(ruta);
