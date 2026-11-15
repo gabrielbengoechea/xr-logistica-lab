@@ -64,9 +64,12 @@ namespace Artigas1.Editor
                 return false;
             }
 
+            // por defecto, solo las escenas de Artigas-1: las de ejemplo de la plantilla VR suman contenido y variantes
+            string[] enBuild = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
+            string[] propias = enBuild.Where(s => s.StartsWith("Assets/Artigas1/")).ToArray();
             string[] scenes = args.Scenes.Count > 0
                 ? args.Scenes.ToArray()
-                : EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
+                : propias.Length > 0 ? propias : enBuild;
             if (scenes.Length == 0)
             {
                 Debug.LogError("[Artigas1] No hay escenas para compilar: agregalas en Build Settings o pasá -scenes.");
@@ -128,7 +131,9 @@ namespace Artigas1.Editor
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel32;
             PlayerSettings.colorSpace = ColorSpace.Linear;
             PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
-            PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { GraphicsDeviceType.Vulkan, GraphicsDeviceType.OpenGLES3 });
+            // Quest 2 y 3 corren Vulkan; compilar también OpenGLES3 duplica las variantes de shaders y el tiempo de build
+            PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { GraphicsDeviceType.Vulkan });
+            ReducirVariantes();
             EditorUserBuildSettings.androidBuildSubtarget = MobileTextureSubtarget.ASTC;
             EditorUserBuildSettings.buildAppBundle = args.AppBundle;
             EditorUserBuildSettings.development = args.Development;
@@ -136,6 +141,44 @@ namespace Artigas1.Editor
             PlayerSettings.Android.forceInternetPermission = true;
             // En la red del aula el backend suele estar en http://IP-local: se permite HTTP también en release.
             PlayerSettings.insecureHttpOption = InsecureHttpOption.AlwaysAllowed;
+        }
+
+        /// <summary>
+        /// La iluminación de Artigas-1 es horneada y el sol del exterior no proyecta sombras: se apagan las sombras en
+        /// tiempo real de los assets de URP. Así se eliminan miles de variantes de shaders (sombras y sombras suaves) y el
+        /// visor ahorra el mapa de sombras en cada cuadro.
+        /// </summary>
+        public static void ReducirVariantes()
+        {
+            var assets = new System.Collections.Generic.HashSet<RenderPipelineAsset>();
+            if (GraphicsSettings.defaultRenderPipeline != null)
+            {
+                assets.Add(GraphicsSettings.defaultRenderPipeline);
+            }
+            for (int i = 0; i < QualitySettings.count; i++)
+            {
+                RenderPipelineAsset a = QualitySettings.GetRenderPipelineAssetAt(i);
+                if (a != null)
+                {
+                    assets.Add(a);
+                }
+            }
+            foreach (RenderPipelineAsset a in assets)
+            {
+                var so = new SerializedObject(a);
+                foreach (string campo in new[] { "m_MainLightShadowsSupported", "m_AdditionalLightShadowsSupported", "m_SoftShadowsSupported" })
+                {
+                    SerializedProperty p = so.FindProperty(campo);
+                    if (p != null)
+                    {
+                        p.boolValue = false;
+                    }
+                }
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(a);
+                Debug.Log($"[Artigas1] Sombras en tiempo real apagadas en {a.name} (menos variantes de shaders).");
+            }
+            AssetDatabase.SaveAssets();
         }
 
         private static bool OpenXrActiveForAndroid()
