@@ -35,6 +35,15 @@ namespace Artigas1
         private InputAction _gatillo;
         private TabletaMapa _tableta;
 
+        /// <summary>Para grabar demostraciones sin visor: el grip y el gatillo salen de acá en lugar de los controles.</summary>
+        public bool Simulado { get; set; }
+
+        public float GripSimulado { get; set; }
+
+        public float GatilloSimulado { get; set; }
+
+        public bool Izquierda => izquierda;
+
         public void Configurar(bool esIzquierda, SkinnedMeshRenderer renderer, Transform[] bones, bool esPresurizado)
         {
             izquierda = esIzquierda;
@@ -140,8 +149,8 @@ namespace Artigas1
 
         private void Posar(float k)
         {
-            float grip = _grip.ReadValue<float>();
-            float gatillo = _gatillo.ReadValue<float>();
+            float grip = Simulado ? GripSimulado : _grip.ReadValue<float>();
+            float gatillo = Simulado ? GatilloSimulado : _gatillo.ReadValue<float>();
             PoseMano meta = PoseObjetivo(grip, gatillo, out float[] indiceMeta, out float mezclaIndice);
             float[] indice = null;
             if (indiceMeta != null)
