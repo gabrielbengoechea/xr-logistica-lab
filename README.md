@@ -100,7 +100,7 @@ CI runs these checks with GitHub Actions (`.github/workflows/`), and `pages.yml`
 - [ ] Validate comfort and performance on Meta Quest 2 (target: stable 72 fps; motion-sickness test with 10 participants).
 - [ ] Confirm Unity editor version and publish a tested APK build process.
 - [ ] Add headset screenshots and a short demo video.
-- [ ] Artigas-1 phase 2: Colonia module with RFID portal, cargo straps and ratchet, wrist tablet with tasks and manifest.
+- [ ] Artigas-1 next modules: Colonia module with RFID portal, cargo straps and ratchet, wrist tablet with tasks and manifest.
 - [ ] Add `scan`, `rfid`, `strap` and `alarm` events to the telemetry contract.
 - [ ] Teacher authentication and cloud-hosted backend.
 - [ ] Choose and add a license.
