@@ -146,6 +146,8 @@ let balance = null;
 let panelBalance = null;
 /** @type {LotesFlotantes | null} */
 let lotes = null;
+/** Texturas de la Tierra que se cargaron (KTX2 o WebP), para las pruebas. */
+let texTierraCargadas = null;
 /** @type {VisibilidadModulos | null} */
 let portales = null;
 let inspecciones = null;
@@ -408,7 +410,7 @@ function reunirHerramientas() {
 // Armado
 // =====================================================================================================
 const anisotropia = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, anisotropia)]).then(([gEstacion, texTierra]) => {
+Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, anisotropia, renderer)]).then(([gEstacion, texTierra]) => {
   estacion = armarEstacion(gEstacion, materialPara);
   scene.add(estacion.grupo);
   portales = new VisibilidadModulos(estacion);        // no se dibuja lo que queda detrás de una escotilla cerrada
@@ -416,6 +418,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   const etiquetas = crearEtiquetas(legibles, renderer);
   if (etiquetas.malla) scene.add(etiquetas.malla);
   inventario = new Inventario(estacion.cargas, etiquetas.datos, CATEGORIAS);
+  texTierraCargadas = texTierra;
   orbital = crearEntornoOrbital(texTierra);
   scene.add(orbital.grupo);
   portales.agregarDeAfuera(orbital.grupo);
@@ -665,7 +668,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   // para las pruebas automáticas y para depurar desde la consola
   window.artigas1 = {
     guanteListo, manosPoses: POSES,
-    THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, flotantes, ir, manosDePrueba,
+    THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, texturasTierra: () => texTierraCargadas, flotantes, ir, manosDePrueba,
     inventario, amarres, medidorFps, lotes: () => lotes, portales: () => portales, telemetria, balance: () => balance, panelBalance: () => panelBalance, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
     acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas }, aviso, panelInforme, teclas,
     avanzar: (dt = 1 / 72, dibujar = false) => cuadro(0, null, dt, !dibujar),

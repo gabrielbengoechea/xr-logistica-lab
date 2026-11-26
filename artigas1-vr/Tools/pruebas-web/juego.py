@@ -926,7 +926,10 @@ JS = r"""
   A.rig.quaternion.identity();
 
   // =========================================================================================== FASE 8
-  fase('FASE 8 · Rendimiento: lotes de objetos sueltos y visibilidad por módulos');
+  fase('FASE 8 · Rendimiento: texturas KTX2, lotes de objetos sueltos y visibilidad por módulos');
+  const TT = A.texturasTierra();
+  ok('texturas: la Tierra se carga en KTX2, comprimida para la GPU y con sus mipmaps', TT.formato === 'ktx2' && [TT.baseDia, TT.baseNoche, TT.detDia, TT.detNoche].every((t) => t.isCompressedTexture && t.mipmaps.length > 8), [TT.formato, TT.baseDia.mipmaps.length]);
+  ok('texturas: la de noche queda lineal (son datos: luces y agua) y la de día en sRGB', TT.baseNoche.colorSpace !== 'srgb' && TT.detNoche.colorSpace !== 'srgb' && TT.baseDia.colorSpace === 'srgb');
   const LF = A.lotes(), PV = A.portales();
   ok('lotes: los objetos sueltos y las herramientas se dibujan en dos lotes (uno por material)', LF.lotes.length === 2 && LF.agrupados >= 30, [LF.lotes.length, LF.agrupados]);
   // un objeto del lote sigue a su malla: se toma, se mueve y el lote lo dibuja donde está
@@ -1066,6 +1069,13 @@ async def main():
                 print("(sin pydantic: no se valida el informe contra el backend)")
             except Exception as e:  # noqa: BLE001
                 res["R"].append({"nombre": nombre, "pasa": False, "dato": str(e)[:800]})
+        # con ?ktx2=no (o si el navegador no puede con KTX2) se usan las WebP de siempre
+        pg3 = await b.new_page(viewport={"width": 320, "height": 180})
+        await pg3.goto(os.environ.get("URL", "http://localhost:8765/artigas1/") + "?ktx2=no")
+        await pg3.wait_for_function("!!window.artigas1", timeout=120000)
+        formato = await pg3.evaluate("window.artigas1.texturasTierra().formato")
+        res["R"].append({"nombre": "texturas: con ?ktx2=no se cargan las WebP de respaldo", "pasa": formato == "webp", "dato": formato})
+        await pg3.close()
         mal = total = 0
         for r in res["R"]:
             if "fase" in r:
