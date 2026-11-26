@@ -35,6 +35,11 @@ export const PARAMETROS_FLOTANTES = {
   radioMano: 0.06,           // m: la mano abierta empuja como una esfera
   velocidadGolpe: 0.6,       // m/s: una mano más lenta que esto se está acercando para tomar y no empuja
   distanciaActiva: 7.0,      // m: más lejos de la cabeza no se calcula ni se dibuja
+  // Herramienta en la mano: la mano puede meterse en una pared (no hay nada que la frene), pero la herramienta
+  // no. Se la saca de la estructura con una esfera chica en el centro y otra en la punta: así queda apoyada
+  // contra la superficie y la punta igual llega a los puntos de trabajo, que están sobre la superficie.
+  radioTomadoMax: 0.05,      // m: esfera del centro (como mucho el radio del objeto)
+  radioPunta: 0.012,         // m: esfera de la punta
 };
 
 const _v = new THREE.Vector3();
@@ -42,6 +47,8 @@ const _n = new THREE.Vector3();
 const _p = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _m = new THREE.Matrix4();
+const _antes = new THREE.Vector3();
+const _punta = new THREE.Vector3();
 
 /** Punto del segmento ab más cercano a p (en `out`). */
 function cercanoEnSegmento(p, a, b, out) {
@@ -167,6 +174,7 @@ export class SistemaFlotantes {
           const estabaFijo = f.fijo;
           f.mano = m;
           f.fijo = false;
+          f._ultimaLibre = null;                       // el barrido contra las paredes arranca donde se tomó
           m.sostiene = f;
           m.nuevoAgarre = true;
           if (m.objeto) {
@@ -223,6 +231,7 @@ export class SistemaFlotantes {
         } else {
           f.posicion.copy(m.posicion).add(f._local);
         }
+        if (f.datos && f.datos.herramienta) this._fueraDeLaEstructura(f);
         f.malla.visible = true;
         this.activos++;
         continue;
@@ -304,6 +313,44 @@ export class SistemaFlotantes {
         f.malla.quaternion.premultiply(_q);
       }
     }
+  }
+
+  /**
+   * Saca de las paredes y los equipos a una herramienta que está en la mano (ver `radioTomadoMax`). Mueve el
+   * objeto entero: queda apoyado contra la superficie aunque la mano siga de largo. Deja en `f.apoyada` si
+   * hubo que correrlo.
+   */
+  _fueraDeLaEstructura(f) {
+    const p = this.p;
+    _antes.copy(f.posicion);                            // donde la pone la mano
+    const r = Math.min(f.radio, p.radioTomadoMax);
+    // Barrido desde la última posición libre hasta la de la mano, en pasos más cortos que la esfera: si la mano
+    // cruza una pared de un salto, la herramienta no aparece del otro lado. Un salto de más de 1 m es un
+    // traslado del cuerpo (o recién se tomó): ahí se pone directo.
+    if (!f._ultimaLibre) f._ultimaLibre = new THREE.Vector3().copy(f.posicion);
+    const delta = _n.subVectors(_antes, f._ultimaLibre);
+    if (delta.lengthSq() > 1) f._ultimaLibre.copy(_antes);
+    else {
+      const n = Math.max(1, Math.ceil(delta.length() / (r * 0.8)));
+      f.posicion.copy(f._ultimaLibre);
+      delta.multiplyScalar(1 / n);
+      for (let i = 0; i < n; i++) {
+        f.posicion.add(delta);
+        for (const sistema of this.colisionadores()) sistema.resolverEsfera(f.posicion, r);
+      }
+    }
+    for (const sistema of this.colisionadores()) sistema.resolverEsfera(f.posicion, r);
+    if (f.agarre && f.agarre.punta) {
+      f.malla.updateMatrix();
+      _punta.copy(f.agarre.punta).applyQuaternion(f.malla.quaternion).add(f.posicion);
+      const antesPunta = _v.copy(_punta);
+      const x = antesPunta.x, y = antesPunta.y, z = antesPunta.z;
+      for (const sistema of this.colisionadores()) sistema.resolverEsfera(_punta, p.radioPunta);
+      f.posicion.x += _punta.x - x; f.posicion.y += _punta.y - y; f.posicion.z += _punta.z - z;
+    }
+    f._ultimaLibre.copy(f.posicion);
+    f.apoyada = f.posicion.distanceToSquared(_antes) > 1e-8;
+    if (f.apoyada) f.malla.updateMatrixWorld(true);
   }
 
   /** Devuelve un objeto a su lugar de reposo y lo deja fijo (reunir las herramientas). */

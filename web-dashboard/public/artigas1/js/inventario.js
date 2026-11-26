@@ -90,7 +90,9 @@ export class Inventario {
   }
 
   ubicacionDe(flotante) {
-    return flotante.datos.hueco ? flotante.datos.hueco.codigo : 'EN TRÁNSITO';
+    const d = flotante.datos;
+    if (!d.hueco) return 'EN TRÁNSITO';
+    return d.amarre && !d.amarre.amarrado ? `${d.hueco.codigo} (sin amarrar)` : d.hueco.codigo;
   }
 
   /**

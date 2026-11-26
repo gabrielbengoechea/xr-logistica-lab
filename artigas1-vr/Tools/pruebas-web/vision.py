@@ -127,6 +127,9 @@ async () => {
   // Lo que se mueve de verdad (paneles, antenas, el cable) corre sus bordes: un píxel cambia una vez y queda.
   // Un parpadeo o un destello es un píxel que sube y vuelve a bajar (o al revés): se cuentan esas idas y vueltas
   // de más de 60/255 en menos de medio segundo.
+  // los avisos siguen a la mirada (js/avisos.js) y las pruebas teletransportan la cabeza cada 0,1 s: el aviso
+  // se correría con cada salto. Acá se mide la luz del exterior, así que se lo apaga.
+  A.aviso.tiempo = 0; A.scene.getObjectByName('Aviso').visible = false;
   const ultimoSalto = new Int8Array(W * H), edad = new Uint8Array(W * H).fill(255);
   let previa = dibujarOjo(ojoIzq), idaYVuelta = 0, peor = 0;
   for (let k = 0; k < 40; k++) {

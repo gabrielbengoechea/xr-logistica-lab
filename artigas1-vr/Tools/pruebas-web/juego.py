@@ -68,6 +68,8 @@ JS = r"""
     h.grip(1); pasos(2);
     return h.mano.sostiene === f;
   };
+  // amarra un contenedor apoyado: la mano libre junto al trinquete y tres veces el gatillo
+  const amarrar = (h, c) => { soltar(h); h.en(A.amarres.posicionTrinquete(c)); pasos(2); for (let i = 0; i < 3; i++) h.clic(); return !!(c.datos.amarre && c.datos.amarre.amarrado); };
   const centroBoton = (panel, id) => {
     const b = panel.botones.find((x) => x.id === id);
     if (!b) return null;
@@ -273,9 +275,19 @@ JS = r"""
   izq.en(destino.posicion.clone()); pasos(3);
   izq.en(destino.posicion.clone().sub(cont.posicion.clone().sub(izq.mano.posicion)).add(V(0.1, 0.05, 0.05))); pasos(3);
   izq.grip(0); pasos(2);
-  ok('contenedores: soltado cerca de su hueco queda asegurado en él, con la correa', cont.fijo && cont.datos.hueco === destino && destino.ocupado && cont.posicion.distanceTo(destino.posicion) < 1e-6 && cont.datos.correa.visible, A.aviso.texto);
+  ok('contenedores: soltado cerca de su hueco queda apoyado en él, con la correa floja', cont.fijo && cont.datos.hueco === destino && destino.ocupado && cont.posicion.distanceTo(destino.posicion) < 1e-6 && cont.datos.correa.visible, A.aviso.texto);
+  const am = cont.datos.amarre;
+  ok('amarre: apoyado todavía no está amarrado (correa ámbar, trinquete a la vista)', am && !am.amarrado && am.dientes === 0 && am.trinquete.visible && am.correa.material.color.getHex() === 0xf2b600, am && am.correa.material.color.getHexString());
+  ok('amarre: la tablet lo muestra sin amarrar', I.listado().find((f) => f.codigo === cont.datos.codigo).ubicacion === `${destino.codigo} (sin amarrar)`);
+  ok('amarre: el trinquete está del lado del pasillo', A.amarres.posicionTrinquete(cont).length() < cont.posicion.length() || Math.hypot(A.amarres.posicionTrinquete(cont).x, A.amarres.posicionTrinquete(cont).y) < Math.hypot(cont.posicion.x, cont.posicion.y));
+  soltar(izq); izq.en(A.amarres.posicionTrinquete(cont)); pasos(2); izq.clic();
+  ok('amarre: cada gatillo junto al trinquete es un diente (y no abre el mapa)', am.dientes === 1 && !am.amarrado && !A.mapa.abierto, am.dientes);
+  izq.clic(); izq.clic();
+  ok('amarre: con tres dientes queda amarrado (luz verde, correa tensa)', am.amarrado && am.luz.material.color.getHex() === 0x3ecf6e && !A.mapa.abierto, A.aviso.texto);
+  izq.clic();
+  ok('amarre: amarrado, más gatillos no hacen nada', am.dientes === 3);
   seg(2);
-  ok('contenedores: asegurado, no deriva', cont.posicion.distanceTo(destino.posicion) < 1e-6);
+  ok('contenedores: amarrado, no deriva', cont.posicion.distanceTo(destino.posicion) < 1e-6);
   ok('contenedores: la tablet lo lista en su ubicación', I.listado().find((f) => f.codigo === cont.datos.codigo).ubicacion === destino.codigo);
 
   // ---- herramientas con punto de agarre
@@ -508,21 +520,30 @@ JS = r"""
   const dMano = centroTab().distanceTo(izq.mano.posicion), dCab = centroTab().distanceTo(cabeza());
   ok('mapa: la tablet está en la mano (a menos de 25 cm del control) y a distancia de lectura', dMano < 0.25 && dCab > 0.3 && dCab < 0.8, [+dMano.toFixed(3), +dCab.toFixed(2)]);
   const mira = normalTab().dot(cabeza().sub(centroTab()).normalize());
-  ok('mapa: la pantalla mira a los ojos', mira > 0.6, +mira.toFixed(2));
+  ok('mapa: la pantalla mira a los ojos', mira > 0.97, +mira.toFixed(2));
   A.mapa.cuerpo.geometry.computeBoundingBox(); const tam = A.mapa.cuerpo.geometry.boundingBox.getSize(new T.Vector3());
   ok('mapa: tablet de tamaño de mano (unos 33 × 22 cm, delgada)', Math.max(tam.x, tam.y, tam.z) < 0.4 && Math.min(tam.x, tam.y, tam.z) < 0.04, tam.toArray().map((x) => +x.toFixed(3)));
   ok('mapa: la mano izquierda toma la pose de sostener la tablet y no agarra ni señala', izq.mano.sostieneMapa && izq.mano.ocupada && !izq.mano.cerrada && !izq.mano.apunta);
   // sigue a la mano en el mismo cuadro, sin retraso
-  const cTab0 = centroTab(); const haciaTab = V(0.05, 0.04, -0.03);
+  // la mano queda en el mismo lugar del borde de la tablet en el mismo cuadro (la orientación sale de los ojos)
+  const manoEnTab = () => izq.mano.posicion.clone().applyMatrix4(tablet.matrixWorld.clone().invert());
+  const enTab0 = manoEnTab(); const cTab0 = centroTab(); const haciaTab = V(0.05, 0.04, -0.03);
   izq.en(izq.mano.posicion.clone().add(haciaTab)); pasos(1);
   const corridaTab = centroTab().sub(cTab0);
-  ok('mapa: sigue al control en el mismo cuadro (sin retraso ni temblor)', corridaTab.distanceTo(haciaTab) < 0.002, corridaTab.toArray().map((x) => +x.toFixed(4)));
-  const qMuneca = new T.Quaternion().setFromEuler(new T.Euler(-0.15, 0.35, 0.1, 'YXZ'));
-  izq.g.quaternion.copy(qMuneca); izq.a.quaternion.copy(qMuneca); pasos(1);
-  const relativa = new T.Matrix4().copy(izq.mano.objeto.matrixWorld).invert().multiply(tablet.matrixWorld);
+  ok('mapa: sigue al control en el mismo cuadro (sin retraso ni temblor)', manoEnTab().distanceTo(enTab0) < 0.002 && corridaTab.length() > 0.04, [+manoEnTab().distanceTo(enTab0).toFixed(4), +corridaTab.length().toFixed(3)]);
+  // en el visor el marco del control depende de cómo se agarre: con la muñeca girada (o el control apuntando al
+  // piso, como pasaba en el Quest) la pantalla tiene que aparecer igual mirando a los ojos, sin girar la mano
+  const miradas = [];
+  for (const e of [[-0.15, 0.35, 0.1], [-1.2, 0, 0], [0.4, -0.5, 0.8], [-0.6, 0.9, -1.1]]) {
+    const q = new T.Quaternion().setFromEuler(new T.Euler(...e, 'YXZ'));
+    izq.g.quaternion.copy(q); izq.a.quaternion.copy(q); pasos(1);
+    miradas.push(+normalTab().dot(cabeza().sub(centroTab()).normalize()).toFixed(3));
+  }
   izq.g.quaternion.copy(qNatural); izq.a.quaternion.copy(qNatural); pasos(1);
-  const relativa2 = new T.Matrix4().copy(izq.mano.objeto.matrixWorld).invert().multiply(tablet.matrixWorld);
-  ok('mapa: gira con la muñeca y mantiene la misma pose en la mano', relativa.elements.every((x, i) => Math.abs(x - relativa2.elements[i]) < 1e-4));
+  ok('mapa: con la muñeca en cualquier postura la pantalla aparece mirando a los ojos', miradas.every((x) => x > 0.97), miradas);
+  const arribaTab = V(0, 1, 0).transformDirection(tablet.matrixWorld), arribaCuerpo = V(0, 1, 0).applyQuaternion(A.rig.quaternion);
+  const ladoTab = V(1, 0, 0).transformDirection(tablet.matrixWorld);
+  ok('mapa: la tablet queda derecha (no se ladea: su borde de abajo es horizontal para el cuerpo)', Math.abs(ladoTab.dot(arribaCuerpo)) < 0.02 && arribaTab.dot(arribaCuerpo) > 0.5, [+ladoTab.dot(arribaCuerpo).toFixed(3), +arribaTab.dot(arribaCuerpo).toFixed(2)]);
   ok('mapa: no queda metido en una pared', A.estacion.colisiones.puntoMasCercano(centroTab(), 0.12, new T.Vector3()) === Infinity);
   ok('mapa: marca el módulo actual', A.navegacion.actual === 'rivera' && A.mapa._estadoDe('rivera') === 'actual', A.navegacion.actual);
   const lugares = A.mapa.panel.botones.filter((b) => b.id.startsWith('lugar:')).map((b) => b.id.slice(6));
@@ -648,8 +669,11 @@ JS = r"""
     }
     const r2 = colocar(izq, c, h);
     if (r2) fallas.push(`${p.id}: ${r2}`);
+    if (act.pasos[i].hecho) fallas.push(`${p.id}: se cumplió sin amarrar`);
+    if (!amarrar(izq, c)) fallas.push(`${p.id}: no se amarró (${c.datos.amarre && c.datos.amarre.dientes} dientes)`);
+    if (!act.pasos[i].hecho && E('almacenamiento') === 'ACTIVA') fallas.push(`${p.id}: amarrado pero el paso no se cumplió`);
   });
-  ok('almacenamiento: la pistola dice el hueco de cada contenedor y soltarlo ahí lo asegura (con un error a propósito)', fallas.length === 0 && act.errores === 1, fallas);
+  ok('almacenamiento: la pistola dice el hueco de cada contenedor; apoyarlo ahí y amarrarlo con el trinquete cumple el paso (con un error a propósito)', fallas.length === 0 && act.errores === 1, fallas);
   ok('almacenamiento: completada, con su resumen', E('almacenamiento') === 'COMPLETADA' && act.resultado?.pasos === 3 && A.panelInforme.malla.visible, act.resultado);
   cerrarInforme();
 
@@ -680,7 +704,7 @@ JS = r"""
   cerrarInforme();
   act = G.obtener('mantenimiento');
   const adentro = (t) => F.objetos.find((f) => f.tipo === t && !f.mano && Math.abs(f.posicion.x) < 1.5);
-  ok('mantenimiento: cuatro puntos marcados, cada uno con su herramienta', act.pasos.length === 4 && A.inspecciones.puntos.filter((p) => p.activo).length === 4 && A.inspecciones.marcas.count === 4, A.inspecciones.puntos.filter((p) => p.activo).map((p) => `${p.id}:${p.herramienta}`));
+  ok('mantenimiento: cinco puntos marcados, cada uno con su herramienta (también el destornillador)', act.pasos.length === 5 && A.inspecciones.puntos.filter((p) => p.activo).length === 5 && A.inspecciones.marcas.count === 5 && A.inspecciones.punto('tapa_tablero').herramienta === 'destornillador', A.inspecciones.puntos.filter((p) => p.activo).map((p) => `${p.id}:${p.herramienta}`));
   const trabajar = (h, punto, s) => {
     const f = h.mano.sostiene, aDistancia = ['linterna', 'inspector', 'escaner'].includes(f.tipo);
     const haciaElEje = V(-punto.posicion.x, -punto.posicion.y, 0).normalize();
@@ -688,6 +712,17 @@ JS = r"""
     apuntarHerramienta(h, punto.posicion.clone(), 0.5, punto.posicion.clone().addScaledVector(haciaElEje, aDistancia ? 0.5 : 0.06));
     h.gatillo(1); seg(s); h.gatillo(0); pasos(2);
   };
+  // carteles de los puntos: se ven desde cerca, encima de todo, con la herramienta que piden
+  ubicar(V(0.1, 0.1, 4.6)); pasos(2);
+  const carteles = A.inspecciones.puntos.filter((p) => p.activo).map((p) => p.cartel.malla);
+  ok('mantenimiento: cada punto tiene un cartel visible, encima de todo, con la herramienta que pide', carteles.length === 5 && carteles.every((c) => c.visible && c.material.depthTest === false));
+  // la herramienta en la mano no atraviesa la pared aunque la mano sí
+  const llaveT = adentro('llave');
+  ubicar(llaveT.posicion.clone().add(V(-0.4, 0.1, 0.2))); tomar(der, llaveT); seg(0.4);
+  der.en(V(0.85, 0.0, 5.3)); pasos(2); A.rig.quaternion.identity(); der.mover(V(0.9, 0, 0), 4); pasos(2);   // la mano entra 50 cm en la pared en 4 cuadros
+  const dentroPared = A.estacion.colisiones.puntoMasCercano(llaveT.posicion, 0.035, new T.Vector3()) !== Infinity;
+  ok('herramientas: con la mano metida en la pared, la herramienta queda apoyada del lado de adentro', !dentroPared && llaveT.posicion.x < 1.3 && llaveT.apoyada, llaveT.posicion.toArray().map((x) => +x.toFixed(3)));
+  soltar(der); A.acciones.reunirHerramientas(); pasos(2);
   const pFiltro = A.inspecciones.punto('filtro_co2');
   ubicar(adentro('medidor').posicion.clone().add(V(-0.4, 0.1, 0.2))); tomar(der, adentro('medidor')); seg(0.4);
   trabajar(der, pFiltro, 1.0);
@@ -697,6 +732,12 @@ JS = r"""
   ubicar(adentro('inspector').posicion.clone().add(V(-0.4, 0.1, 0.2))); tomar(der, adentro('inspector')); seg(0.4);
   trabajar(der, cortado, 0.7);
   const avanceParcial = cortado.avance;
+  // con la herramienta correcta en el punto pero sin apretar, se recuerda usar el gatillo
+  const pistaAntes = A.aviso.texto;
+  { const h = der, punto = cortado; const haciaElEje = V(-punto.posicion.x, -punto.posicion.y, 0).normalize();
+    L.teletransportar(punto.posicion.clone().addScaledVector(haciaElEje, 0.8)); L.velocidad.set(0, 0, 0);
+    apuntarHerramienta(h, punto.posicion.clone(), 0.5, punto.posicion.clone().addScaledVector(haciaElEje, 0.5)); seg(2.0); }
+  ok('mantenimiento: con la herramienta correcta y sin apretar, avisa que hay que mantener el gatillo', /gatillo/.test(A.aviso.texto) && A.aviso.texto !== pistaAntes, A.aviso.texto);
   ok('mantenimiento: soltar el gatillo antes de tiempo no completa el punto', !cortado.hecho && avanceParcial > 0.2 && avanceParcial < 0.8, +avanceParcial.toFixed(2));
   soltar(der); A.acciones.reunirHerramientas(); pasos(2);
   const hechosM = [];
@@ -708,7 +749,7 @@ JS = r"""
     if (!act.pasos.find((x) => x.id === p.id).hecho) hechosM.push(`${p.id}: sin completar (${p.avance.toFixed(2)})`);
     soltar(der); A.acciones.reunirHerramientas(); pasos(2);
   }
-  ok('mantenimiento: los cuatro puntos se completan con linterna, inspector, medidor y llave', hechosM.length === 0, hechosM);
+  ok('mantenimiento: los cinco puntos se completan con linterna, inspector, medidor, llave y destornillador', hechosM.length === 0, hechosM);
   ok('mantenimiento: completada; se apagan las marcas', E('mantenimiento') === 'COMPLETADA' && (() => { pasos(2); return A.inspecciones.marcas.count === 0; })(), act.resultado);
   ok('gestor: al completar el mantenimiento se desbloquea la caminata espacial', E('eva') === 'DISPONIBLE');
   cerrarInforme();
@@ -849,6 +890,38 @@ JS = r"""
   }
   A.renderer.xr.isPresenting = true;
   ok('llamadas de dibujo adentro: menos de 100 en todos los módulos', Object.values(llamadas).every((n) => n < 100), llamadas);
+
+  // =========================================================================================== FASE 7
+  fase('FASE 7 · Carteles legibles y rayo contra paredes');
+  // de cara a un rack de Rivera, a medio metro: antes el aviso quedaba a 95 cm, adentro del rack
+  A.rig.quaternion.setFromAxisAngle(V(0, 1, 0), -Math.PI / 2); A.camera.position.set(0, 0, 0);
+  ubicar(V(0.55, 0.0, -2.0)); pasos(3);
+  const haciaPared = V(0, 0, -1).applyQuaternion(A.camera.getWorldQuaternion(new T.Quaternion()));
+  const librePared = A.paneles.obstaculo(cabeza(), haciaPared, 2);
+  A.panelInforme.malla.visible = false; A.acciones.avisar('Prueba de cartel junto a la pared', 'ok'); pasos(1);
+  const pa = A.scene.getObjectByName('Aviso');
+  const dAviso = pa.position.distanceTo(cabeza());
+  ok('carteles: el aviso queda antes de la pared, del lado del jugador', dAviso < librePared && A.estacion.colisiones.puntoMasCercano(pa.position, 0.02, new T.Vector3()) === Infinity, [+dAviso.toFixed(2), +librePared.toFixed(2)]);
+  ok('carteles: se dibuja encima de todo (ni la mano ni un objeto lo tapan) y debajo del parpadeo', pa.material.depthTest === false && pa.renderOrder < 998 && A.panelInforme.malla.material.depthTest === false);
+  const tamAparente = pa.scale.x / dAviso;
+  ok('carteles: más cerca se achica, así se lee del mismo tamaño', Math.abs(tamAparente - 1 / 0.95) < 0.02, +tamAparente.toFixed(3));
+  // el jugador gira: el cartel vuelve despacio delante de los ojos
+  A.rig.quaternion.setFromAxisAngle(V(0, 1, 0), Math.PI); pasos(1);
+  const miraNueva = V(0, 0, -1).applyQuaternion(A.camera.getWorldQuaternion(new T.Quaternion()));
+  const anguloAviso = () => miraNueva.angleTo(pa.position.clone().sub(cabeza()).normalize());
+  const antesGiro = anguloAviso(); pasos(4); const enCamino = anguloAviso(); seg(1.2);
+  ok('carteles: si el jugador gira, el aviso vuelve suave delante de los ojos', antesGiro > 1 && enCamino > 0.35 && anguloAviso() < 0.45, [+antesGiro.toFixed(2), +enCamino.toFixed(2), +anguloAviso().toFixed(2)]);
+  // rayo: un terminal del otro lado del mamparo Rivera–Nodo no se aprieta
+  const tPrueba = A.terminales[1].malla, guardado = { p: tPrueba.position.clone(), r: tPrueba.rotation.y };
+  const origenRayo = V(0.9, 0.3, -0.6), dirRayo = V(0, 0, 1);
+  tPrueba.position.set(0.9, 0.3, 1.0); tPrueba.rotation.y = Math.PI; tPrueba.updateMatrixWorld(true);
+  const tras = A.paneles.apuntar(origenRayo, dirRayo, new T.Vector3());
+  tPrueba.position.set(0.9, 0.3, 0.2); tPrueba.updateMatrixWorld(true);
+  const delante = A.paneles.apuntar(origenRayo, dirRayo, new T.Vector3());
+  tPrueba.position.copy(guardado.p); tPrueba.rotation.y = guardado.r; tPrueba.updateMatrixWorld(true);
+  ok('rayo: no aprieta un terminal del otro lado de un mamparo, sí uno del mismo lado', (!tras || tras.panel !== A.terminales[1]) && delante && delante.panel === A.terminales[1], [tras && tras.panel.nombre, delante && delante.panel.nombre]);
+  ok('rayo: los terminales de siempre se siguen apretando (están sobre equipos)', A.terminales.every((t) => { t.malla.updateWorldMatrix(true, false); const c = t.malla.getWorldPosition(new T.Vector3()); const n = V(0, 0, 1).transformDirection(t.malla.matrixWorld); const v = A.paneles.apuntar(c.clone().addScaledVector(n, 0.6), n.clone().negate(), new T.Vector3()); return v && v.panel === t; }));
+  A.rig.quaternion.identity();
   return { R };
 }
 """

@@ -10,6 +10,7 @@ export const PUNTOS_TALLER = {
   soporte_vital: { posicion: new THREE.Vector3(-1.15, 0.19, 4.93), herramienta: 'inspector', segundos: 1.5, texto: 'Apuntá el inspector a la pantalla de soporte vital' },
   banco_bus: { posicion: new THREE.Vector3(0.95, -0.12, 4.97), herramienta: 'medidor', segundos: 1.5, texto: 'Medí la tensión del bus en el banco con el medidor' },
   valvula: { posicion: new THREE.Vector3(-1.15, -0.36, 5.28), herramienta: 'llave', segundos: 2.0, texto: 'Ajustá la válvula del filtro con la llave' },
+  tapa_tablero: { posicion: new THREE.Vector3(1.15, 0.35, 5.70), herramienta: 'destornillador', segundos: 2.0, texto: 'Ajustá los tornillos de la tapa del tablero eléctrico con el destornillador' },
 };
 export const PUNTOS_EVA = {
   junta_solar: { herramienta: 'inspector', segundos: 2.0, texto: 'Inspeccioná la junta del panel solar' },
@@ -48,7 +49,7 @@ export function definirActividades(gestor, mundo) {
 
   gestor.registrar({
     id: 'almacenamiento', titulo: 'Almacenamiento en Rivera', modulo: 'rivera', concepto: 'Ubicación y aseguramiento de cargas',
-    instrucciones: 'Hay contenedores sueltos. Escaneá cada uno: la pistola te dice en qué hueco va. Llevalo flotando hasta ese hueco del rack y soltalo ahí: queda asegurado con su correa.',
+    instrucciones: 'Hay contenedores sueltos. Escaneá cada uno: la pistola te dice en qué hueco va. Llevalo flotando hasta ese hueco del rack y soltalo ahí: queda apoyado, con la correa floja en ámbar. Para amarrarlo, acercá la mano libre al trinquete naranja y apretá el gatillo tres veces, hasta que la luz se ponga verde.',
     referencia: 240,
     pasos: (a) => {
       // los tres más cercanos al almacén que todavía no están en su lugar
@@ -56,13 +57,14 @@ export function definirActividades(gestor, mundo) {
       const elegidos = inventario.contenedores.filter((f) => !f.datos.hueco || f.datos.hueco.codigo !== f.datos.destino)
         .sort((x, y) => x.posicion.distanceToSquared(centro) - y.posicion.distanceToSquared(centro)).slice(0, 3);
       a.datos.codigos = elegidos.map((f) => f.datos.codigo);
-      return elegidos.map((f) => ({ id: f.datos.codigo, texto: `Asegurá ${f.datos.codigo} en ${f.datos.destino}` }));
+      return elegidos.map((f) => ({ id: f.datos.codigo, texto: `Llevá ${f.datos.codigo} a ${f.datos.destino} y amarralo` }));
     },
     alEvento(a, tipo, d) {
       if (tipo === 'escaneo' && d.ok && d.tipo === 'contenedor') a.aviso(`${d.codigo} va en ${d.destino}`);
-      if (tipo !== 'colocado' || !a.datos.codigos.includes(d.codigo)) return;
-      if (d.correcto) a.completarPaso(d.codigo);
-      else a.error(`${d.codigo} no va en ${d.hueco}: va en ${d.destino}`);
+      if ((tipo !== 'colocado' && tipo !== 'amarrado') || !a.datos.codigos.includes(d.codigo)) return;
+      // apoyarlo en el hueco equivocado es el error; en el correcto, el paso se cumple recién al amarrarlo
+      if (tipo === 'colocado' && !d.correcto) a.error(`${d.codigo} no va en ${d.hueco}: va en ${d.destino}`);
+      if (tipo === 'amarrado' && d.correcto) a.completarPaso(d.codigo);
     },
   });
 
@@ -94,13 +96,14 @@ export function definirActividades(gestor, mundo) {
     alEvento(a, tipo, d) {
       if (tipo === 'inspeccion') a.completarPaso(d.punto);
       if (tipo === 'herramienta_incorrecta') a.error(`Ahí hace falta ${NOMBRE_HERRAMIENTA[d.pide] || d.pide}`);
+      if (tipo === 'pista') a.aviso(d.texto);
     },
   });
 
   gestor.registrar({
     id: 'mantenimiento', titulo: 'Mantenimiento del taller', modulo: 'tacuarembo', concepto: 'Mantenimiento y uso de herramientas',
-    instrucciones: 'Ronda de mantenimiento en Tacuarembó. Cada punto marcado pide una herramienta: tomala, apuntala o apoyala en el punto y mantené el gatillo hasta que el aro se ponga verde.',
-    referencia: 210,
+    instrucciones: 'Ronda de mantenimiento en Tacuarembó. Las herramientas están junto al banco de trabajo; la linterna, al fondo del módulo. Cada punto tiene un aro y un cartel con la herramienta que pide. Tomala, apuntala o apoyala en el punto y mantené apretado el gatillo hasta que la barra se llene y el aro se ponga verde.',
+    referencia: 250,
     ...conPuntos(PUNTOS_TALLER),
   });
 

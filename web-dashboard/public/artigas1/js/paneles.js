@@ -158,6 +158,17 @@ export class SistemaPaneles {
     /** @type {PanelVR[]} */
     this.paneles = [];
     this.alcance = 3.0;
+    /**
+     * Distancia libre a lo largo de un rayo, contra la estructura: (origen, direccion, hasta) => metros.
+     * Si está, el rayo no aprieta botones del otro lado de una pared o un mamparo.
+     * @type {((origen: THREE.Vector3, direccion: THREE.Vector3, hasta: number) => number) | null}
+     */
+    this.obstaculo = null;
+    /**
+     * Lo que se ignora justo antes del panel: los terminales están montados sobre equipos cuya caja de colisión
+     * sobresale hasta unos 18 cm. Un mamparo entero queda siempre más lejos que esto.
+     */
+    this.toleranciaPared = 0.25;
     this._estado = new WeakMap();
     this.laser = new THREE.Mesh(
       new THREE.BoxGeometry(0.0025, 0.0025, 1).translate(0, 0, -0.5),
@@ -189,10 +200,17 @@ export class SistemaPaneles {
   apuntar(origen, direccion, out) {
     let mejor = null;
     let tMejor = this.alcance;
+    let libre = -1;                                            // se mide una sola vez, recién si hace falta
     for (const p of this.paneles) {
       if (!this._visible(p)) continue;
       const t = p.cortar(origen, direccion, _p);
-      if (t < tMejor) { tMejor = t; mejor = p; out.copy(_p); }
+      if (t >= tMejor) continue;
+      // un panel dibujado encima de todo (avisos, informe) se ve aunque esté cerca de una pared: no se bloquea
+      if (this.obstaculo && p.malla.material.depthTest !== false) {
+        if (libre < 0) libre = this.obstaculo(origen, direccion, this.alcance);
+        if (t > libre + this.toleranciaPared) continue;          // hay una pared antes del panel
+      }
+      tMejor = t; mejor = p; out.copy(_p);
     }
     return mejor ? { panel: mejor, distancia: tMejor, boton: mejor.botonEn(out.x, out.y) } : null;
   }

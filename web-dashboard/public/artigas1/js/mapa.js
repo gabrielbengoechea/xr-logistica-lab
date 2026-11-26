@@ -26,6 +26,12 @@ const ICONOS = { esclusa: [2.11, 0.0], junta_solar: [-6.8, 3.15], antena: [2.11,
 const _v = new THREE.Vector3();
 const _p = new THREE.Vector3();
 const _m = new THREE.Matrix4();
+const _ox = new THREE.Vector3();
+const _oy = new THREE.Vector3();
+const _oz = new THREE.Vector3();
+const _cab = new THREE.Vector3();
+const _arr = new THREE.Vector3();
+const _qc = new THREE.Quaternion();
 
 /** Medidas de la tablet de navegación (metros). La pantalla dibuja el mismo canvas de 1280 × 800. */
 export const TABLET_MAPA = { ancho: 0.330, alto: 0.222, espesor: 0.014, radio: 0.016, pantallaAncho: 0.300, pantallaAlto: 0.1875 };
@@ -46,6 +52,39 @@ export function poseTabletEnMano(inclinacion = -1.2, out = new THREE.Matrix4()) 
   out.makeBasis(x, y, z);
   // el borde izquierdo (x = -ancho/2) queda 2 cm adentro de la palma; el plano de la tablet pasa por la mano
   const centro = new THREE.Vector3().addScaledVector(x, TABLET_MAPA.ancho / 2 - 0.018).addScaledVector(y, 0.012).addScaledVector(z, -0.004);
+  return out.setPosition(centro);
+}
+
+/**
+ * Pose de la tablet en la mano, mirando a los ojos (la que se usa). En el visor, el marco del control cambia
+ * según cómo lo agarre cada persona: con la pose fija en la mano (`poseTabletEnMano`), la pantalla aparecía
+ * mirando hacia abajo y había que girar la muñeca para leerla. Ahora:
+ *   - la posición sale de la mano, en el mismo cuadro (sin retraso): la mano la toma por su borde;
+ *   - la orientación sale de los ojos: la pantalla mira siempre a la cabeza, con el «arriba» del cuerpo del
+ *     astronauta (no el de la cabeza, para que no se incline si se ladea la cabeza).
+ * Así aparece lista para leer con la mano en cualquier postura.
+ * @param {THREE.Vector3} mano     Posición de la mano en el mundo.
+ * @param {THREE.Vector3} cabeza   Posición de los ojos en el mundo.
+ * @param {THREE.Vector3} arriba   Arriba del cuerpo (del rig) en el mundo.
+ * @param {'left'|'right'} lado    La mano que la sostiene: la tablet se extiende hacia el centro del cuerpo.
+ */
+export function poseTabletMirandoALosOjos(mano, cabeza, arriba, lado = 'left', out = new THREE.Matrix4()) {
+  // el borde de la tablet queda en la palma (1,8 cm adentro) y la pantalla un poco por encima de la mano
+  const hacia = lado === 'right' ? -1 : 1;
+  const x = _ox, y = _oy, z = _oz;
+  const centro = _cab.copy(mano);
+  // tres pasadas: la orientación depende del centro (que mire a los ojos desde ahí) y el centro de la orientación
+  for (let i = 0; i < 3; i++) {
+    z.copy(cabeza).sub(centro);
+    if (z.lengthSq() < 1e-6) z.set(0, 0, 1);
+    z.normalize();
+    x.crossVectors(arriba, z);
+    if (x.lengthSq() < 1e-6) x.set(1, 0, 0);               // mirando la mano justo desde arriba: cualquier lado sirve
+    x.normalize();
+    y.crossVectors(z, x).normalize();
+    centro.copy(mano).addScaledVector(x, hacia * (TABLET_MAPA.ancho / 2 - 0.018)).addScaledVector(y, 0.03);
+  }
+  out.makeBasis(x, y, z);
   return out.setPosition(centro);
 }
 
@@ -118,7 +157,9 @@ export class MapaEstacion {
    * @param {{guiar: (id: string) => void, trasladar: (id: string) => void, iniciar: (id: string) => void, cancelarGuia: () => void}} o.acciones
    * @param {() => {afuera: boolean}} o.estado
    */
-  constructor({ paneles, escena, navegacion, gestor, acciones, estado }) {
+  constructor({ paneles, escena, navegacion, gestor, acciones, estado, camara = null }) {
+    /** Cámara del visor: la tablet en la mano mira a los ojos (ver poseTabletMirandoALosOjos). */
+    this.camara = camara;
     this.paneles = paneles;
     this.escena = escena;
     this.navegacion = navegacion;
@@ -180,7 +221,16 @@ export class MapaEstacion {
   _seguirMano() {
     const m = this.mano;
     m.objeto.updateWorldMatrix(true, false);
-    _m.multiplyMatrices(m.objeto.matrixWorld, this.poseEnMano);
+    if (this.camara) {
+      this.camara.updateWorldMatrix(true, false);
+      this.camara.getWorldPosition(_v);
+      _p.setFromMatrixPosition(m.objeto.matrixWorld);
+      if (this.camara.parent) this.camara.parent.getWorldQuaternion(_qc); else _qc.identity();
+      _arr.set(0, 1, 0).applyQuaternion(_qc);
+      poseTabletMirandoALosOjos(_p, _v, _arr, m.lado, _m);
+    } else {
+      _m.multiplyMatrices(m.objeto.matrixWorld, this.poseEnMano);   // sin cámara (pruebas aisladas): pose fija
+    }
     const s = this._escalaVisible();
     if (s !== 1) _m.multiply(new THREE.Matrix4().makeScale(s, s, s));
     this.tablet.matrix.copy(_m);
