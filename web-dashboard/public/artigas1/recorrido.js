@@ -42,6 +42,8 @@ import { Confort, ORDEN_TUNEL } from './js/confort.js';
 import { PARAMETROS_AVISO, UbicadorCartel, distanciaLibre, siempreVisible } from './js/avisos.js';
 import { Amarres, DIENTES } from './js/amarre.js';
 import { MedidorFps } from './js/rendimiento.js';
+import { LotesFlotantes } from './js/lotes.js';
+import { VisibilidadModulos } from './js/portales.js';
 
 const INICIO = 'rivera';
 
@@ -132,6 +134,10 @@ let orbital = null;
 /** @type {SistemaFlotantes | null} */
 let flotantes = null;
 let inventario = null;
+/** @type {LotesFlotantes | null} */
+let lotes = null;
+/** @type {VisibilidadModulos | null} */
+let portales = null;
 let inspecciones = null;
 let exterior = null;
 /** @type {EVAController | null} */
@@ -312,6 +318,7 @@ function crearTerminal(idActividad, posicion, giroY, extra = null) {
   scene.add(panel.malla);
   paneles.agregar(panel);
   terminales.push(panel);
+  portales.agregar(panel.malla, posicion);
   return panel;
 }
 
@@ -394,12 +401,14 @@ const anisotropia = Math.min(4, renderer.capabilities.getMaxAnisotropy());
 Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, anisotropia)]).then(([gEstacion, texTierra]) => {
   estacion = armarEstacion(gEstacion, materialPara);
   scene.add(estacion.grupo);
+  portales = new VisibilidadModulos(estacion);        // no se dibuja lo que queda detrás de una escotilla cerrada
   const legibles = estacion.cargas.filter((c) => c.legible);
   const etiquetas = crearEtiquetas(legibles, renderer);
   if (etiquetas.malla) scene.add(etiquetas.malla);
   inventario = new Inventario(estacion.cargas, etiquetas.datos, CATEGORIAS);
   orbital = crearEntornoOrbital(texTierra);
   scene.add(orbital.grupo);
+  portales.agregarDeAfuera(orbital.grupo);
   exterior = crearExterior(SOL, COLOR_SOL);
   scene.add(exterior.grupo);
   for (const p of exterior.pasamanos) estacion.barandas.segmentos.push(p);
@@ -485,6 +494,10 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   ponerHerramienta('tarjeta', V(0.48, -0.32, 1.25), -0.4);
   ponerHerramienta('inspector', V(2.08, 0.36, 2.86), -1.2);        // soporte exterior de la esclusa
   ponerHerramienta('llave', V(2.08, 0.08, 2.92), -1.2);
+
+  // ---- un lote de dibujo por material para todos los objetos sueltos (js/lotes.js)
+  lotes = new LotesFlotantes(scene);
+  lotes.armar(flotantes.objetos);
 
   // ---- soltar y tomar: el contenedor queda apoyado en el hueco y se amarra con el trinquete (js/amarre.js)
   flotantes.alSoltar = (f) => {
@@ -578,7 +591,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   window.artigas1 = {
     guanteListo, manosPoses: POSES,
     THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, flotantes, ir, manosDePrueba,
-    inventario, amarres, medidorFps, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
+    inventario, amarres, medidorFps, lotes: () => lotes, portales: () => portales, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
     acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas }, aviso, panelInforme, teclas,
     avanzar: (dt = 1 / 72, dibujar = false) => cuadro(0, null, dt, !dibujar),
   };
@@ -980,6 +993,8 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     manos.mostrar(dt);
     if (loco.ultimoChoque > 0.35) manos.vibrarTodas(Math.min(1, loco.ultimoChoque / 2), 30);
     for (const e of estacion.escotillas) e.actualizar(dt, cabeza);
+    portales.actualizar(cabeza, eva.afuera);
+    lotes.actualizar();                                // al final: ya se movió todo lo que se mueve
     orbital.actualizar(dt);
   }
   if (sinDibujar) return;

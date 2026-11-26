@@ -920,8 +920,46 @@ JS = r"""
   const delante = A.paneles.apuntar(origenRayo, dirRayo, new T.Vector3());
   tPrueba.position.copy(guardado.p); tPrueba.rotation.y = guardado.r; tPrueba.updateMatrixWorld(true);
   ok('rayo: no aprieta un terminal del otro lado de un mamparo, sí uno del mismo lado', (!tras || tras.panel !== A.terminales[1]) && delante && delante.panel === A.terminales[1], [tras && tras.panel.nombre, delante && delante.panel.nombre]);
+  A.portales().activo = false; pasos(1, 0);           // todos visibles: acá se prueba el rayo, no los portales
   ok('rayo: los terminales de siempre se siguen apretando (están sobre equipos)', A.terminales.every((t) => { t.malla.updateWorldMatrix(true, false); const c = t.malla.getWorldPosition(new T.Vector3()); const n = V(0, 0, 1).transformDirection(t.malla.matrixWorld); const v = A.paneles.apuntar(c.clone().addScaledVector(n, 0.6), n.clone().negate(), new T.Vector3()); return v && v.panel === t; }));
+  A.portales().activo = true; pasos(1, 0);
   A.rig.quaternion.identity();
+
+  // =========================================================================================== FASE 8
+  fase('FASE 8 · Rendimiento: lotes de objetos sueltos y visibilidad por módulos');
+  const LF = A.lotes(), PV = A.portales();
+  ok('lotes: los objetos sueltos y las herramientas se dibujan en dos lotes (uno por material)', LF.lotes.length === 2 && LF.agrupados >= 30, [LF.lotes.length, LF.agrupados]);
+  // un objeto del lote sigue a su malla: se toma, se mueve y el lote lo dibuja donde está
+  const fl = F.objetos.find((f) => f.dibujoEnLote && f.datos && f.datos.herramienta && !f.mano);
+  const entrada = LF.lotes.flatMap((l) => l.entradas.map((e) => ({ ...e, lote: l.lote }))).find((e) => e.f === fl);
+  ubicar(fl.posicion.clone().add(V(-0.4, 0.1, 0.2))); tomar(der, fl); seg(0.3);
+  der.en(der.mano.posicion.clone().add(V(0.05, 0.08, -0.06))); pasos(1);
+  const mLote = new T.Matrix4(); entrada.lote.getMatrixAt(entrada.id, mLote);
+  ok('lotes: el lote dibuja la herramienta donde la lleva la mano, en el mismo cuadro', new T.Vector3().setFromMatrixPosition(mLote).distanceTo(fl.posicion) < 1e-5 && fl.malla.material.visible === false && entrada.lote.getVisibleAt(entrada.id));
+  soltar(der); A.acciones.reunirHerramientas(); pasos(2);
+  // portales: con las escotillas cerradas no se dibuja el resto de la estación, y la imagen es la misma
+  A.renderer.xr.isPresenting = false;
+  const W8 = 320, H8 = 180; A.renderer.setSize(W8, H8, false); A.camera.aspect = W8 / H8; A.camera.updateProjectionMatrix();
+  const gl = A.renderer.getContext();
+  const leer = () => { const b = new Uint8Array(W8 * H8 * 4); gl.readPixels(0, 0, W8, H8, gl.RGBA, gl.UNSIGNED_BYTE, b); return b; };
+  const difPortales = [], llamadasPortal = {};
+  for (const id of ['tacuarembo', 'nodo', 'cupula', 'rivera', 'colonia', 'carguero']) for (const yaw of [0, Math.PI]) {
+    A.ir(id); A.rig.quaternion.setFromAxisAngle(V(0, 1, 0), yaw); A.camera.rotation.set(0, 0, 0); pasos(4, DT);
+    PV.activo = true; pasos(1, 0); A.renderer.render(A.scene, A.camera); const a = leer(); const n = A.renderer.info.render.calls;
+    PV.activo = false; pasos(1, 0); A.renderer.render(A.scene, A.camera); const b = leer(); const nTodo = A.renderer.info.render.calls; PV.activo = true;
+    let dif = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30) dif++;
+    if (dif > 3) difPortales.push(`${id} ${yaw ? 'atrás' : 'adelante'}: ${dif} px`);
+    llamadasPortal[`${id}${yaw ? '_atras' : ''}`] = `${nTodo}→${n}`;
+  }
+  pasos(1, 0);
+  ok('portales: lo que se deja de dibujar detrás de las escotillas cerradas no cambia la imagen (12 vistas)', difPortales.length === 0, difPortales);
+  const tac = llamadasPortal.tacuarembo.split('→').map(Number);
+  ok('portales: el taller de Tacuarembó baja a menos de 40 llamadas de dibujo', tac[1] < 40 && tac[1] < tac[0], llamadasPortal);
+  A.ir('rivera'); pasos(3);
+  const cieloRivera = A.orbital.grupo.visible;
+  A.ir('cupula'); pasos(3);
+  ok('portales: la Tierra y el cielo se dibujan solo si se ven (en la Cúpula sí, en Rivera no)', !cieloRivera && A.orbital.grupo.visible);
+  A.renderer.xr.isPresenting = true; A.renderer.setSize(640, 360, false); A.camera.aspect = 640 / 360; A.camera.updateProjectionMatrix();
   return { R };
 }
 """
