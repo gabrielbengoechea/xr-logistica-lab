@@ -130,7 +130,7 @@ La estación completa se recorre en el navegador (compu o Quest, con WebXR) desd
 | `materiales.js` | Reflejos de entorno, juntas de panel, vidrio con Fresnel, sol en la Cúpula |
 | `entorno.js` | Tierra al atardecer calculada por píxel (esfera exacta), geografía real, luces de Buenos Aires y Montevideo, nubes sutiles (procedurales, fuera de la zona de Uruguay), atmósfera, sol y estrellas |
 | `flotantes.js` | Objetos sueltos en microgravedad y agarre universal: puntos de agarre, pasar de mano, soltar con inercia |
-| `manos.js`, `guante.js` | Manos del traje: guante modelado en Blender con piel de 16 huesos sobre la cinemática de los dedos, poses por control, brazos y cuerpo en primera persona con rodamientos de aluminio, módulo de control del pecho con pantalla, parche de la bandera en el brazo izquierdo y materiales por pieza (tela, goma, puño anodizado) |
+| `manos.js`, `guante.js` | Manos del traje: guante modelado en Blender con piel de 16 huesos sobre la cinemática de los dedos, poses por control, brazos y cuerpo en primera persona con torso rígido torneado, fuelles en codos y rodillas, costuras, rodamientos de aluminio en hombros, codos, cintura, rodillas y tobillos, módulo de control del pecho con pantalla, parche de la bandera en el brazo izquierdo y materiales por pieza (tela, goma, puño anodizado) |
 | `herramientas.js`, `escaner.js`, `tablet.js` | Herramientas con punto de agarre, pistola lectora y tablet logística |
 | `inventario.js`, `amarre.js` | Bultos, huecos del almacén y contenedores; correa y trinquete (apoyado en ámbar hasta amarrarlo) |
 | `actividades.js`, `misiones.js`, `inspeccion.js` | Gestor de actividades, las cinco actividades y los puntos de mantenimiento, con su cartel de herramienta y avance |
