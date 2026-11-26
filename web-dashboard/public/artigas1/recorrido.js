@@ -48,6 +48,7 @@ import { Telemetria } from './js/telemetria.js';
 import { BalanceRivera, TANQUES, crearPanelBalance, geometriaTanque } from './js/balance.js';
 import { DescargaCarguero, crearPanelManifiesto, crearPanelPresion, crearPanelRfid } from './js/descarga.js';
 import { CambioFiltro, crearPantallaSoporte } from './js/filtro.js';
+import { Induccion, crearPanelBienvenida, crearPanelInduccion } from './js/induccion.js';
 
 const INICIO = 'rivera';
 
@@ -287,6 +288,7 @@ function abrirInforme(modo, actividad) {
   ubicadorInforme.colocar(camera);
   panelInforme.malla.visible = true;
   panelInforme.sucio = true;
+  reubicarAviso();
 }
 
 function cerrarInforme() {
@@ -352,6 +354,59 @@ function crearTerminal(idActividad, posicion, giroY, extra = null) {
 // =====================================================================================================
 // Acciones del juego
 // =====================================================================================================
+// =====================================================================================================
+// Bienvenida y práctica guiada (js/induccion.js)
+// =====================================================================================================
+const induccion = new Induccion();
+const panelBienvenida = crearPanelBienvenida({
+  practicar: () => { cerrarBienvenida(); empezarPractica(); },
+  explorar: () => { cerrarBienvenida(); avisar('Explorá libre. La práctica guiada está en el menú de la tablet.'); },
+});
+siempreVisible(panelBienvenida.malla, 988);
+panelBienvenida.malla.visible = false;
+scene.add(panelBienvenida.malla);
+paneles.agregar(panelBienvenida);
+const ubicadorBienvenida = new UbicadorCartel(panelBienvenida.malla, colisionadores, { seguir: false, bajar: 0.05 });
+const panelPractica = crearPanelInduccion(induccion, { cerrar: () => induccion.cerrar() });
+siempreVisible(panelPractica.malla, 988);
+panelPractica.malla.visible = false;
+scene.add(panelPractica.malla);
+paneles.agregar(panelPractica);
+// la práctica va arriba de la mirada: abajo están las manos, la tablet y los botones con los que se practica
+const ubicadorPractica = new UbicadorCartel(panelPractica.malla, colisionadores, { seguir: true, bajar: -0.32 });
+let bienvenidaPendiente = false;
+
+function bienvenidaVista() {
+  try { return window.localStorage.getItem('artigas1.bienvenida') === '1'; } catch { return false; }
+}
+function mostrarBienvenida() {
+  ubicadorBienvenida.colocar(camera);
+  panelBienvenida.malla.visible = true;
+  panelBienvenida.sucio = true;
+  reubicarAviso();
+}
+/** Si un panel con botones aparece donde está el aviso, el aviso se corre (ver UbicadorCartel). */
+function reubicarAviso() {
+  if (panelAviso.malla.visible) ubicadorAviso.colocar(camera);
+}
+function cerrarBienvenida() {
+  panelBienvenida.malla.visible = false;
+  try { window.localStorage.setItem('artigas1.bienvenida', '1'); } catch { /* sin almacenamiento */ }
+}
+function empezarPractica() {
+  induccion.empezar();
+  ubicadorPractica.colocar(camera);
+  panelPractica.malla.visible = true;
+  panelPractica.sucio = true;
+}
+induccion.alCambiar = (tipo) => {
+  panelPractica.sucio = true;
+  if (tipo === 'inicio') telemetria.registrar('activity_start', 'practica');
+  if (tipo === 'paso') { sonido.tocar('logro'); manos.vibrarTodas(0.5, 50); }
+  if (tipo === 'fin') { sonido.tocar('logro'); telemetria.registrar('activity_end', 'practica', null, 'completada'); }
+  if (tipo === 'cierre') panelPractica.malla.visible = false;
+};
+
 function iniciarActividad(id) {
   const motivo = gestor.impedimento(id);
   if (motivo) { avisar(motivo, 'error'); sonido.tocar('error'); return false; }
@@ -477,6 +532,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
         siguienteTunel: () => ORDEN_TUNEL[(ORDEN_TUNEL.indexOf(ajustes.tunel) + 1) % ORDEN_TUNEL.length],
         calibrarManos: () => { manos.calibrar(manos.calibracion + 1); ajustes.calibracionManos = manos.calibracion; guardarAjustes(); return manos.calibracion; },
         reunir: reunirHerramientas,
+        practica: () => empezarPractica(),
       } });
       paneles.agregar(t.panel);
       tablets.push(t);
@@ -794,7 +850,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     guanteListo, manosPoses: POSES,
     THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, texturasTierra: () => texTierraCargadas, flotantes, ir, manosDePrueba,
     inventario, amarres, medidorFps, lotes: () => lotes, portales: () => portales, telemetria, balance: () => balance, panelBalance: () => panelBalance, descarga: () => descarga, panelesDescarga: () => panelesDescarga, cambioFiltro: () => cambioFiltro, pantallaSoporte: () => pantallaSoporte, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
-    acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas }, aviso, panelInforme, teclas,
+    acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas, mostrarBienvenida, empezarPractica }, induccion, panelBienvenida, panelPractica, aviso, panelInforme, teclas,
     avanzar: (dt = 1 / 72, dibujar = false) => cuadro(0, null, dt, !dibujar),
   };
 }).catch((e) => {
@@ -808,6 +864,7 @@ function alLeer(l) {
   else avisar(`${l.texto}. ${l.detalle}.`, 'error', 2.5);
   manos.vibrarTodas(l.ok ? 0.6 : 1, l.ok ? 50 : 140);
   gestor.evento('escaneo', l);
+  if (l.ok) induccion.marcar('escaneo');
   telemetria.registrar('scan', l.ok ? l.codigo : (l.bulto && l.bulto.codigo) || null, null, l.ok ? 'ok' : l.motivo);
 }
 
@@ -857,6 +914,7 @@ window.addEventListener('pointermove', (e) => {
   arrastre.x = e.clientX;
   arrastre.y = e.clientY;
   aplicarMirada();
+  if (arrastre.movido > 60) induccion.marcar('giro');     // en la compu se gira arrastrando
 });
 const teclas = new Set();
 window.addEventListener('keydown', (e) => {
@@ -880,7 +938,11 @@ window.addEventListener('resize', () => {
   camaraExterna.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
-renderer.xr.addEventListener('sessionstart', () => { pitch = 0; aplicarMirada(); sonido.activar(); terceraPersona = false; });
+renderer.xr.addEventListener('sessionstart', () => {
+  pitch = 0; aplicarMirada(); sonido.activar(); terceraPersona = false;
+  // la primera vez en el visor: bienvenida (se muestra en el primer cuadro, con la cabeza ya ubicada)
+  if (!bienvenidaVista()) bienvenidaPendiente = true;
+});
 renderer.xr.addEventListener('sessionend', () => aplicarMirada());
 
 /** En la compu: trae la tablet más cercana a la mano (tecla T). */
@@ -1033,6 +1095,7 @@ function entradaXR(dt) {
       velGiro += (metaH - velGiro) * (1 - Math.exp(-12 * dt));        // sin arranques ni frenadas bruscas
       velInclinacion += (metaV - velInclinacion) * (1 - Math.exp(-12 * dt));
       if (Math.abs(velGiro) > 1e-4) girarAlrededorDeLaCabeza(ARRIBA, velGiro * dt);
+      if (Math.abs(velGiro) > 0.5) induccion.marcar('giro');   // con giro suave también se practica
       if (Math.abs(velInclinacion) > 1e-4) {
         const eje = ejeInclinacion(_ejeHorizontal);
         const permitido = inclinacionPermitida(eje, velInclinacion * dt);
@@ -1048,7 +1111,7 @@ function entradaXR(dt) {
       const horizontal = Math.abs(x) >= Math.abs(y);
       if (giroListo && horizontal && Math.abs(x) > 0.7) {
         const angulo = x > 0 ? -Math.PI / 6 : Math.PI / 6;
-        if (confort.parpadear(() => girarAlrededorDeLaCabeza(ARRIBA, angulo))) giroListo = false;
+        if (confort.parpadear(() => girarAlrededorDeLaCabeza(ARRIBA, angulo))) { giroListo = false; induccion.marcar('giro'); }
       } else if (giroListo && !horizontal && ajustes.giroVertical && Math.abs(y) > 0.7) {
         const eje = ejeInclinacion(_ejeHorizontal).clone();
         const angulo = inclinacionPermitida(eje, y > 0 ? -Math.PI / 9 : Math.PI / 9);
@@ -1170,6 +1233,8 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     loco.p.friccionLibre = ajustes.frenoAsistido && empuje.lengthSq() < 1e-6 ? 0.9 : 0.04;
     if (transicion.activa) { empuje.set(0, 0, 0); frenando = true; }
     loco.actualizar(dt, todasLasManos, empuje, frenando);
+    induccion.actualizar({ agarrado: todasLasManos.some((m) => m.agarre), velocidad: loco.velocidad.length(), frenando, mapaEnLaMano: mapa.abierto && (mapa.modo === 'mano' || !enVisor) });
+    if (bienvenidaPendiente) { bienvenidaPendiente = false; mostrarBienvenida(); }
     confort.nivelTunel = ajustes.tunel;
     confort.actualizar(dt, loco.velocidad.length(), girandoSuave);
     girandoSuave = false;
@@ -1191,6 +1256,7 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     marcas();
     if (aviso.tiempo > 0) { aviso.tiempo -= dt; if (aviso.tiempo <= 0) panelAviso.malla.visible = false; }
     ubicadorAviso.actualizar(dt, camera);
+    ubicadorPractica.actualizar(dt, camera);
     relojTerminales += dt;
     if (relojTerminales > 0.5) {
       relojTerminales = 0;

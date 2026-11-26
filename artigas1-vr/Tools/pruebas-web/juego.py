@@ -1104,6 +1104,48 @@ JS = r"""
   ok('filtro: al cerrar la puerta el cartucho entra y la actividad se completa', !CF.abierta && repuesto.oculto && E('filtro') === 'COMPLETADA' && act.resultado?.completada, act.resultado);
   cerrarInforme();
 
+  // =========================================================================================== FASE 13
+  fase('FASE 13 · Bienvenida y práctica guiada');
+  const IND = A.induccion, PBV = A.panelBienvenida, PPR = A.panelPractica;
+  soltar(izq); soltar(der); A.rig.quaternion.identity(); A.camera.rotation.set(0, 0, 0);
+  ubicar(V(0.1, 0.1, -2.0)); pasos(3);
+  try { window.localStorage.removeItem('artigas1.bienvenida'); } catch { /* */ }
+  A.acciones.mostrarBienvenida(); pasos(1);
+  ok('bienvenida: aparece delante, encima de todo, con PRÁCTICA GUIADA y EXPLORAR', PBV.malla.visible && PBV.malla.material.depthTest === false && ['practicar', 'explorar'].every((id) => PBV.botones.some((b) => b.id === id)));
+  der.en(cabeza().add(V(0.15, -0.2, -0.3))); pasos(2);
+  ok('bienvenida: PRÁCTICA GUIADA la cierra, la recuerda y empieza la práctica', apretar(der, PBV, 'practicar') && !PBV.malla.visible && IND.activa && PPR.malla.visible && window.localStorage.getItem('artigas1.bienvenida') === '1');
+  ok('práctica: un paso adelantado no cuenta (se aprende de a uno)', !IND.marcar('mapa') && IND.pasoActual.id === 'agarre');
+  // 1 · agarrarse de una baranda
+  const barP = A.estacion.barandas.segmentos.find((sg) => sg.a.z < -0.5 && sg.b.z > -4.5 || sg.b.z < -0.5 && sg.a.z > -4.5);
+  const pbP = barP.a.clone().lerp(barP.b, 0.5);
+  ubicar(pbP.clone().add(V(pbP.x > 0 ? -0.35 : 0.35, pbP.y > 0 ? -0.3 : 0.3, 0)));
+  der.en(pbP); pasos(2); der.grip(1); pasos(3);
+  ok('práctica: agarrarse cumple el primer paso', IND.hechos.has('agarre'), [...IND.hechos]);
+  // 2 · impulsarse: tirar y soltar
+  for (let i = 0; i < 10; i++) { der.g.position.z += 0.012; pasos(1); }
+  der.grip(0); pasos(3);
+  ok('práctica: tirar de la baranda y soltar cumple el impulso', IND.hechos.has('impulso'), +L.velocidad.length().toFixed(2));
+  // 3 · frenar con A
+  der.boton(4, 1); seg(2.5); der.boton(4, 0); pasos(2);
+  ok('práctica: frenar con A cumple el freno', IND.hechos.has('freno'));
+  // 4 · girar con el stick derecho
+  der.stick(1, 0); seg(0.4); der.stick(0, 0); seg(0.5);
+  ok('práctica: el giro con el stick derecho cumple el paso', IND.hechos.has('giro'), A.ajustes.giro);
+  // 5 · el mapa en la mano
+  ubicar(V(0.1, 0.1, -2.0)); pasos(2);
+  izq.en(cabeza().add(V(-0.16, -0.30, -0.34))); pasos(1); izq.gatillo(1); seg(0.4);
+  ok('práctica: el mapa en la mano cumple el paso', IND.hechos.has('mapa'));
+  izq.gatillo(0); seg(0.4);
+  // 6 · escanear un bulto
+  const esc6 = A.escaneres.find((x) => x.flotante.mano === der.mano) || A.escaneres.find((x) => !x.flotante.mano);
+  if (!esc6.flotante.mano) { ubicar(esc6.flotante.posicion.clone().add(V(-0.3, 0.1, 0.35))); tomar(der, esc6.flotante); seg(0.4); }
+  const bultoP = I.bultos.find((b) => b.legible && b.ubicacion.startsWith('RIV'));
+  leerBulto(der, bultoP);
+  ok('práctica: escanear un bulto la termina; el panel lo dice y se cierra con CERRAR', IND.terminada && !IND.activa && PPR.malla.visible && (PPR.redibujar(), PPR.botones.some((b) => b.id === 'cerrar')), [...IND.hechos]);
+  PPR.botones.find((b) => b.id === 'cerrar').accion(); pasos(1);
+  ok('práctica: CERRAR guarda el panel', !PPR.malla.visible);
+  ok('práctica: se vuelve a abrir desde el menú de la tablet', (() => { const t = A.tablets[0]; t.pagina = 'inicio'; t.panel.redibujar(); return t.panel.botones.some((b) => b.id === 'practica'); })());
+
   // =========================================================================================== FASE 9
   fase('FASE 9 · Telemetría para el panel docente');
   const TL = A.telemetria;

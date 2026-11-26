@@ -95,7 +95,10 @@ export class TabletLogistica {
     ctx.font = '23px sans-serif';
     ctx.fillStyle = a ? COLORES.amarillo : COLORES.gris;
     const texto = a ? (a.pasoActual ? `Ahora: ${a.pasoActual.texto}` : '') : 'Abrí ÓRDENES DE TRABAJO para empezar una. El mapa se abre con el gatillo izquierdo.';
-    renglones(ctx, texto, W - 96).slice(0, 2).forEach((r, i) => ctx.fillText(r, 44, 540 + i * 30));
+    // sin actividad, a la derecha: la práctica guiada de los controles (js/induccion.js)
+    const anchoTexto = !a && this.acciones.practica ? W - 96 - 300 : W - 96;
+    renglones(ctx, texto, anchoTexto).slice(0, 2).forEach((r, i) => ctx.fillText(r, 44, 540 + i * 30));
+    if (!a && this.acciones.practica) panel.boton('practica', W - 324, 500, 280, 96, 'PRÁCTICA GUIADA', () => this.acciones.practica(), { estilo: 'aviso' });
     if (a && a.ultimoAviso) { ctx.fillStyle = COLORES.celeste; ctx.fillText(a.ultimoAviso.slice(0, 70), 44, 606); }
     return undefined;
   }
