@@ -45,6 +45,7 @@ import { MedidorFps } from './js/rendimiento.js';
 import { LotesFlotantes } from './js/lotes.js';
 import { VisibilidadModulos } from './js/portales.js';
 import { Telemetria } from './js/telemetria.js';
+import { BalanceRivera, TANQUES, crearPanelBalance, geometriaTanque } from './js/balance.js';
 
 const INICIO = 'rivera';
 
@@ -139,6 +140,10 @@ let orbital = null;
 /** @type {SistemaFlotantes | null} */
 let flotantes = null;
 let inventario = null;
+/** @type {BalanceRivera | null} */
+let balance = null;
+/** @type {PanelVR | null} */
+let panelBalance = null;
 /** @type {LotesFlotantes | null} */
 let lotes = null;
 /** @type {VisibilidadModulos | null} */
@@ -500,6 +505,24 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   ponerHerramienta('inspector', V(2.08, 0.36, 2.86), -1.2);        // soporte exterior de la esclusa
   ponerHerramienta('llave', V(2.08, 0.08, 2.92), -1.2);
 
+  // ---- tanques de lastre del balance de masas (js/balance.js): esperan ocultos hasta que empieza la actividad
+  balance = new BalanceRivera(inventario);
+  const geoTanque = geometriaTanque();
+  geoTanque.computeBoundingSphere();
+  for (const t of TANQUES) {
+    const malla = new THREE.Mesh(geoTanque, fabrica.material);
+    malla.name = `Tanque_${t.codigo}`;
+    malla.position.set(...t.posicion);
+    estacion.grupo.add(malla);
+    const f = flotantes.agregar(malla, geoTanque.boundingSphere.radius, {
+      tipo: 'contenedor', agarre: agarreLibre(geoTanque.boundingSphere.radius), fijo: true,
+      datos: { codigo: t.codigo, descripcion: `Lastre de agua ${t.pesoKg} kg`, pesoKg: t.pesoKg, destino: '', hueco: null, escaneado: false, lastre: true },
+    });
+    f.oculto = true;
+    inventario.contenedores.push(f);
+    balance.tanques.push(f);
+  }
+
   // ---- un lote de dibujo por material para todos los objetos sueltos (js/lotes.js)
   lotes = new LotesFlotantes(scene);
   lotes.armar(flotantes.objetos);
@@ -526,7 +549,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   };
   amarres.alAmarrar = (f) => {
     const h = f.datos.hueco;
-    const correcto = !!h && h.codigo === f.datos.destino;
+    const correcto = !!h && (!f.datos.destino || h.codigo === f.datos.destino);   // los tanques de lastre van en cualquier hueco
     avisar(correcto ? `${f.datos.codigo} amarrado en ${h.codigo}` : `${f.datos.codigo} amarrado, pero en un hueco que no es el suyo`, correcto ? 'ok' : 'error');
     gestor.evento('amarrado', { codigo: f.datos.codigo, hueco: h ? h.codigo : '', destino: f.datos.destino, correcto });
     telemetria.registrar('strap', f.datos.codigo, h ? h.codigo : null, correcto ? null : 'hueco equivocado');
@@ -551,7 +574,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   for (const [id, p] of Object.entries(PUNTOS_TALLER)) inspecciones.agregar(id, p.posicion, p.herramienta, p.segundos, p.texto);
   estacion.grupo.add(crearTapaTablero(PUNTOS_TALLER.tapa_tablero.posicion));
   for (const [id, p] of Object.entries(PUNTOS_EVA)) inspecciones.agregar(id, PUNTOS_EXTERIORES[id], p.herramienta, p.segundos, p.texto);
-  definirActividades(gestor, { inventario, inspecciones });
+  definirActividades(gestor, { inventario, inspecciones, balance });
 
   eva = new EVAController({
     rig, camara: camera, escena: scene, loco, manos, exterior, transicion, sonido,
@@ -568,6 +591,26 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   crearTerminal('inventario', V(0.86, -0.02, 0.615), Math.PI);
   crearTerminal('recepcion', V(0.86, 0.30, -4.955), Math.PI);
   crearTerminal('mantenimiento', V(0.86, 0.30, 3.625), 0);
+  // el panel de balance del Nodo es también el terminal de su actividad (js/balance.js)
+  panelBalance = crearPanelBalance(balance, {
+    confirmar: () => {
+      const d = balance.medir();
+      gestor.evento('balance_confirmar', { dentro: balance.dentro, desvio: d, tolerancia: balance.tolerancia, amarrados: balance.amarrados() });
+      telemetria.registrar(balance.dentro ? 'snap_ok' : 'snap_fail', 'balance', null, `desvío ${(d * 100).toFixed(1)} cm · tolerancia ${(balance.tolerancia * 100).toFixed(1)} cm`);
+    },
+    estado: () => gestor.obtener('balance').estado,
+    puedeIniciar: () => !gestor.impedimento('balance'),
+    iniciar: () => iniciarActividad('balance'),
+    pausar: () => gestor.pausar(),
+    reanudar: () => gestor.reanudar(),
+    abandonar: () => gestor.abandonar(),
+  });
+  panelBalance.malla.position.set(-1.141, 0.18, 2.105);   // sobre la pantalla del panel de balance del kit
+  panelBalance.malla.rotation.y = Math.PI / 2;
+  scene.add(panelBalance.malla);
+  paneles.agregar(panelBalance);
+  terminales.push(panelBalance);
+  portales.agregar(panelBalance.malla, panelBalance.malla.position);
   crearTerminal('eva', V(1.175, 0.02, 3.02), -Math.PI / 2, { texto: () => 'SALIR AL EXTERIOR', accion: () => { camera.getWorldPosition(cabeza); const m = eva.salir(cabeza); if (m) avisar(m, 'error'); } });
   crearTerminal('eva', V(1.80, 0.0, 1.25), Math.PI / 2, { texto: () => 'ENTRAR A LA ESTACIÓN', accion: () => { camera.getWorldPosition(cabeza); const m = eva.entrar(cabeza); if (m) avisar(m, 'error'); } });
 
@@ -587,6 +630,15 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     if (tipo === 'inicio') {
       sonido.tocar('aviso'); abrirInforme('instrucciones', a); if (mapa) mapa.cerrar();
       // el taller arranca ordenado: las herramientas sueltas de Tacuarembó vuelven a su lugar
+      if (a.id === 'balance') {
+        // los tanques vuelven a esperar junto a la escotilla y se calcula la tolerancia con los huecos libres
+        for (const f of balance.tanques) {
+          if (f.datos.hueco) { inventario.retirar(f); amarres.quitar(f); }
+          flotantes.guardar(f);
+          f.oculto = false;
+        }
+        balance.preparar();
+      }
       if (a.id === 'mantenimiento') for (const f of flotantes.objetos) if (f.datos && f.datos.herramienta && !f.mano && f.reposo.posicion.z > 3.6) flotantes.guardar(f);
     }
     if (tipo === 'paso') { sonido.tocar('logro'); if (a.pasoActual) avisar(`✔ ${dato.texto}`, 'ok'); }
@@ -614,7 +666,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   window.artigas1 = {
     guanteListo, manosPoses: POSES,
     THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, flotantes, ir, manosDePrueba,
-    inventario, amarres, medidorFps, lotes: () => lotes, portales: () => portales, telemetria, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
+    inventario, amarres, medidorFps, lotes: () => lotes, portales: () => portales, telemetria, balance: () => balance, panelBalance: () => panelBalance, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
     acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas }, aviso, panelInforme, teclas,
     avanzar: (dt = 1 / 72, dibujar = false) => cuadro(0, null, dt, !dibujar),
   };
@@ -1013,6 +1065,7 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     if (relojTerminales > 0.5) {
       relojTerminales = 0;
       if (gestor.activa) for (const t of terminales) if (t.malla.position.distanceToSquared(cabeza) < 16) t.sucio = true;
+      if (panelBalance.malla.visible && panelBalance.malla.position.distanceToSquared(cabeza) < 16) panelBalance.sucio = true;   // medición en vivo
     }
     manos.mostrar(dt);
     if (loco.ultimoChoque > 0.35) manos.vibrarTodas(Math.min(1, loco.ultimoChoque / 2), 30);

@@ -253,7 +253,7 @@ JS = r"""
 
   // ---- contenedores
   const cont = I.contenedores[0], destino = I.huecos.find((h) => h.codigo === cont.datos.destino);
-  ok('contenedores: cada uno tiene código y hueco de destino libre', I.contenedores.length >= 3 && I.contenedores.every((c) => c.datos.codigo && I.huecos.some((h) => h.codigo === c.datos.destino && !h.ocupado)), I.contenedores.map((c) => `${c.datos.codigo}→${c.datos.destino}`));
+  ok('contenedores: cada uno tiene código y hueco de destino libre (los tanques de lastre van en cualquiera)', I.contenedores.length >= 3 && I.contenedores.filter((c) => !c.datos.lastre).every((c) => c.datos.codigo && I.huecos.some((h) => h.codigo === c.datos.destino && !h.ocupado)), I.contenedores.map((c) => `${c.datos.codigo}→${c.datos.destino}`));
   ubicar(cont.posicion.clone().add(V(0, 0.1, 0.5)));
   izq.en(cont.posicion.clone().add(V(0, 0, cont.radio * 0.5))); pasos(2);
   ok('contenedores: se toman con el grip (izquierdo)', (() => { izq.grip(1); pasos(2); return izq.mano.sostiene === cont; })());
@@ -613,8 +613,8 @@ JS = r"""
     h.grip(0); pasos(2);
     return c.datos.hueco === hueco ? '' : 'no quedó en el hueco';
   };
-  ok('gestor: cinco actividades registradas; la caminata espacial arranca bloqueada y el resto disponible', G.lista().length === 5 && E('eva') === 'BLOQUEADA' && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento'].every((x) => E(x) === 'DISPONIBLE'), G.lista().map((a) => `${a.id}:${a.estado}`));
-  ok('acceso: hay un terminal físico por actividad (seis paneles)', A.terminales.length === 6 && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'eva'].every((x) => terminal(x)), A.terminales.map((t) => t.nombre));
+  ok('gestor: seis actividades registradas; la caminata espacial arranca bloqueada y el resto disponible', G.lista().length === 6 && E('eva') === 'BLOQUEADA' && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'balance'].every((x) => E(x) === 'DISPONIBLE'), G.lista().map((a) => `${a.id}:${a.estado}`));
+  ok('acceso: hay un terminal físico por actividad (siete paneles; el del balance es su propio panel)', A.terminales.length === 7 && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'eva', 'balance'].every((x) => terminal(x)), A.terminales.map((t) => t.nombre));
 
   // ---- RECEPCIÓN: se inicia desde el terminal de Colonia
   let term = terminal('recepcion');
@@ -961,6 +961,38 @@ JS = r"""
   ok('portales: la Tierra y el cielo se dibujan solo si se ven (en la Cúpula sí, en Rivera no)', !cieloRivera && A.orbital.grupo.visible);
   A.renderer.xr.isPresenting = true; A.renderer.setSize(640, 360, false); A.camera.aspect = 640 / 360; A.camera.updateProjectionMatrix();
 
+  // =========================================================================================== FASE 10
+  fase('FASE 10 · Balance de masas (minijuego B)');
+  const B = A.balance(), PB = A.panelBalance();
+  const tanques = B.tanques;
+  ok('balance: los tres tanques esperan ocultos hasta que empieza la actividad', tanques.length === 3 && tanques.every((f) => f.oculto && !f.malla.visible));
+  term = terminal('balance');
+  ubicar(frenteA(term, 0.9)); der.en(frenteA(term, 0.5).add(V(0.1, -0.1, 0))); pasos(2);
+  ok('balance: el terminal es el panel de balance del Nodo y se inicia desde ahí', term === PB && apretar(der, term, 'iniciar') && E('balance') === 'ACTIVA');
+  cerrarInforme(); pasos(2);
+  act = G.obtener('balance');
+  ok('balance: cuatro pasos (tres tanques y confirmar); la carga arranca corrida fuera de la tolerancia', act.pasos.length === 4 && !B.dentro && B.tolerancia >= 0.03 && B.mejor.desvio < B.tolerancia, [+(B.desvio * 100).toFixed(1), +(B.tolerancia * 100).toFixed(1), +(B.mejor.desvio * 100).toFixed(1)]);
+  ok('balance: los tanques aparecen junto a la escotilla, sin meterse en la estructura', tanques.every((f) => !f.oculto && A.estacion.colisiones.puntoMasCercano(f.posicion, 0.05, new T.Vector3()) === Infinity));
+  // todos del mismo lado (estribor): queda fuera de la tolerancia
+  const estribor = B.huecosLibres().filter((h) => /^RIV-E/.test(h.codigo)).slice(0, 3);
+  const fallasB = [];
+  tanques.forEach((c, i) => { const r = colocar(izq, c, estribor[i]); if (r) fallasB.push(`${c.datos.codigo}: ${r}`); if (!amarrar(izq, c)) fallasB.push(`${c.datos.codigo}: sin amarrar`); });
+  ok('balance: los tres tanques se ubican y se amarran (cada uno cumple su paso)', fallasB.length === 0 && act.hechos === 3, fallasB);
+  ubicar(frenteA(PB, 0.8)); der.en(frenteA(PB, 0.45).add(V(0.1, -0.1, 0))); pasos(2);
+  const errAntes = act.errores;
+  apretar(der, PB, 'confirmar');
+  ok('balance: con los tres del mismo lado, CONFIRMAR da error de tolerancia', act.errores === errAntes + 1 && E('balance') === 'ACTIVA' && /tolerancia/.test(A.aviso.texto), A.aviso.texto);
+  // se reubican según la mejor distribución
+  for (const f of tanques) { I.retirar(f); A.amarres.quitar(f); F.guardar(f); }
+  const plan = B.mejor.huecos.map((c) => I.huecos.find((h) => h.codigo === c));
+  tanques.forEach((c, i) => { const r = colocar(izq, c, plan[i]); if (r) fallasB.push(`${c.datos.codigo}: ${r}`); amarrar(izq, c); });
+  B.medir();
+  ok('balance: redistribuidos, el centro de masa entra en el círculo', fallasB.length === 0 && B.dentro, [+(B.desvio * 100).toFixed(1), fallasB]);
+  ubicar(frenteA(PB, 0.8)); der.en(frenteA(PB, 0.45).add(V(0.1, -0.1, 0))); pasos(2);
+  apretar(der, PB, 'confirmar');
+  ok('balance: CONFIRMAR la completa, con su resumen', E('balance') === 'COMPLETADA' && act.resultado?.completada && A.panelInforme.malla.visible, act.resultado);
+  cerrarInforme();
+
   // =========================================================================================== FASE 9
   fase('FASE 9 · Telemetría para el panel docente');
   const TL = A.telemetria;
@@ -977,6 +1009,7 @@ JS = r"""
   TL.registrar('hint', 'prueba', null, 'evento en vivo');
   TL.enviar(true);
   window.fetch = fetchOriginal;
+  TL.config = { ...TL.config, backend: null };
   const sesion = enviadas.find((x) => x.url.endsWith('/api/v1/telemetry/session'));
   const vivo = enviadas.find((x) => x.url.endsWith('/api/v1/telemetry/event'));
   ok('telemetría: manda el evento en vivo y la sesión al backend configurado, con la clave', !!sesion && !!vivo && sesion.clave === 'secreta' && vivo.cuerpo.event.type === 'hint', enviadas.map((x) => x.url));
