@@ -169,6 +169,12 @@ export class SistemaPaneles {
      * sobresale hasta unos 18 cm. Un mamparo entero queda siempre más lejos que esto.
      */
     this.toleranciaPared = 0.25;
+    /**
+     * Si devuelve true, los toques con el dedo no cuentan (el rayo sí). Sirve para que apoyarse o chocar contra
+     * un panel mientras el cuerpo se mueve no apriete botones: quien aprieta un botón está quieto.
+     * @type {(() => boolean) | null}
+     */
+    this.sinToque = null;
     this._estado = new WeakMap();
     this.laser = new THREE.Mesh(
       new THREE.BoxGeometry(0.0025, 0.0025, 1).translate(0, 0, -0.5),
@@ -225,6 +231,7 @@ export class SistemaPaneles {
     this.laser.visible = false;
     this.punto.visible = false;
     const local = new THREE.Vector3();
+    const sinToque = this.sinToque ? this.sinToque() : false;
     for (const m of manos) {
       m.apunta = false;
       m.gatilloUsado = false;
@@ -234,7 +241,7 @@ export class SistemaPaneles {
       if (m.ocupada) continue;                                   // sostiene la tablet del mapa: ni toca ni apunta
       // --- toque con la punta del índice
       let tocado = null;
-      if (m.punta) {
+      if (m.punta && !sinToque && !m.agarre) {            // agarrado de una baranda o moviéndose, el dedo no aprieta
         for (const p of this.paneles) {
           if (!this._visible(p) || (m.sostiene && m.sostiene.malla === p.malla.parent)) continue;
           p.malla.updateWorldMatrix(true, false);

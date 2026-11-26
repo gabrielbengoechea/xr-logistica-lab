@@ -121,6 +121,9 @@ const paneles = new SistemaPaneles(scene, sonido);
 // el rayo de los controles no aprieta terminales del otro lado de un mamparo
 const RAYO_PANELES = { ...PARAMETROS_AVISO, paso: 0.04, radioPrueba: 0.02 };
 paneles.obstaculo = (o, d, hasta) => distanciaLibre(colisionadores(), o, d, hasta, RAYO_PANELES);
+// con el cuerpo en movimiento (más de 0,4 m/s) los toques con el dedo no aprietan botones: así, deslizarse contra
+// una consola o un terminal no inicia una actividad sin querer
+paneles.sinToque = () => !!loco && loco.velocidad.length() > 0.4;
 const transicion = new StationTransitionManager(camera);
 const confort = new Confort(camera);
 // fps: siempre en la consola cada 10 s; con ?fps en la dirección, también un contador en la vista
@@ -202,7 +205,9 @@ panelAviso.interactivo = false;
 panelAviso.malla.visible = false;
 siempreVisible(panelAviso.malla, 991);   // ni una pared, ni una bolsa, ni la mano lo tapan (ver js/avisos.js)
 scene.add(panelAviso.malla);
-const ubicadorAviso = new UbicadorCartel(panelAviso.malla, colisionadores);
+const _apuntado = new THREE.Vector3();
+// el aviso no se pone encima de un panel con botones (terminales, consolas, tablet, mapa, informe)
+const ubicadorAviso = new UbicadorCartel(panelAviso.malla, colisionadores, { ocupado: (o, d) => !!paneles.apuntar(o, d, _apuntado) });
 
 /**
  * Cartel breve delante del astronauta. Queda antes de la primera pared, se dibuja encima de todo y, si el

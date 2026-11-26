@@ -494,9 +494,10 @@ JS = r"""
   ok('velocidad máxima ajustable', vRapida > vLenta * 2, [+vLenta.toFixed(2), +vRapida.toFixed(2)]);
   A.ajustes.velocidad = 1;
   // las paredes siguen siendo sólidas con el stick
-  // (en z = -5,3: más atrás, las manos chocarían contra la consola de recepción y apretarían INICIAR)
-  ubicar(V(0, 0.5, -5.3)); izq.stick(1, 0); seg(5); izq.stick(0, 0);
+  // contra la consola de recepción de Colonia: las manos chocan con su pantalla, pero en movimiento no aprietan
+  ubicar(V(0, 0.5, -6.0)); izq.stick(1, 0); seg(5); izq.stick(0, 0);
   ok('con el stick tampoco se atraviesan las paredes', cabeza().x <= 1.2 - L.p.radioCabeza + 0.01, +cabeza().x.toFixed(3));
+  ok('paneles: deslizarse contra una consola no aprieta sus botones (en movimiento el dedo no cuenta)', !G.activa, G.activa && G.activa.id);
   // impulso desde una baranda
   const bar = A.estacion.barandas.segmentos.find((s) => s.a.z < -0.5 && s.b.z > -4.5 || s.b.z < -0.5 && s.a.z > -4.5);
   const pb = bar.a.clone().lerp(bar.b, 0.5);
@@ -913,6 +914,24 @@ JS = r"""
   const anguloAviso = () => miraNueva.angleTo(pa.position.clone().sub(cabeza()).normalize());
   const antesGiro = anguloAviso(); pasos(4); const enCamino = anguloAviso(); seg(1.2);
   ok('carteles: si el jugador gira, el aviso vuelve suave delante de los ojos', antesGiro > 1 && enCamino > 0.35 && anguloAviso() < 0.45, [+antesGiro.toFixed(2), +enCamino.toFixed(2), +anguloAviso().toFixed(2)]);
+  // frente a un terminal, el aviso no tapa sus botones: se corre arriba de la mirada
+  const tAv = terminal('inventario');
+  A.rig.quaternion.identity(); A.camera.position.set(0, 0, 0);
+  // se mira justo donde el aviso caería sobre el botón INICIAR (17° por encima de él)
+  const bIni = centroBoton(tAv, 'iniciar');
+  const ojo = bIni.clone().addScaledVector(V(0, 0, 1).transformDirection(tAv.malla.matrixWorld), 0.75).add(V(0, 0.05, 0));
+  const miraAv = bIni.clone().add(V(0, Math.tan(0.30) * 0.75, 0));
+  ubicar(ojo); pasos(2);
+  A.rig.quaternion.setFromRotationMatrix(new T.Matrix4().lookAt(cabeza(), miraAv, V(0, 1, 0))); pasos(2);
+  A.scene.getObjectByName('Aviso').visible = false; A.acciones.avisar('Prueba: no tapar botones', 'ok'); pasos(1);
+  const tapados = [];
+  for (const [a, b] of [[0, 0], [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45]]) {
+    const p = V(a * 0.66, b * 0.11, 0).applyMatrix4(pa.matrixWorld);
+    const v = A.paneles.apuntar(cabeza(), p.sub(cabeza()).normalize(), new T.Vector3());
+    if (v && v.boton) tapados.push(`${v.panel.nombre}:${v.boton.id}`);
+  }
+  ok('carteles: frente a un terminal, el aviso no queda encima de sus botones', tapados.length === 0, tapados);
+  A.rig.quaternion.identity();
   // rayo: un terminal del otro lado del mamparo Rivera–Nodo no se aprieta
   const tPrueba = A.terminales[1].malla, guardado = { p: tPrueba.position.clone(), r: tPrueba.rotation.y };
   const origenRayo = V(0.9, 0.3, -0.6), dirRayo = V(0, 0, 1);
