@@ -330,6 +330,19 @@ function crearAtlas() {
     texto('SAW-1 · ALA SOLAR', 26, w / 2, h / 2);
   });
 
+  // placa del laboratorio que opera la estación: solo texto y un aro, sin imitar logos
+  lugar('lab', 512, 128, (w, h) => {
+    ctx.fillStyle = '#e1e3de';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#0038a8';
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.arc(64, h / 2, 38, 0, Math.PI * 2); ctx.stroke();
+    texto('XR', 30, 64, h / 2, '#0038a8');
+    texto('XR LOGÍSTICA LAB', 40, 116, 50, '#101820', 'bold', 'left');
+    texto('OPERACIÓN · MÓDULO RIV-02', 22, 118, 92, '#2b3440', '600', 'left');
+  });
+  if (y + fila > ATLAS_ALTO) throw new Error('el atlas del exterior no alcanza para todas las señales');
+
   const tex = new THREE.CanvasTexture(lienzo);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
@@ -385,6 +398,27 @@ function crearMaterial(sol, colorSol, atlas) {
         return max(l.x, l.y);
       }
 
+      // Sombra de los cascos (cilindros a lo largo de Z): rayo hacia el sol contra cada módulo. Es exacta y nítida,
+      // como la sombra del sol en órbita, y no usa mapas de sombra. El radio se achica un poco porque los cascos
+      // son prismas de 14 lados y sus caras quedan por dentro del círculo.
+      float sombraCilindro(vec3 p, vec3 l, float r, float z0, float z1) {
+        float a = dot(l.xy, l.xy);
+        if (a < 1e-5) return 1.0;
+        float b = dot(p.xy, l.xy), c = dot(p.xy, p.xy) - r * r;
+        float h = b * b - a * c;
+        if (h <= 0.0) return 1.0;
+        h = sqrt(h);
+        float t1 = (-b - h) / a, t2 = (-b + h) / a;
+        if (t2 < 0.06) return 1.0;
+        float za = p.z + l.z * max(t1, 0.06), zb = p.z + l.z * t2;
+        return (max(za, zb) < z0 || min(za, zb) > z1) ? 1.0 : 0.0;
+      }
+      float sombraCascos(vec3 p, vec3 l) {
+        float s = 1.0;
+${CASCOS.map((c) => `        s *= sombraCilindro(p, l, ${(c.radio * 0.975).toFixed(3)}, ${c.z0.toFixed(2)}, ${c.z1.toFixed(2)});`).join('\n')}
+        return s;
+      }
+
       void main() {
         vec3 n = normalize(vN);
         if (!gl_FrontFacing) n = -n;
@@ -393,20 +427,24 @@ function crearMaterial(sol, colorSol, atlas) {
         float celda = step(2.5, vT) * step(vT, 3.5);
         if (celda > 0.5) {
           // Celdas con antialias: el borde de cada una se suaviza en un píxel (fwidth) y, cuando quedan más chicas
-          // que unos pocos píxeles, la grilla se funde en su color promedio.
+          // que unos pocos píxeles, la grilla se funde en su color promedio. Junta angosta de kapton (bronce oscuro)
+          // y una junta más ancha cada 4 x 6 celdas, que marca los módulos del panel.
           vec2 g = fract(vUv);
           vec2 w = max(fwidth(vUv), vec2(1e-4));
-          vec2 dentro = smoothstep(vec2(0.05) - w, vec2(0.05) + w, g);
+          vec2 dentro = smoothstep(vec2(0.018) - w, vec2(0.018) + w, g) * (1.0 - smoothstep(vec2(0.982) - w, vec2(0.982) + w, g));
           float adentro = dentro.x * dentro.y;
+          vec2 gm = fract(vUv / vec2(4.0, 6.0)) * vec2(4.0, 6.0);
+          vec2 qm = min(gm, vec2(4.0, 6.0) - gm);
+          float modulo = 1.0 - (smoothstep(0.045 - w.x, 0.045 + w.x, qm.x) * smoothstep(0.045 - w.y, 0.045 + w.y, qm.y));
           float detalle = clamp(1.6 - 9.0 * max(w.x, w.y), 0.0, 1.0);
-          adentro = mix(0.9, adentro, detalle);
+          adentro = mix(0.93, adentro * (1.0 - modulo), detalle);
           // dos barras colectoras plateadas por celda y una leve diferencia de tono entre celdas
           float qb = abs(fract(g.x * 3.0 + 0.5) - 0.5) / 3.0;
-          float barra = (1.0 - smoothstep(0.012 - w.x, 0.012 + w.x, qb)) * step(0.08, g.x) * step(g.x, 0.92) * detalle;
-          vec3 azul = vec3(0.015, 0.03, 0.12) * (0.88 + 0.24 * azar(floor(vUv)));
-          base = mix(vec3(0.42, 0.40, 0.34), azul, adentro);
-          base = mix(base, vec3(0.36, 0.37, 0.40), barra * adentro * 0.8);
-          esp = 0.16;
+          float barra = (1.0 - smoothstep(0.010 - w.x, 0.010 + w.x, qb)) * step(0.08, g.x) * step(g.x, 0.92) * detalle;
+          vec3 azul = vec3(0.020, 0.032, 0.115) * (0.86 + 0.26 * azar(floor(vUv)));
+          base = mix(vec3(0.22, 0.17, 0.10), azul, adentro);
+          base = mix(base, vec3(0.34, 0.35, 0.38), barra * adentro * 0.7);
+          esp = 0.22; expo = 16.0;
         } else if (vT > 3.5 && vT < 4.5) {
           // Manta térmica (MLI): paneles de 0,55 m con costura, acolchado cada 11 cm y un tono propio por panel
           vec2 panel = floor(vS / 0.55);
@@ -439,6 +477,7 @@ function crearMaterial(sol, colorSol, atlas) {
         // especular chico. Nada cambia de golpe al mover la cabeza ni entre un ojo y el otro.
         float ns = dot(n, uSol);
         float d = smoothstep(-0.05, 0.25, ns) * max(ns, 0.0) + smoothstep(-0.05, 0.25, ns) * 0.04;   // terminador suave
+        d *= sombraCascos(vW, uSol);
         float tierra = max(-n.y, 0.0) * 0.5 + 0.25;                    // resplandor de la Tierra, de abajo y de los costados
         vec3 luz = uSolColor * d * 1.35 + vec3(0.10, 0.16, 0.28) * tierra * 0.55 + vec3(0.045, 0.05, 0.06);
         vec3 c = base * luz;
@@ -448,6 +487,12 @@ function crearMaterial(sol, colorSol, atlas) {
         float brillo = pow(max(dot(n, normalize(v + uSol)), 0.0), expo) * smoothstep(0.0, 0.2, ns);
         c += uSolColor * brillo * esp;
         if (vT > 6.5 && vT < 7.5) c += vec3(0.05, 0.08, 0.14) * pow(1.0 - max(dot(n, v), 0.0), 3.0);
+        if (celda > 0.5) {
+          // vidrio de las celdas: refleja la Tierra (abajo) y casi nada del espacio (arriba), más cuanto más rasante
+          vec3 rr = reflect(-v, n);
+          float fresnel = 0.04 + 0.5 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
+          c += vec3(0.07, 0.11, 0.20) * smoothstep(0.0, -0.35, rr.y) * fresnel * 2.2;
+        }
         if (vT > 0.5 && vT < 1.5) c = vC * 1.6;                          // luz fija
         // baliza: pulso suave cada 3,6 s en lugar de un destello on/off (los destellos en la periferia marean)
         if (vT > 1.5 && vT < 2.5) c = vC * (0.25 + 1.1 * pow(0.5 + 0.5 * sin(uTiempo * 1.75), 4.0));
@@ -863,6 +908,7 @@ export function crearExterior(sol, colorSol) {
     senalCurva(a, R[`modulo_${id}`], r, mitadTramo(id, k), f, ancho, ancho / 4);
   }
   senalCurva(a, R.bandera, 2.052, mitadTramo('carguero', 1), rad(104), 0.45, 0.3);
+  senalCurva(a, R.lab, 2.112, mitadTramo('rivera', 3), rad(124), 0.9, 0.225);
 
   // ---- pasamanos (visual y capa de agarre) y puntos de anclaje numerados
   const barandas = [];

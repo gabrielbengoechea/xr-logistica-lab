@@ -128,7 +128,7 @@ La estación completa se recorre en el navegador (compu o Quest, con WebXR) desd
 | `locomocion.js` | Gravedad cero con cuerpo sólido: inercia, empuje, freno, rebote amortiguado y agarre |
 | `barandas.js` | Barandas como capa de interacción |
 | `materiales.js` | Reflejos de entorno, juntas de panel, vidrio con Fresnel, sol en la Cúpula |
-| `entorno.js` | Tierra al atardecer calculada por píxel (esfera exacta), geografía real, luces de Buenos Aires y Montevideo, atmósfera, sol y estrellas |
+| `entorno.js` | Tierra al atardecer calculada por píxel (esfera exacta), geografía real, luces de Buenos Aires y Montevideo, nubes sutiles (procedurales, fuera de la zona de Uruguay), atmósfera, sol y estrellas |
 | `flotantes.js` | Objetos sueltos en microgravedad y agarre universal: puntos de agarre, pasar de mano, soltar con inercia |
 | `manos.js`, `guante.js` | Manos del traje: guante modelado en Blender con piel de 16 huesos sobre la cinemática de los dedos, poses por control, brazos y cuerpo en primera persona |
 | `herramientas.js`, `escaner.js`, `tablet.js` | Herramientas con punto de agarre, pistola lectora y tablet logística |
@@ -143,7 +143,7 @@ La estación completa se recorre en el navegador (compu o Quest, con WebXR) desd
 | `lotes.js`, `portales.js` | Rendimiento: los objetos sueltos se dibujan en un lote por material, y no se dibuja lo que queda detrás de una escotilla cerrada (ni la Tierra fuera de la Cúpula) |
 | `telemetria.js` | Sesión para el panel docente con el contrato de `backend/app/schemas.py` (escenario `artigas1-web`): `?alumno=…`, `?backend=…` y `?clave=…` en la dirección |
 | `avisos.js`, `rendimiento.js` | Carteles que quedan antes de la primera pared, encima de todo y siguiendo a la mirada; contador de fps (`?fps` en la dirección, y en la consola cada 10 s) |
-| `exterior.js`, `eva.js` | Exterior detallado (mantas térmicas, aros abulonados, escudos, conductos, alas solares reticuladas, radiadores, antenas, cámaras, señalética en atlas) en una malla fija; caminata espacial, cable y esclusa |
+| `exterior.js`, `eva.js` | Exterior detallado (mantas térmicas, aros abulonados, escudos, conductos, alas solares reticuladas, radiadores, antenas, cámaras, señalética en atlas, placa de XR Logística Lab) en una malla fija; sombras exactas de los cascos calculadas en el shader, celdas solares por módulos con reflejo de la Tierra; caminata espacial, cable y esclusa |
 | `etiquetas.js` | Etiquetas logísticas de cada bolsa, en una sola llamada de dibujo |
 
 Pruebas: `cd web-dashboard && npm test` y, con el sitio servido en el puerto 8765, `python3 artigas1-vr/Tools/pruebas-web/juego.py` (280: el juego completo con los controles simulados) y `fisica.py` (41) y `vision.py` (11: los dos ojos por separado, como en el visor, y la estabilidad de la luz en la caminata espacial). Qué se hizo, qué se midió y qué falta probar en el visor: [`INFORME-exterior-manos.md`](INFORME-exterior-manos.md) (exterior, tablet del mapa y guantes), [`INFORME-vision-eva.md`](INFORME-vision-eva.md) (ojo izquierdo, luz de la caminata y vista vertical), [`INFORME-gameplay.md`](INFORME-gameplay.md) (manos, herramientas, actividades, mapa, exterior y caminata), [`INFORME-ambientacion.md`](INFORME-ambientacion.md) e [`INFORME-refactorizacion.md`](INFORME-refactorizacion.md).

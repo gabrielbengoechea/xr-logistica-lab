@@ -59,6 +59,22 @@ const FRAG_TIERRA = `
   const vec3 AZUL = vec3(0.26, 0.50, 1.0);
   const vec3 NARANJA = vec3(1.0, 0.42, 0.12);
 
+  // Nubes: ruido de valor en 3D sobre la esfera, en el marco de la textura (giran con la Tierra). Tres octavas,
+  // estiradas en el sentido de los paralelos como los frentes de latitudes medias. No son datos meteorológicos.
+  float azarN(vec3 p) { p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419)); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+  float ruidoN(vec3 p) {
+    vec3 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(azarN(i), azarN(i + vec3(1, 0, 0)), f.x), mix(azarN(i + vec3(0, 1, 0)), azarN(i + vec3(1, 1, 0)), f.x), f.y),
+               mix(mix(azarN(i + vec3(0, 0, 1)), azarN(i + vec3(1, 0, 1)), f.x), mix(azarN(i + vec3(0, 1, 1)), azarN(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+  }
+  float nubes(vec3 nl, float fino) {
+    vec3 q = nl * vec3(1.0, 1.0, 1.8);
+    float v = ruidoN(q * 14.0) * 0.55 + ruidoN(q * 37.0 + 3.1) * 0.30;
+    v += ruidoN(q * 95.0 + 7.7) * 0.15 * (1.0 - smoothstep(0.004, 0.02, fino));   // la octava fina se apaga lejos
+    return smoothstep(0.50, 0.74, v);
+  }
+
   // color del cielo visto desde afuera según el sol en ese punto: azul de día, franja cálida en el terminador
   vec3 cieloEn(float mu) {
     float dia = smoothstep(-0.10, 0.25, mu);
@@ -89,6 +105,11 @@ const FRAG_TIERRA = `
     vec2 nocheAgua = mix(texture2D(uBaseNoche, uvB).rg, texture2D(uDetNoche, uvD).rg, enDetalle);
     float luz = pow(nocheAgua.r, 2.6);               // rojo: luces urbanas (la textura guarda la raíz; algo más de contraste)
     float agua = nocheAgua.g;                        // verde: mar, ríos, lagos y embalses
+    // nubes sutiles fuera de la zona de detalle: Uruguay, el Río de la Plata y Buenos Aires quedan despejados
+    float nube = nubes(nl, fwidth(nl.x) + fwidth(nl.y)) * smoothstep(1.05, 1.7, length(plano) / uRho.y) * 0.75;
+    albedo = mix(albedo, vec3(0.50, 0.51, 0.53), nube);
+    agua *= 1.0 - nube;
+    luz *= 1.0 - 0.8 * nube;
 
     float dia = smoothstep(-0.08, 0.22, mu);
     vec3 colorSol = mix(vec3(1.0, 0.40, 0.14), vec3(1.0, 0.96, 0.90), smoothstep(0.0, 0.32, mu));
