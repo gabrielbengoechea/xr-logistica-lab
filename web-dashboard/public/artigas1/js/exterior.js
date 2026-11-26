@@ -23,6 +23,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SistemaColisiones } from './colisiones.js';
+import { dibujarBandera } from './bandera.js';
 
 const COLOR = {
   blanco: 0xd9dbd6, manta: 0xc9c2ad, gris: 0x7b838d, oscuro: 0x2b3038, amarillo: 0xf2b705, dorado: 0xb8893a,
@@ -221,27 +222,7 @@ function crearAtlas() {
       ctx.fill();
     }
   };
-  const bandera = (x0, y0, w, h) => {
-    for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 2 ? '#0038a8' : '#ffffff'; ctx.fillRect(x0, y0 + i * h / 9, w, h / 9 + 0.5); }
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(x0, y0, w * 0.37, h * 5 / 9);
-    const cx = x0 + w * 0.185, cy = y0 + h * 2.5 / 9, r = h * 0.12;
-    ctx.fillStyle = '#fcd116';
-    ctx.strokeStyle = '#7b5d00';
-    ctx.lineWidth = Math.max(1, h * 0.006);
-    for (let k = 0; k < 16; k++) {                                   // rayos del Sol de Mayo
-      const a = k * Math.PI / 8;
-      ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a - 0.12) * r, cy + Math.sin(a - 0.12) * r);
-      ctx.lineTo(cx + Math.cos(a) * r * 1.85, cy + Math.sin(a) * r * 1.85);
-      ctx.lineTo(cx + Math.cos(a + 0.12) * r, cy + Math.sin(a + 0.12) * r);
-      ctx.fill();
-    }
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  };
+  const bandera = (x0, y0, w, h) => dibujarBandera(ctx, x0, y0, w, h);
 
   // nombre de la estación, con la bandera
   lugar('nombre', 1024, 256, (w, h) => {
@@ -340,6 +321,25 @@ function crearAtlas() {
     texto('XR', 30, 64, h / 2, '#0038a8');
     texto('XR LOGÍSTICA LAB', 40, 116, 50, '#101820', 'bold', 'left');
     texto('OPERACIÓN · MÓDULO RIV-02', 22, 118, 92, '#2b3440', '600', 'left');
+  });
+  // traje: parche de misión y código del astronauta (EV1 = primer astronauta de la caminata)
+  lugar('insignia', 128, 128, (w, h) => {
+    ctx.fillStyle = '#0b1c3a';
+    ctx.beginPath(); ctx.arc(w / 2, h / 2, 62, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(w / 2, h / 2, 44, 0, Math.PI * 2); ctx.clip();
+    dibujarBandera(ctx, w / 2 - 44, h / 2 - 30, 88, 60);
+    ctx.restore();
+    ctx.strokeStyle = '#d8b44a'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(w / 2, h / 2, 46, 0, Math.PI * 2); ctx.stroke();
+    texto('ARTIGAS-1', 13, w / 2, 14 + 2, '#ffffff');
+    texto('XR LOGÍSTICA LAB', 9, w / 2, h - 10, '#ffffff', '600');
+  });
+  lugar('codigo', 256, 64, (w, h) => {
+    ctx.fillStyle = '#e8e8e3';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#c8102e';
+    ctx.fillRect(0, 0, 18, h);
+    texto('EV1 · ART1-01 · URY', 21, 137, h / 2);
   });
   if (y + fila > ATLAS_ALTO) throw new Error('el atlas del exterior no alcanza para todas las señales');
 
@@ -718,25 +718,114 @@ function plato(radio, rect) {
 }
 
 /** Traje de caminata espacial, para la vista en tercera persona. El origen es la cabeza. */
-function traje() {
+function traje(R) {
+  // Traje EVA para la vista en tercera persona (va pegado a la cámara: el origen son los ojos, -Z adelante).
+  // Proporciones de un adulto de 1,78 m dentro de un traje presurizado: de los ojos a la suela, 1,70 m.
+  // En gravedad cero el cuerpo adopta la postura neutra: brazos adelante y abiertos, rodillas algo flexionadas.
   const a = new Armado();
-  a.sumar(new THREE.SphereGeometry(0.17, 14, 10), COLOR.blanco);
-  a.sumar(new THREE.SphereGeometry(0.15, 12, 8, 0, Math.PI * 2, 0.5, 1.5).rotateX(-Math.PI / 2), COLOR.dorado, TIPO.normal, new THREE.Matrix4().makeTranslation(0, 0, -0.035));
-  a.caja(0.44, 0.50, 0.28, COLOR.blanco, [0, -0.42, 0.02]);                // torso
-  a.caja(0.40, 0.58, 0.20, COLOR.blanco, [0, -0.40, 0.25]);                // mochila de soporte vital
-  a.caja(0.20, 0.14, 0.08, COLOR.gris, [0, -0.36, -0.15]);                 // módulo de control del pecho
-  a.caja(0.10, 0.04, 0.085, COLOR.azul, [0.09, -0.24, -0.15]);
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const TELA = 0xe4e4de, TELA2 = 0xd2d3cd, GOMA = 0x4d5259, ALU = COLOR.aluminio;
+  // aro de un rodamiento entre dos puntos (eje a lo largo del miembro)
+  const aro = (centro, eje, radio, color = ALU, grueso = 0.012) => {
+    _q.setFromUnitVectors(V(0, 0, 1), eje.clone().normalize());
+    a.sumar(new THREE.TorusGeometry(radio, grueso, 6, 18), color, TIPO.metal, new THREE.Matrix4().compose(centro, _q, UNO));
+  };
+  const miembro = (p0, p1, r0, r1, color = TELA) => {
+    const d = new THREE.Vector3().subVectors(p1, p0);
+    const g = new THREE.CylinderGeometry(r1, r0, d.length(), 12, 1, false);
+    _q.setFromUnitVectors(V(0, 1, 0), d.clone().normalize());
+    a.sumar(g, color, TIPO.normal, new THREE.Matrix4().compose(p0.clone().add(p1).multiplyScalar(0.5), _q, UNO));
+    a.sumar(new THREE.SphereGeometry(r1, 10, 6), color, TIPO.normal, new THREE.Matrix4().makeTranslation(p1.x, p1.y, p1.z));
+  };
+
+  // ---- casco: burbuja de policarbonato con el visor dorado bajado, sello del cuello, luces y cámara a los lados
+  // en SphereGeometry el frente (-Z) es phi = 1,5π: la cáscara deja abierto el frente y ahí va el visor
+  a.sumar(new THREE.SphereGeometry(0.175, 18, 12, Math.PI * 1.88, Math.PI * 1.24, 0, Math.PI * 0.64), COLOR.blanco, TIPO.normal, new THREE.Matrix4().makeTranslation(0, 0.02, 0.02));
+  a.sumar(new THREE.SphereGeometry(0.175, 18, 4, Math.PI * 1.12, Math.PI * 0.76, 0, 0.42), COLOR.blanco, TIPO.normal, new THREE.Matrix4().makeTranslation(0, 0.02, 0.02));
+  a.sumar(new THREE.SphereGeometry(0.172, 18, 10, Math.PI * 1.12, Math.PI * 0.76, 0.42, 1.60), COLOR.dorado, TIPO.vidrio, new THREE.Matrix4().makeTranslation(0, 0.02, 0.02));
+  a.sumar(new THREE.TorusGeometry(0.145, 0.022, 8, 28).rotateX(Math.PI / 2), ALU, TIPO.metal, new THREE.Matrix4().makeTranslation(0, -0.16, 0.02));   // aro del cuello
+  a.sumar(new THREE.TorusGeometry(0.145, 0.008, 4, 28).rotateX(Math.PI / 2), COLOR.rojo, TIPO.normal, new THREE.Matrix4().makeTranslation(0, -0.135, 0.02));  // traba
   for (const s of [-1, 1]) {
-    a.tubo(new THREE.Vector3(s * 0.26, -0.24, 0), new THREE.Vector3(s * 0.36, -0.52, -0.06), 0.065, COLOR.blanco, 8);   // brazo
-    a.tubo(new THREE.Vector3(s * 0.36, -0.52, -0.06), new THREE.Vector3(s * 0.34, -0.72, -0.22), 0.058, COLOR.blanco, 8);
-    a.esfera(0.062, COLOR.gris, [s * 0.34, -0.75, -0.25]);                // guante
-    a.tubo(new THREE.Vector3(s * 0.11, -0.66, 0.02), new THREE.Vector3(s * 0.12, -1.06, 0.0), 0.085, COLOR.blanco, 8);   // pierna
-    a.tubo(new THREE.Vector3(s * 0.12, -1.06, 0.0), new THREE.Vector3(s * 0.12, -1.42, 0.06), 0.075, COLOR.blanco, 8);
-    a.caja(0.13, 0.10, 0.26, COLOR.gris, [s * 0.12, -1.48, 0.0]);          // bota
-    a.caja(0.08, 0.02, 0.10, COLOR.rojo, [s * 0.30, -0.30, -0.02]);        // franja del brazo
+    a.caja(0.05, 0.07, 0.12, COLOR.blanco, [s * 0.175, 0.03, -0.02], [0, 0, 0], TIPO.metal);          // conjunto de luz y cámara
+    a.caja(0.006, 0.03, 0.05, COLOR.luz, [s * 0.202, 0.035, -0.04], [0, 0, 0], TIPO.luz);
+    a.disco(0.015, 0.02, 0x15181c, V(s * 0.175, 0.03, -0.09), V(0, 0, 1), 10, TIPO.vidrio);           // objetivo de la cámara
   }
-  a.sumar(new THREE.TorusGeometry(0.13, 0.02, 5, 14).rotateX(Math.PI / 2), COLOR.gris, TIPO.normal, new THREE.Matrix4().makeTranslation(0, -0.15, 0));   // aro del cuello
-  a.tubo(new THREE.Vector3(0.16, -0.62, 0.1), new THREE.Vector3(0.24, -0.66, 0.0), 0.012, COLOR.amarillo, 5);              // mosquetón del cable
+
+  // ---- torso rígido (HUT): perfil torneado, más ancho que profundo
+  const perfil = [[0.13, 0.0], [0.19, -0.03], [0.225, -0.10], [0.23, -0.22], [0.215, -0.34], [0.19, -0.42], [0.18, -0.45]].map(([r, y]) => new THREE.Vector2(r, y));
+  a.sumar(new THREE.LatheGeometry(perfil, 20).scale(1, 1, 0.72), TELA, TIPO.normal, new THREE.Matrix4().makeTranslation(0, -0.17, 0.0));
+  aro(V(0, -0.625, 0.0), V(0, 1, 0), 0.178, ALU, 0.016);                                              // rodamiento de la cintura
+  // pantalón (calzón rígido) con el rodamiento de la cadera
+  a.sumar(new THREE.CylinderGeometry(0.175, 0.16, 0.18, 18).scale(1, 1, 0.78), TELA2, TIPO.normal, new THREE.Matrix4().makeTranslation(0, -0.72, 0.0));
+  // módulo de control y pantalla en el pecho, con perillas y la válvula de purga
+  a.caja(0.25, 0.13, 0.10, COLOR.gris, [0, -0.38, -0.19], [0.2, 0, 0], TIPO.metal);
+  a.caja(0.09, 0.035, 0.006, 0x101418, [0.05, -0.355, -0.245], [0.2, 0, 0], TIPO.vidrio);
+  a.caja(0.02, 0.012, 0.004, COLOR.verde, [-0.07, -0.36, -0.245], [0.2, 0, 0], TIPO.luz);
+  for (const x of [-0.08, -0.03]) a.disco(0.016, 0.02, COLOR.oscuro, V(x, -0.40, -0.245), V(0, 0.2, 1), 10, TIPO.metal);
+  a.disco(0.022, 0.025, COLOR.azul, V(0.08, -0.405, -0.245), V(0, 0.2, 1), 10, TIPO.metal);
+  // parches: misión en el pecho izquierdo y código del astronauta en el derecho
+  senalPlana(a, R.insignia, new THREE.Matrix4().makeRotationY(Math.PI).multiply(new THREE.Matrix4().makeRotationX(0.12)).setPosition(-0.12, -0.25, -0.168), 0.085, 0.085);
+  senalPlana(a, R.codigo, new THREE.Matrix4().makeRotationY(Math.PI).multiply(new THREE.Matrix4().makeRotationX(0.12)).setPosition(0.12, -0.255, -0.168), 0.11, 0.0275);
+
+  // ---- mochila de soporte vital (PLSS), con la unidad de rescate (SAFER) debajo
+  a.caja(0.48, 0.58, 0.20, COLOR.blanco, [0, -0.40, 0.25], [0, 0, 0], TIPO.metal);
+  a.caja(0.44, 0.52, 0.012, TELA2, [0, -0.40, 0.356]);                                               // tapa de mantenimiento
+  for (const x of [-0.2, 0.2]) for (const y of [-0.15, -0.65]) a.disco(0.008, 0.01, COLOR.acero, V(x, y, 0.364), V(0, 0, 1), 6, TIPO.metal);
+  a.caja(0.30, 0.05, 0.03, COLOR.gris, [0, -0.14, 0.355], [0, 0, 0], TIPO.metal);                    // asa
+  a.caja(0.46, 0.15, 0.24, COLOR.blanco, [0, -0.78, 0.25], [0, 0, 0], TIPO.metal);                   // SAFER
+  for (const x of [-0.2, -0.07, 0.07, 0.2]) a.disco(0.012, 0.02, COLOR.oscuro, V(x, -0.86, 0.25), V(0, 1, 0), 8, TIPO.metal);   // toberas
+  a.caja(0.06, 0.04, 0.02, COLOR.amarillo, [0.19, -0.74, 0.375]);                                      // manija de la SAFER
+  for (const s of [-1, 1]) {
+    // conductos de agua y oxígeno de la mochila al módulo del pecho, por el costado del torso
+    a.tubo(V(s * 0.21, -0.30, 0.15), V(s * 0.25, -0.38, 0.0), 0.016, COLOR.gris, 8);
+    a.tubo(V(s * 0.25, -0.38, 0.0), V(s * 0.12, -0.42, -0.21), 0.016, COLOR.gris, 8);
+    aro(V(s * 0.12, -0.42, -0.21), V(-s, 0, -0.4), 0.02, COLOR.azul, 0.006);
+  }
+  a.caja(0.012, 0.03, 0.012, COLOR.verde, [0.23, -0.20, 0.30], [0, 0, 0], TIPO.luz);                // indicador de la mochila
+
+  // ---- brazos: hombro, codo y muñeca con rodamientos; guante con palma de goma y dedos
+  for (const s of [-1, 1]) {
+    const hombro = V(s * 0.26, -0.25, 0.0), codo = V(s * 0.33, -0.52, -0.08), muneca = V(s * 0.29, -0.70, -0.30);
+    a.sumar(new THREE.SphereGeometry(0.085, 12, 8), TELA, TIPO.normal, new THREE.Matrix4().makeTranslation(hombro.x, hombro.y, hombro.z));
+    aro(V(s * 0.235, -0.22, 0.0), V(s, 0.35, 0), 0.08, ALU, 0.012);
+    miembro(hombro, codo, 0.072, 0.064);
+    aro(codo.clone().lerp(hombro, 0.45), new THREE.Vector3().subVectors(codo, hombro), 0.071, ALU, 0.008);
+    miembro(codo, muneca, 0.062, 0.052);
+    aro(muneca, new THREE.Vector3().subVectors(muneca, codo), 0.055, COLOR.azul, 0.014);           // traba de la muñeca
+    a.caja(0.07, 0.045, 0.012, COLOR.oscuro, [s * 0.36, -0.62, -0.18], [0.3, s * 0.9, 0], TIPO.vidrio);   // lista de tareas del puño
+    // guante: dorso blanco, palma de goma, cuatro dedos algo flexionados y el pulgar
+    const dir = new THREE.Vector3().subVectors(muneca, codo).normalize();
+    const palma = muneca.clone().addScaledVector(dir, 0.06);
+    _q.setFromUnitVectors(V(0, 1, 0), dir);
+    a.sumar(new THREE.BoxGeometry(0.085, 0.095, 0.035), COLOR.blanco, TIPO.normal, new THREE.Matrix4().compose(palma, _q, UNO));
+    a.sumar(new THREE.BoxGeometry(0.08, 0.085, 0.012), GOMA, TIPO.normal, new THREE.Matrix4().compose(palma.clone().add(V(-s * 0.0, 0, 0)).addScaledVector(V(-s, 0, 0), 0.0).add(V(0, 0, 0.018)), _q, UNO));
+    for (let k = 0; k < 4; k++) {
+      const base = palma.clone().addScaledVector(dir, 0.05).add(V(s * (k - 1.5) * 0.02, 0, 0));
+      const medio = base.clone().addScaledVector(dir, 0.035).add(V(0, 0, 0.012));
+      a.tubo(base, medio, 0.0095, COLOR.blanco, 6);
+      a.tubo(medio, medio.clone().addScaledVector(dir, 0.025).add(V(0, 0, 0.02)), 0.009, GOMA, 6);
+    }
+    a.tubo(palma.clone().add(V(-s * 0.04, 0, 0)), palma.clone().add(V(-s * 0.06, 0, -0.04)).addScaledVector(dir, 0.03), 0.011, COLOR.blanco, 6);
+  }
+  // parche de la bandera en el brazo izquierdo, hacia afuera
+  senalPlana(a, R.bandera, new THREE.Matrix4().makeRotationY(-Math.PI / 2).multiply(new THREE.Matrix4().makeRotationX(0.18)).setPosition(-0.36, -0.36, -0.035), 0.09, 0.06);
+
+  // ---- piernas: cadera, rodilla y tobillo con rodamientos, franja roja de EV1 en los muslos y botas
+  for (const s of [-1, 1]) {
+    const cadera = V(s * 0.1, -0.80, 0.0), rodilla = V(s * 0.12, -1.20, -0.07), tobillo = V(s * 0.12, -1.58, 0.03);
+    aro(V(s * 0.1, -0.80, 0.0), V(0, 1, 0), 0.092, ALU, 0.01);
+    miembro(cadera, rodilla, 0.09, 0.078);
+    aro(cadera.clone().lerp(rodilla, 0.3), new THREE.Vector3().subVectors(rodilla, cadera), 0.091, COLOR.rojo, 0.016);
+    aro(rodilla.clone().lerp(cadera, 0.08), new THREE.Vector3().subVectors(rodilla, cadera), 0.08, ALU, 0.009);
+    miembro(rodilla, tobillo, 0.074, 0.062);
+    aro(tobillo, new THREE.Vector3().subVectors(tobillo, rodilla), 0.064, ALU, 0.01);
+    a.caja(0.12, 0.10, 0.27, TELA2, [s * 0.12, -1.645, -0.03]);                                         // bota
+    a.caja(0.125, 0.025, 0.28, GOMA, [s * 0.12, -1.70, -0.03]);                                         // suela
+    a.caja(0.10, 0.025, 0.05, COLOR.gris, [s * 0.12, -1.62, -0.15], [0, 0, 0], TIPO.metal);            // traba de los pies
+  }
+  // bolsillo del muslo y mosquetón del cable de seguridad en la cintura
+  a.caja(0.07, 0.09, 0.03, TELA2, [0.20, -0.92, -0.07]);
+  a.tubo(V(0.16, -0.66, -0.12), V(0.24, -0.70, -0.06), 0.012, COLOR.amarillo, 5);
   return a.terminar();
 }
 
@@ -984,7 +1073,7 @@ export function crearExterior(sol, colorSol) {
   caja(-0.6, VIGA_Y, 1.6, 0.6, VIGA_Y + 1.9, 2.9);
 
   colisiones.construir();
-  const mallaTraje = new THREE.Mesh(traje(), material);
+  const mallaTraje = new THREE.Mesh(traje(R), material);
   mallaTraje.name = 'Traje_EVA';
   return {
     grupo, colisiones, pasamanos: barandas, traje: mallaTraje, paneles, antenas, material, anclajes, atlas: atlas.tex,

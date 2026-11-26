@@ -22,6 +22,8 @@
 //   - «modelo» de la mano derecha: dedos hacia -Z, palma hacia -Y, pulgar del lado -X. La izquierda es su espejo.
 import * as THREE from 'three';
 import { ManoGuante, cargarDatosGuante, geometriaGuante, materialGuante, rigida } from './guante.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { dibujarBandera } from './bandera.js';
 
 /** Curvatura de cada falange (radianes) de índice, medio, anular y meñique; abanico; y pulgar [abre, f1, f2, f3]. */
 export const POSES = {
@@ -60,9 +62,12 @@ export const PIEZAS_POR_MANO = PIEZAS_PALMA.length + DEDOS.length * 3 + 3;   // 
 /** Puño del guante, antebrazo y brazo. */
 export const PIEZAS_BRAZO = 3;
 export const PIEZAS_POR_LADO = PIEZAS_POR_MANO + PIEZAS_BRAZO;                 // 21
+const MANOS_MAX = 3;                                                           // izquierda, derecha y la de escritorio
 /** Torso, unidad de control del pecho, cadera, dos muslos, dos piernas y dos botas. */
 export const PIEZAS_CUERPO = 9;
-const MANOS_MAX = 3;                                                           // izquierda, derecha y la de escritorio
+/** Rodamientos de aluminio del traje (anillos): dos por brazo (hombro y sobre el codo) y el de la cintura. */
+const AROS = MANOS_MAX * 2 + 1;
+const ARO_CINTURA = MANOS_MAX * 2;
 /** Medidas del cuerpo (metros), desde los ojos. */
 export const CUERPO = { hombroAbajo: 0.20, hombroAncho: 0.185, brazo: 0.30, antebrazo: 0.27, radioBrazo: 0.052, radioAntebrazo: 0.044 };
 const COLOR_TRAJE = 0xe9e9e4;
@@ -70,6 +75,9 @@ const COLOR_GOMA = 0x6c7178;        // yemas y palma del guante
 const COLOR_PUNO = 0x74acdf;        // aro del puño, celeste
 const COLOR_EQUIPO = 0x9aa0a6;
 const COLOR_BOTA = 0x4a4f57;
+const COLOR_ARO = 0xb4bac2;         // rodamientos de aluminio anodizado
+/** Rugosidad y metalicidad por tipo de pieza: tela técnica, goma, puño anodizado, equipo, rodamientos. */
+const MATERIAL_PIEZA = { tela: [0.88, 0.0], goma: [0.95, 0.0], puno: [0.45, 0.55], equipo: [0.55, 0.35], aro: [0.38, 0.8], bota: [0.9, 0.0] };
 const LARGO_BASE = 5;                                                          // la cápsula unitaria mide 5 de punta a punta
 /** Pieza de la cinemática que mueve cada hueso del guante: palma, 12 falanges y 3 del pulgar. */
 export const PIEZA_DE_HUESO = [0, ...Array.from({ length: 15 }, (_, i) => PIEZAS_PALMA_N + i)];
@@ -110,6 +118,10 @@ const _z = new THREE.Vector3();
 const _p1 = new THREE.Vector3();
 const _p2 = new THREE.Vector3();
 const _color = new THREE.Color();
+const _q2 = new THREE.Quaternion();
+const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
+const _ejeZ = new THREE.Vector3(0, 0, 1);
 
 /**
  * Matriz de una cápsula entre `a` y `b`. `rx` y `ry` son los radios de la sección; `ejeX` orienta el radio `rx`
@@ -131,6 +143,12 @@ export function capsulaEntre(out, a, b, rx, ry = rx, ejeX = null) {
   e[4] *= ry; e[5] *= ry; e[6] *= ry;
   e[8] *= sz; e[9] *= sz; e[10] *= sz;
   return out.setPosition((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+}
+
+/** Matriz de un anillo (toro de radio 1 en el plano XY) centrado en `centro`, perpendicular a `eje`, de radio `r`. */
+function aroEn(out, centro, eje, r) {
+  _q2.setFromUnitVectors(_ejeZ, _v2.copy(eje).normalize());
+  return out.compose(centro, _q2, _v3.set(r, r, r));
 }
 
 /**
@@ -219,6 +237,79 @@ function crearMano(indice) {
   };
 }
 
+/**
+ * Módulo de control del pecho (DCM) y parche de la bandera, en geometría propia: lo que se ve al mirar hacia abajo.
+ * Marco local del pecho: X a la derecha del cuerpo, Y arriba, -Z adelante. Una malla con color por vértice para el
+ * equipo y un plano con textura (lienzo 2D, sin imágenes externas) para la pantalla y los rótulos.
+ */
+function crearPechoYParche() {
+  const piezas = [];
+  const color = new THREE.Color();
+  const sumar = (g, hex, m) => {
+    const geo = g.index ? g.toNonIndexed() : g;
+    geo.applyMatrix4(m);
+    color.setHex(hex, THREE.SRGBColorSpace);
+    const n = geo.getAttribute('position').count, c = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) c.set([color.r, color.g, color.b], i * 3);
+    geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    geo.deleteAttribute('uv');
+    piezas.push(geo);
+  };
+  // se arma con la tapa hacia arriba (+Y) y el frente hacia -Z; después todo el módulo se inclina hacia los ojos
+  const T = (x, y, z) => new THREE.Matrix4().makeTranslation(x, y, z);
+  const inclinacion = 0.55;
+  sumar(new THREE.BoxGeometry(0.24, 0.10, 0.075), 0x9aa0a6, T(0, 0, 0));
+  sumar(new THREE.BoxGeometry(0.25, 0.012, 0.085), 0x6e757d, T(0, 0.056, 0));                              // tapa
+  // perillas de temperatura y de modo, válvula de purga (roja) y conectores de agua y oxígeno a los costados
+  for (const [x, hex] of [[-0.09, 0x2b3038], [0.09, 0x2b3038], [0.0, 0xc8102e]]) sumar(new THREE.CylinderGeometry(0.012, 0.014, 0.016, 12), hex, T(x, 0.07, -0.028));
+  for (const s of [-1, 1]) {
+    sumar(new THREE.CylinderGeometry(0.016, 0.016, 0.03, 12).rotateZ(Math.PI / 2), 0x0038a8, T(s * 0.135, -0.01, 0));
+    sumar(new THREE.TorusGeometry(0.018, 0.004, 6, 14).rotateY(Math.PI / 2), 0xb4bac2, T(s * 0.152, -0.01, 0));
+  }
+  const geo = mergeGeometries(piezas, false);
+  geo.computeVertexNormals();
+  const pecho = new THREE.Group();
+  pecho.name = 'Traje_Pecho';
+  pecho.matrixAutoUpdate = false;
+  const modulo = new THREE.Group();
+  modulo.rotation.x = inclinacion;
+  pecho.add(modulo);
+  modulo.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.3 })));
+
+  // lienzo: pantalla del módulo (izquierda) y bandera (derecha)
+  const lienzo = document.createElement('canvas');
+  lienzo.width = 512; lienzo.height = 128;
+  const ctx = lienzo.getContext('2d');
+  ctx.fillStyle = '#0c1116'; ctx.fillRect(0, 0, 256, 128);
+  ctx.fillStyle = '#7fe0a0'; ctx.font = 'bold 30px monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText('ARTIGAS-1', 16, 34);
+  ctx.fillStyle = '#9fb6c8'; ctx.font = '600 22px monospace';
+  ctx.fillText('EV1 · ART1-01', 16, 74);
+  ctx.fillText('XR LOGÍSTICA LAB', 16, 106);
+  ctx.fillStyle = '#e8e8e3'; ctx.fillRect(256, 0, 256, 128);
+  dibujarBandera(ctx, 268, 14, 232, 100);
+  const tex = new THREE.CanvasTexture(lienzo);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const plano = (u0, u1, ancho, alto, emisivo) => {
+    const g = new THREE.PlaneGeometry(ancho, alto);
+    const uv = g.getAttribute('uv');
+    for (let i = 0; i < uv.count; i++) uv.setX(i, u0 + (u1 - u0) * uv.getX(i));
+    return new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, metalness: 0, emissive: emisivo ? 0xffffff : 0x000000, emissiveMap: emisivo ? tex : null, emissiveIntensity: emisivo ? 0.6 : 0 }));
+  };
+  // pantalla sobre la tapa, detrás de las perillas (queda mirando hacia los ojos por la inclinación del módulo)
+  const pantalla = plano(0, 0.5, 0.11, 0.055, true);
+  pantalla.rotation.x = -Math.PI / 2;
+  pantalla.position.set(0, 0.0625, 0.012);
+  modulo.add(pantalla);
+  const parche = plano(0.5, 1, 0.075, 0.0375, false);
+  parche.name = 'Traje_Parche_Bandera';
+  parche.matrixAutoUpdate = false;
+  parche.visible = false;
+  pecho.visible = false;
+  return { pecho, parche };
+}
+
 export class Manos {
   /**
    * @param {THREE.WebGLRenderer} renderer @param {THREE.Object3D} rig @param {THREE.Scene} escena
@@ -237,9 +328,20 @@ export class Manos {
     this._porIndice = [];
     this._frente = new THREE.Vector3(0, 0, -1);
     this._material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.82, metalness: 0.0 });
+    // rugosidad y metalicidad por pieza (atributo por instancia): la tela es mate, los rodamientos brillan
+    this._material.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 aRugMetal;\nvarying vec2 vRugMetal;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRugMetal = aRugMetal;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vRugMetal;')
+        .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vRugMetal.x;')
+        .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vRugMetal.y;');
+    };
     const capsula = new THREE.CapsuleGeometry(1, 3, 3, 8);
     capsula.rotateX(Math.PI / 2);                 // a lo largo de Z
-    this.malla = new THREE.InstancedMesh(capsula, this._material, MANOS_MAX * PIEZAS_POR_LADO + PIEZAS_CUERPO);
+    const total = MANOS_MAX * PIEZAS_POR_LADO + PIEZAS_CUERPO;
+    const rugMetal = new THREE.InstancedBufferAttribute(new Float32Array(total * 2), 2);
+    capsula.setAttribute('aRugMetal', rugMetal);
+    this.malla = new THREE.InstancedMesh(capsula, this._material, total);
     this.malla.name = 'Manos_y_Cuerpo';
     this.malla.frustumCulled = false;
     this.malla.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -249,15 +351,29 @@ export class Manos {
       const base = m * PIEZAS_POR_LADO;
       for (let i = 0; i < PIEZAS_POR_LADO; i++) {
         const yema = i >= PIEZAS_PALMA.length && i < PIEZAS_POR_MANO && (i - PIEZAS_PALMA.length) % 3 === 2;
-        const color = i === 0 || i === 1 || yema ? COLOR_GOMA : i === PIEZAS_POR_MANO ? COLOR_PUNO : COLOR_TRAJE;
-        this.malla.setColorAt(base + i, _color.set(color));
+        const goma = i === 0 || i === 1 || yema, puno = i === PIEZAS_POR_MANO;
+        this.malla.setColorAt(base + i, _color.set(goma ? COLOR_GOMA : puno ? COLOR_PUNO : COLOR_TRAJE));
+        rugMetal.setXY(base + i, ...MATERIAL_PIEZA[goma ? 'goma' : puno ? 'puno' : 'tela']);
       }
     }
     const cuerpo = MANOS_MAX * PIEZAS_POR_LADO;
-    [COLOR_TRAJE, COLOR_EQUIPO, COLOR_TRAJE, COLOR_TRAJE, COLOR_TRAJE, COLOR_TRAJE, COLOR_TRAJE, COLOR_BOTA, COLOR_BOTA]
-      .forEach((c, i) => this.malla.setColorAt(cuerpo + i, _color.set(c)));
+    const piezas = [['tela', COLOR_TRAJE], ['equipo', COLOR_EQUIPO], ['tela', COLOR_TRAJE], ['tela', COLOR_TRAJE], ['tela', COLOR_TRAJE],
+      ['tela', COLOR_TRAJE], ['tela', COLOR_TRAJE], ['bota', COLOR_BOTA], ['bota', COLOR_BOTA]];
+    piezas.forEach(([tipo, c], i) => { this.malla.setColorAt(cuerpo + i, _color.set(c)); rugMetal.setXY(cuerpo + i, ...MATERIAL_PIEZA[tipo]); });
     this.malla.instanceColor.needsUpdate = true;
     escena.add(this.malla);
+    // rodamientos: anillos de aluminio en una malla instanciada aparte (una llamada de dibujo)
+    this.aros = new THREE.InstancedMesh(new THREE.TorusGeometry(1, 0.085, 6, 24), new THREE.MeshStandardMaterial({ color: COLOR_ARO, roughness: MATERIAL_PIEZA.aro[0], metalness: MATERIAL_PIEZA.aro[1] }), AROS);
+    this.aros.name = 'Traje_Rodamientos';
+    this.aros.frustumCulled = false;
+    this.aros.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    for (let i = 0; i < AROS; i++) this.aros.setMatrixAt(i, _cero);
+    escena.add(this.aros);
+    // módulo de control del pecho y parche de la bandera en el brazo izquierdo (ver crearPechoYParche)
+    const { pecho, parche } = crearPechoYParche();
+    this.pecho = pecho;
+    this.parche = parche;
+    escena.add(pecho, parche);
 
     for (let i = 0; i < 2; i++) {
       const agarre = renderer.xr.getControllerGrip(i);
@@ -404,11 +520,16 @@ export class Manos {
     const frente = this._frente;
     const derechaCuerpo = _p2.crossVectors(frente, arriba).normalize();
     const g = 0.86 + 0.14 * this.grosor;          // mangas un poco más gruesas con el traje presurizado
+    let parcheDibujado = false;
     for (const m of [...this._porIndice, this.escritorio]) {
       const base = m.indice * PIEZAS_POR_LADO;
       const guante = this.guantes ? this.guantes[m.indice] : null;
       if (!activas.has(m)) {
-        if (m._visible !== false) { for (let i = 0; i < PIEZAS_POR_LADO; i++) this.malla.setMatrixAt(base + i, _cero); m._visible = false; }
+        if (m._visible !== false) {
+          for (let i = 0; i < PIEZAS_POR_LADO; i++) this.malla.setMatrixAt(base + i, _cero);
+          for (let i = 0; i < 2; i++) this.aros.setMatrixAt(m.indice * 2 + i, _cero);
+          m._visible = false;
+        }
         if (guante) guante.malla.visible = false;
         continue;
       }
@@ -459,32 +580,64 @@ export class Manos {
       if (this.cuerpoVisible) {
         this.malla.setMatrixAt(base + PIEZAS_POR_MANO + 1, capsulaEntre(_c, elCodo, muneca, CUERPO.radioAntebrazo * g));
         this.malla.setMatrixAt(base + PIEZAS_POR_MANO + 2, capsulaEntre(_c, hombro, elCodo, CUERPO.radioBrazo * g));
+        // rodamientos del traje: uno cerca del hombro y otro sobre el codo, apenas más anchos que la manga
+        _d.subVectors(elCodo, hombro).normalize();
+        this.aros.setMatrixAt(m.indice * 2, aroEn(_c, _w.copy(hombro).addScaledVector(_d, 0.05), _d, CUERPO.radioBrazo * g * 1.02));
+        this.aros.setMatrixAt(m.indice * 2 + 1, aroEn(_c, _w.copy(elCodo).addScaledVector(_d, -0.07), _d, CUERPO.radioBrazo * g * 0.99));
+        if (!derecha) {
+          // parche de la bandera: en la cara de afuera del brazo izquierdo, a un tercio del hombro
+          // hacia afuera: del eje del torso al brazo, perpendicular al brazo (cara del deltoides)
+          _w.copy(hombro).addScaledVector(_d, 0.10);
+          _x.copy(_w).sub(ojos).addScaledVector(arriba, 0.40).addScaledVector(frente, 0.04);
+          _x.addScaledVector(arriba, -_x.dot(arriba) * 0.6);
+          _x.addScaledVector(_d, -_x.dot(_d)).normalize();
+          // el largo de la bandera corre a lo largo del brazo: así el parche plano no se hunde en la manga curva
+          _y.crossVectors(_x, _d);
+          _w.addScaledVector(_x, CUERPO.radioBrazo * g + 0.003);
+          this.parche.matrix.makeBasis(_d, _y, _x).setPosition(_w);
+          this.parche.matrixWorldNeedsUpdate = true;
+          this.parche.visible = true;
+          parcheDibujado = true;
+        }
       } else {
         this.malla.setMatrixAt(base + PIEZAS_POR_MANO + 1, _cero);
         this.malla.setMatrixAt(base + PIEZAS_POR_MANO + 2, _cero);
+        for (let i = 0; i < 2; i++) this.aros.setMatrixAt(m.indice * 2 + i, _cero);
       }
       if (m.nuevoAgarre) {
         m.nuevoAgarre = false;
         this.vibrar(m, 0.5, 40);
       }
     }
+    if (!parcheDibujado) this.parche.visible = false;
     this._cuerpo(ojos, arriba, frente, derechaCuerpo, g);
     this.malla.instanceMatrix.needsUpdate = true;
+    this.aros.instanceMatrix.needsUpdate = true;
   }
 
   /** Torso, unidad de control, cadera y piernas debajo de la cabeza: se ven al mirar hacia abajo. */
   _cuerpo(ojos, arriba, frente, derecha, g) {
     const base = MANOS_MAX * PIEZAS_POR_LADO;
     if (!this.cuerpoVisible) {
-      if (this._cuerpoDibujado !== false) { for (let i = 0; i < PIEZAS_CUERPO; i++) this.malla.setMatrixAt(base + i, _cero); this._cuerpoDibujado = false; }
+      if (this._cuerpoDibujado !== false) { for (let i = 0; i < PIEZAS_CUERPO; i++) this.malla.setMatrixAt(base + i, _cero); this.aros.setMatrixAt(ARO_CINTURA, _cero); this._cuerpoDibujado = false; }
+      this.pecho.visible = false;
       return;
     }
     this._cuerpoDibujado = true;
     const P = (out, abajo, adelante, alCostado) => out.copy(ojos).addScaledVector(arriba, -abajo).addScaledVector(frente, adelante).addScaledVector(derecha, alCostado);
     // torso ovalado, del cuello a la cintura (más ancho que profundo)
     this.malla.setMatrixAt(base, capsulaEntre(_c, P(_w, 0.26, -0.04, 0), P(_e, 0.56, -0.05, 0), 0.165 * g, 0.115 * g, derecha));
-    // unidad de control sobre el pecho
-    this.malla.setMatrixAt(base + 1, capsulaEntre(_c, P(_w, 0.40, 0.105 * g, -0.065), P(_e, 0.40, 0.105 * g, 0.065), 0.075, 0.042, arriba));
+    // unidad de control sobre el pecho: malla propia con pantalla, perillas y conectores (la cápsula queda apagada)
+    this.malla.setMatrixAt(base + 1, _cero);
+    _z.copy(frente).negate();
+    this.pecho.matrix.makeBasis(derecha, arriba, _z).setPosition(P(_w, 0.37, 0.075 * g + 0.075, 0));
+    this.pecho.matrixWorldNeedsUpdate = true;
+    this.pecho.visible = true;
+    // rodamiento de la cintura, entre el torso y la cadera
+    // anillo ovalado: X hacia la derecha del cuerpo, Z (el eje) hacia arriba
+    _y.crossVectors(arriba, derecha);
+    _c.makeBasis(derecha, _y, arriba).multiply(_s.makeScale(0.168 * g, 0.12 * g, 0.16)).setPosition(P(_w, 0.59, -0.05, 0));
+    this.aros.setMatrixAt(ARO_CINTURA, _c);
     // cadera
     this.malla.setMatrixAt(base + 2, capsulaEntre(_c, P(_w, 0.66, -0.07, -0.07), P(_e, 0.66, -0.07, 0.07), 0.105 * g, 0.10 * g, arriba));
     // piernas: en gravedad cero quedan flexionadas, con las rodillas adelante y los pies atrás
@@ -496,6 +649,18 @@ export class Manos {
       const tobillo = P(_w, 1.30, -0.16, lado * 0.11);
       this.malla.setMatrixAt(base + 5 + i, capsulaEntre(_c, rodilla, tobillo, 0.062 * g));
       this.malla.setMatrixAt(base + 7 + i, capsulaEntre(_c, tobillo, P(_e, 1.34, -0.02, lado * 0.11), 0.052 * g, 0.045 * g, derecha));
+    }
+  }
+
+  /** Oculta (o vuelve a mostrar) las manos y el cuerpo de primera persona mientras se dibuja otra cámara. */
+  ocultarParaTercera(ocultar) {
+    this.malla.visible = !ocultar;
+    this.aros.visible = !ocultar;
+    if (ocultar) { this._pechoAntes = this.pecho.visible; this._parcheAntes = this.parche.visible; this.pecho.visible = false; this.parche.visible = false; } else { this.pecho.visible = this._pechoAntes ?? this.pecho.visible; this.parche.visible = this._parcheAntes ?? this.parche.visible; }
+    if (!this.guantes) return;
+    for (const g of this.guantes) {
+      if (!g) continue;
+      if (ocultar) { g._visibleAntes = g.malla.visible; g.malla.visible = false; } else g.malla.visible = g._visibleAntes ?? g.malla.visible;
     }
   }
 
