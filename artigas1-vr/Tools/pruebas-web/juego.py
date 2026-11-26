@@ -960,7 +960,29 @@ JS = r"""
   A.ir('cupula'); pasos(3);
   ok('portales: la Tierra y el cielo se dibujan solo si se ven (en la Cúpula sí, en Rivera no)', !cieloRivera && A.orbital.grupo.visible);
   A.renderer.xr.isPresenting = true; A.renderer.setSize(640, 360, false); A.camera.aspect = 640 / 360; A.camera.updateProjectionMatrix();
-  return { R };
+
+  // =========================================================================================== FASE 9
+  fase('FASE 9 · Telemetría para el panel docente');
+  const TL = A.telemetria;
+  const tiposTL = new Set(TL.eventos.map((e) => e.type));
+  const esperados = ['session_start', 'activity_start', 'scan', 'grab', 'release', 'snap_ok', 'snap_fail', 'strap', 'inspect', 'hint', 'activity_end'];
+  ok('telemetría: lo jugado quedó registrado (escaneos, agarres, huecos, amarres, mantenimiento, pistas y actividades)', esperados.every((t) => tiposTL.has(t)), esperados.filter((t) => !tiposTL.has(t)));
+  ok('telemetría: los eventos están en orden de tiempo', TL.eventos.every((e, i) => i === 0 || e.t >= TL.eventos[i - 1].t));
+  const fins = TL.eventos.filter((e) => e.type === 'activity_end').map((e) => `${e.part}: ${e.detail}`);
+  ok('telemetría: cada actividad terminada manda su resultado', fins.some((x) => /almacenamiento: completada/.test(x)) && fins.some((x) => /mantenimiento: completada/.test(x)), fins);
+  const enviadas = [];
+  const fetchOriginal = window.fetch;
+  window.fetch = (url, op) => { enviadas.push({ url: String(url), cuerpo: JSON.parse(op.body), clave: op.headers['X-API-Key'] || '' }); return Promise.resolve(new Response('{}', { status: 201 })); };
+  TL.config = { ...TL.config, backend: 'http://aula.local:8000', clave: 'secreta' };
+  TL.registrar('hint', 'prueba', null, 'evento en vivo');
+  TL.enviar(true);
+  window.fetch = fetchOriginal;
+  const sesion = enviadas.find((x) => x.url.endsWith('/api/v1/telemetry/session'));
+  const vivo = enviadas.find((x) => x.url.endsWith('/api/v1/telemetry/event'));
+  ok('telemetría: manda el evento en vivo y la sesión al backend configurado, con la clave', !!sesion && !!vivo && sesion.clave === 'secreta' && vivo.cuerpo.event.type === 'hint', enviadas.map((x) => x.url));
+  const inf = sesion && sesion.cuerpo;
+  ok('telemetría: la sesión cuenta los pasos de las actividades como piezas y termina con session_end', inf && inf.parts_total > 0 && inf.parts_placed <= inf.parts_total && inf.parts_placed > 0 && inf.events[inf.events.length - 1].type === 'session_end' && inf.scenario === 'artigas1-web', inf && [inf.parts_placed, inf.parts_total, inf.assembly_errors, inf.hints_used]);
+  return { R, informeTelemetria: inf };
 }
 """
 
@@ -998,6 +1020,19 @@ async def main():
         aj = await pg2.evaluate("(() => { const a = window.artigas1.ajustes; return [a.giro, a.giroVertical, a.tunel, a.limiteInclinacion, a.version]; })()")
         res["R"].append({"nombre": "confort: los ajustes de la versión anterior encienden la vista vertical y conservan el túnel elegido", "pasa": aj == ["pasos", True, "fuerte", 80, 3], "dato": aj})
         await pg2.close()
+        # el informe de telemetría se valida con el modelo del backend (la fuente de verdad del contrato)
+        if res.get("informeTelemetria"):
+            import sys
+            sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "backend"))
+            nombre = "telemetría: la sesión es válida para el backend (SessionReport de backend/app/schemas.py)"
+            try:
+                from app.schemas import SessionReport
+                SessionReport.model_validate(res["informeTelemetria"])
+                res["R"].append({"nombre": nombre, "pasa": True, "dato": len(res["informeTelemetria"]["events"])})
+            except ImportError:
+                print("(sin pydantic: no se valida el informe contra el backend)")
+            except Exception as e:  # noqa: BLE001
+                res["R"].append({"nombre": nombre, "pasa": False, "dato": str(e)[:800]})
         mal = total = 0
         for r in res["R"]:
             if "fase" in r:

@@ -44,6 +44,7 @@ import { Amarres, DIENTES } from './js/amarre.js';
 import { MedidorFps } from './js/rendimiento.js';
 import { LotesFlotantes } from './js/lotes.js';
 import { VisibilidadModulos } from './js/portales.js';
+import { Telemetria } from './js/telemetria.js';
 
 const INICIO = 'rivera';
 
@@ -121,6 +122,10 @@ paneles.obstaculo = (o, d, hasta) => distanciaLibre(colisionadores(), o, d, hast
 const transicion = new StationTransitionManager(camera);
 const confort = new Confort(camera);
 // fps: siempre en la consola cada 10 s; con ?fps en la dirección, también un contador en la vista
+// sesión para el panel docente (js/telemetria.js: ?alumno=…&backend=…)
+const telemetria = new Telemetria();
+window.addEventListener('pagehide', () => telemetria.enviar(true));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') telemetria.enviar(false); });
 const medidorFps = new MedidorFps(camera, new URLSearchParams(window.location.search).has('fps'));
 const gestor = new GestorActividades();
 const navegacion = new Navegacion(scene);
@@ -500,7 +505,10 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   lotes.armar(flotantes.objetos);
 
   // ---- soltar y tomar: el contenedor queda apoyado en el hueco y se amarra con el trinquete (js/amarre.js)
+  /** Nombre de un objeto para la telemetría: el código de la carga o el tipo de herramienta. */
+  const nombreTelemetria = (f) => (f.datos && f.datos.codigo) || f.tipo || f.malla.name;
   flotantes.alSoltar = (f) => {
+    if (f.tipo === 'contenedor' || (f.datos && f.datos.herramienta)) telemetria.registrar('release', nombreTelemetria(f));
     if (f.tipo !== 'contenedor') return;
     const h = inventario.huecoCercano(f.posicion, 0.32);
     if (!h) return;
@@ -514,14 +522,17 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     sonido.tocar(correcto ? 'ok' : 'aviso');
     avisar(correcto ? `${f.datos.codigo} apoyado en ${h.codigo}. Amarralo: mano libre junto al trinquete naranja y ${DIENTES} veces el gatillo` : `${f.datos.codigo} quedó en ${h.codigo}, pero su lugar es ${f.datos.destino}`, correcto ? 'ok' : 'error', correcto ? 5 : 3.5);
     gestor.evento('colocado', { codigo: f.datos.codigo, hueco: h.codigo, destino: f.datos.destino, correcto });
+    telemetria.registrar(correcto ? 'snap_ok' : 'snap_fail', f.datos.codigo, h.codigo, correcto ? null : `va en ${f.datos.destino}`);
   };
   amarres.alAmarrar = (f) => {
     const h = f.datos.hueco;
     const correcto = !!h && h.codigo === f.datos.destino;
     avisar(correcto ? `${f.datos.codigo} amarrado en ${h.codigo}` : `${f.datos.codigo} amarrado, pero en un hueco que no es el suyo`, correcto ? 'ok' : 'error');
     gestor.evento('amarrado', { codigo: f.datos.codigo, hueco: h ? h.codigo : '', destino: f.datos.destino, correcto });
+    telemetria.registrar('strap', f.datos.codigo, h ? h.codigo : null, correcto ? null : 'hueco equivocado');
   };
   flotantes.alTomar = (f) => {
+    if (f.tipo === 'contenedor' || (f.datos && f.datos.herramienta)) telemetria.registrar('grab', nombreTelemetria(f));
     if (f.tipo === 'contenedor' && f.datos.hueco) {
       inventario.retirar(f);
       amarres.quitar(f);
@@ -532,6 +543,9 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   // ---- actividades, puntos de trabajo, navegación y mapa
   inspecciones = new Inspecciones(scene, (tipo, datos) => {
     gestor.evento(tipo, datos);
+    if (tipo === 'inspeccion') telemetria.registrar('inspect', datos.punto, null, datos.herramienta);
+    if (tipo === 'herramienta_incorrecta') telemetria.registrar('snap_fail', datos.punto, datos.pide, `herramienta incorrecta: ${datos.herramienta}`);
+    if (tipo === 'pista') { telemetria.pistas++; telemetria.registrar('hint', datos.punto, null, datos.texto); }
     if (tipo === 'inspeccion') { sonido.tocar('ok'); manos.vibrarTodas(0.6, 60); }
   });
   for (const [id, p] of Object.entries(PUNTOS_TALLER)) inspecciones.agregar(id, p.posicion, p.herramienta, p.segundos, p.texto);
@@ -558,6 +572,15 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   crearTerminal('eva', V(1.80, 0.0, 1.25), Math.PI / 2, { texto: () => 'ENTRAR A LA ESTACIÓN', accion: () => { camera.getWorldPosition(cabeza); const m = eva.entrar(cabeza); if (m) avisar(m, 'error'); } });
 
   gestor.escuchar((tipo, a, dato) => {
+    // telemetría: inicio y fin de cada actividad, y su avance
+    if (tipo === 'inicio') telemetria.registrar('activity_start', a.id);
+    if (tipo === 'paso' || tipo === 'error') telemetria.progreso(a.pasos.length, a.hechos, a.errores);
+    if (tipo === 'fin' || tipo === 'abandono') {
+      const r = a.resultado;
+      telemetria.registrar('activity_end', a.id, null, tipo === 'abandono' ? 'abandonada' : r && r.completada ? `completada · ${r.puntaje} puntos · ${Math.round(r.segundos)} s` : `no superada · ${r ? r.motivo : ''}`);
+      telemetria.cerrarActividad(a.pasos.length, a.hechos, a.errores);
+      telemetria.enviar(false);
+    }
     for (const t of terminales) t.sucio = true;
     for (const t of tablets) t.panel.sucio = true;
     if (mapa) mapa.panel.sucio = true;
@@ -591,7 +614,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   window.artigas1 = {
     guanteListo, manosPoses: POSES,
     THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, flotantes, ir, manosDePrueba,
-    inventario, amarres, medidorFps, lotes: () => lotes, portales: () => portales, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
+    inventario, amarres, medidorFps, lotes: () => lotes, portales: () => portales, telemetria, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
     acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas }, aviso, panelInforme, teclas,
     avanzar: (dt = 1 / 72, dibujar = false) => cuadro(0, null, dt, !dibujar),
   };
@@ -606,6 +629,7 @@ function alLeer(l) {
   else avisar(`${l.texto}. ${l.detalle}.`, 'error', 2.5);
   manos.vibrarTodas(l.ok ? 0.6 : 1, l.ok ? 50 : 140);
   gestor.evento('escaneo', l);
+  telemetria.registrar('scan', l.ok ? l.codigo : (l.bulto && l.bulto.codigo) || null, null, l.ok ? 'ok' : l.motivo);
 }
 
 // =====================================================================================================
@@ -996,6 +1020,8 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     portales.actualizar(cabeza, eva.afuera);
     lotes.actualizar();                                // al final: ya se movió todo lo que se mueve
     orbital.actualizar(dt);
+    telemetria.enVisor = enVisor;
+    telemetria.actualizar(dt);
   }
   if (sinDibujar) return;
   if (terceraPersona && !renderer.xr.isPresenting && loco) {

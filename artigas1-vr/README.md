@@ -96,6 +96,15 @@ Corren sobre la matemática de `Tools/verificar-compilacion/Stubs/UnityMath.cs` 
 
 ## Telemetría
 
+**Recorrido web.** Manda la sesión con el escenario `artigas1-web`. Usa los tipos de evento nuevos del contrato (`scan`, `strap`, `inspect`, `activity_start` y `activity_end`) y cuenta los pasos de las actividades como piezas. En el aula:
+
+1. Abrir `…/artigas1/?alumno=ana-3&backend=https://<backend del aula>`. La dirección se recuerda en el visor.
+2. Agregar el origen de la página a `XRLAB_CORS_ORIGINS`.
+
+El Quest solo abre WebXR desde HTTPS, así que el backend también tiene que estar en HTTPS, por ejemplo con un túnel. Si no, el navegador bloquea los envíos por contenido mixto. Servido por el mismo backend o con `npm run dev`, no hace falta `?backend`.
+
+**Unity:**
+
 Usa el contrato de XR Logística Lab tal cual (`backend/app/schemas.py`):
 
 | Evento de Artigas-1 | Tipo en el contrato |
@@ -124,11 +133,13 @@ La estación completa se recorre en el navegador (compu o Quest, con WebXR) desd
 | `inventario.js`, `amarre.js` | Bultos, huecos del almacén y contenedores; correa y trinquete (apoyado en ámbar hasta amarrarlo) |
 | `actividades.js`, `misiones.js`, `inspeccion.js` | Gestor de actividades, las cinco actividades y los puntos de mantenimiento, con su cartel de herramienta y avance |
 | `paneles.js`, `mapa.js`, `navegacion.js` | Interfaz VR (el rayo no atraviesa mamparos), mapa de la estación (tablet en la mano izquierda que aparece mirando a los ojos mientras se aprieta el gatillo) y guía entre módulos |
+| `lotes.js`, `portales.js` | Rendimiento: los objetos sueltos se dibujan en un lote por material, y no se dibuja lo que queda detrás de una escotilla cerrada (ni la Tierra fuera de la Cúpula) |
+| `telemetria.js` | Sesión para el panel docente con el contrato de `backend/app/schemas.py` (escenario `artigas1-web`): `?alumno=…`, `?backend=…` y `?clave=…` en la dirección |
 | `avisos.js`, `rendimiento.js` | Carteles que quedan antes de la primera pared, encima de todo y siguiendo a la mirada; contador de fps (`?fps` en la dirección, y en la consola cada 10 s) |
 | `exterior.js`, `eva.js` | Exterior detallado (mantas térmicas, aros abulonados, escudos, conductos, alas solares reticuladas, radiadores, antenas, cámaras, señalética en atlas) en una malla fija; caminata espacial, cable y esclusa |
 | `etiquetas.js` | Etiquetas logísticas de cada bolsa, en una sola llamada de dibujo |
 
-Pruebas: `cd web-dashboard && npm test` y, con el sitio servido en el puerto 8765, `python3 artigas1-vr/Tools/pruebas-web/juego.py` (220: el juego completo con los controles simulados) y `fisica.py` (41) y `vision.py` (11: los dos ojos por separado, como en el visor, y la estabilidad de la luz en la caminata espacial). Qué se hizo, qué se midió y qué falta probar en el visor: [`INFORME-exterior-manos.md`](INFORME-exterior-manos.md) (exterior, tablet del mapa y guantes), [`INFORME-vision-eva.md`](INFORME-vision-eva.md) (ojo izquierdo, luz de la caminata y vista vertical), [`INFORME-gameplay.md`](INFORME-gameplay.md) (manos, herramientas, actividades, mapa, exterior y caminata), [`INFORME-ambientacion.md`](INFORME-ambientacion.md) e [`INFORME-refactorizacion.md`](INFORME-refactorizacion.md).
+Pruebas: `cd web-dashboard && npm test` y, con el sitio servido en el puerto 8765, `python3 artigas1-vr/Tools/pruebas-web/juego.py` (231: el juego completo con los controles simulados) y `fisica.py` (41) y `vision.py` (11: los dos ojos por separado, como en el visor, y la estabilidad de la luz en la caminata espacial). Qué se hizo, qué se midió y qué falta probar en el visor: [`INFORME-exterior-manos.md`](INFORME-exterior-manos.md) (exterior, tablet del mapa y guantes), [`INFORME-vision-eva.md`](INFORME-vision-eva.md) (ojo izquierdo, luz de la caminata y vista vertical), [`INFORME-gameplay.md`](INFORME-gameplay.md) (manos, herramientas, actividades, mapa, exterior y caminata), [`INFORME-ambientacion.md`](INFORME-ambientacion.md) e [`INFORME-refactorizacion.md`](INFORME-refactorizacion.md).
 
 ## Lo que sigue (fase 2)
 

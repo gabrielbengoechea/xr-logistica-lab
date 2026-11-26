@@ -115,3 +115,23 @@ def test_persistencia_entre_reinicios(settings: Settings, informe: dict) -> None
         c.post("/api/v1/telemetry/session", json=informe)
     with TestClient(create_app(settings)) as c:
         assert c.get("/api/v1/health").json()["sessions"] == 1
+
+
+def test_eventos_de_artigas1(client: TestClient, informe: dict) -> None:
+    """El recorrido web de Artigas-1 manda escaneos, amarres, puntos de mantenimiento y actividades."""
+    informe = copy.deepcopy(informe)
+    informe.update(session_id="web-artigas1-0001", scenario="artigas1-web", device="web", interaction="controllers")
+    informe["events"] = [
+        {"t": 0.0, "type": "session_start"},
+        {"t": 2.0, "type": "activity_start", "part": "almacenamiento"},
+        {"t": 5.5, "type": "scan", "part": "CT-01", "detail": "ok"},
+        {"t": 9.0, "type": "snap_ok", "part": "CT-01", "target": "RIV-E2-A3"},
+        {"t": 11.0, "type": "strap", "part": "CT-01", "target": "RIV-E2-A3"},
+        {"t": 40.0, "type": "inspect", "part": "filtro_co2", "detail": "linterna"},
+        {"t": 60.0, "type": "activity_end", "part": "almacenamiento", "detail": "completada · 92 puntos"},
+        {"t": 240.0, "type": "session_end"},
+    ]
+    r = client.post("/api/v1/telemetry/session", json=informe)
+    assert r.status_code == 201, r.text
+    eventos = client.get("/api/v1/telemetry/sessions/web-artigas1-0001/events").json()
+    assert [e["type"] for e in eventos][1:7] == ["activity_start", "scan", "snap_ok", "strap", "inspect", "activity_end"]

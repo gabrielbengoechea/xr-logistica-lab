@@ -106,6 +106,12 @@ export type EventType =
   | 'assemble'
   | 'hint'
   | 'session_end'
+  // Artigas-1: escáner, amarre con trinquete, puntos de mantenimiento y actividades
+  | 'scan'
+  | 'strap'
+  | 'inspect'
+  | 'activity_start'
+  | 'activity_end'
 
 export type InteractionMode = 'hands' | 'controllers' | 'mouse'
 
