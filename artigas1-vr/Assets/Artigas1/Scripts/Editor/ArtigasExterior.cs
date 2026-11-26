@@ -303,6 +303,105 @@ namespace Artigas1.Editor
         }
 
         // ------------------------------------------------------------------------------------------------ Tierra y cielo
+        /// <summary>
+        /// El shader de la Tierra (v2) calcula la normal por píxel desde el centro de la esfera, que de fábrica es el
+        /// origen del objeto (los casquetes de cupula.py nacen con todos sus vértices a radio R del origen). Acá se
+        /// comprueba con los vértices reales del FBX importado; si no se cumple, se ajusta una esfera por mínimos
+        /// cuadrados y se pasa ese centro al material (_Centro, w = 1).
+        /// </summary>
+        private static void RevisarCentroTierra(Renderer esfera, Material baseM, Material detalleM)
+        {
+            var mf = esfera.GetComponent<MeshFilter>();
+            if (mf == null || mf.sharedMesh == null || mf.sharedMesh.vertexCount < 4)
+            {
+                return;
+            }
+            Vector3[] v = mf.sharedMesh.vertices;
+            Transform t = esfera.transform;
+            Vector3 origen = t.position;
+            float min = float.MaxValue, max = 0f;
+            var p = new Vector3[v.Length];
+            for (int i = 0; i < v.Length; i++)
+            {
+                p[i] = t.TransformPoint(v[i]);
+                float d = Vector3.Distance(origen, p[i]);
+                min = Mathf.Min(min, d);
+                max = Mathf.Max(max, d);
+            }
+            if (min > 100f && max - min < 0.002f * max)
+            {
+                Debug.Log($"[Artigas1] Tierra: el origen del objeto es el centro de la esfera (radio {max:F0} m).");
+                return;
+            }
+            if (!AjustarEsfera(p, out Vector3 centro, out float radio))
+            {
+                Debug.LogWarning("[Artigas1] Tierra: no se pudo ajustar la esfera; el shader usa el origen del objeto.");
+                return;
+            }
+            var c = new Vector4(centro.x, centro.y, centro.z, 1f);
+            baseM.SetVector("_Centro", c);
+            detalleM.SetVector("_Centro", c);
+            Debug.LogWarning($"[Artigas1] Tierra: el origen del objeto no es el centro de la esfera; se fijó _Centro = {centro} (radio {radio:F0} m). Si la Tierra se mueve en juego, este centro queda fijo.");
+        }
+
+        /// <summary>Esfera por mínimos cuadrados: |p|² = 2 c·p + k, con k = R² − |c|². Sistema normal de 4×4.</summary>
+        private static bool AjustarEsfera(Vector3[] p, out Vector3 centro, out float radio)
+        {
+            var a = new double[4, 5];
+            var o = p[0];   // se trabaja relativo al primer punto, para no perder precisión a 1000 m
+            foreach (Vector3 q0 in p)
+            {
+                Vector3 q = q0 - o;
+                double[] f = { 2.0 * q.x, 2.0 * q.y, 2.0 * q.z, 1.0 };
+                double y = (double)q.x * q.x + (double)q.y * q.y + (double)q.z * q.z;
+                for (int i = 0; i < 4; i++)
+                {
+                    for (int j = 0; j < 4; j++)
+                    {
+                        a[i, j] += f[i] * f[j];
+                    }
+                    a[i, 4] += f[i] * y;
+                }
+            }
+            for (int col = 0; col < 4; col++)
+            {
+                int piv = col;
+                for (int r = col + 1; r < 4; r++)
+                {
+                    if (System.Math.Abs(a[r, col]) > System.Math.Abs(a[piv, col]))
+                    {
+                        piv = r;
+                    }
+                }
+                if (System.Math.Abs(a[piv, col]) < 1e-9)
+                {
+                    centro = Vector3.zero;
+                    radio = 0f;
+                    return false;
+                }
+                for (int k = 0; k < 5; k++)
+                {
+                    (a[col, k], a[piv, k]) = (a[piv, k], a[col, k]);
+                }
+                for (int r = 0; r < 4; r++)
+                {
+                    if (r == col)
+                    {
+                        continue;
+                    }
+                    double m = a[r, col] / a[col, col];
+                    for (int k = col; k < 5; k++)
+                    {
+                        a[r, k] -= m * a[col, k];
+                    }
+                }
+            }
+            double cx = a[0, 4] / a[0, 0], cy = a[1, 4] / a[1, 1], cz = a[2, 4] / a[2, 2], kk = a[3, 4] / a[3, 3];
+            centro = o + new Vector3((float)cx, (float)cy, (float)cz);
+            radio = (float)System.Math.Sqrt(System.Math.Max(0.0, kk + cx * cx + cy * cy + cz * cz));
+            return radio > 1f;
+        }
+
         private static void ArmarTierra(Light sol)
         {
             var fbx = AssetDatabase.LoadAssetAtPath<GameObject>(ArtigasImportador.Modelos + "Entorno/Tierra_Uruguay_al_nadir.fbx");
@@ -332,6 +431,7 @@ namespace Artigas1.Editor
                 r.shadowCastingMode = ShadowCastingMode.Off;
                 r.receiveShadows = false;
             }
+            RevisarCentroTierra(esfera, baseM, detalleM);
             TierraOrbital orbita = pivote.gameObject.AddComponent<TierraOrbital>();
             var so = new SerializedObject(orbita);
             so.FindProperty("sol").objectReferenceValue = sol;

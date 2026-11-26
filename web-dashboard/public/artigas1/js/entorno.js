@@ -98,6 +98,13 @@ const FRAG_TIERRA = `
     color += mix(albedo * vec3(0.40, 0.41, 0.47), vec3(0.050, 0.075, 0.140) + albedo * 0.10, agua) * crepusculo;
     color += vec3(1.0, 0.62, 0.34) * agua * dia * (1.0 - dia) * 0.10;                       // reflejo cálido en el terminador
     color += albedo * 0.012;
+    // brillo del sol sobre el agua (mar, Río de la Plata, embalses): un reflejo concentrado y un lustre ancho y
+    // débil alrededor. Solo en el lado iluminado; con el sol bajo queda cálido y cerca del borde, como en las
+    // fotos desde la órbita. La tierra firme no brilla.
+    vec3 medio = normalize(uSol - r);
+    float nh = max(dot(n, medio), 0.0);
+    float brillo = (pow(nh, 220.0) * 0.9 + pow(nh, 24.0) * 0.05) * agua * smoothstep(-0.02, 0.10, mu);
+    color += colorSol * brillo;
     float noche = smoothstep(0.03, -0.09, mu);       // las ciudades se encienden a medida que entran en la noche
     color += vec3(1.0, 0.60, 0.24) * luz * noche * 3.0;
     // bruma: más atmósfera cuanto más rasante se mira

@@ -63,6 +63,8 @@ Blender/               scripts que generan el kit 3D (ver Blender/README.md)
    - **3. Armar escena F1 (Módulo Rivera)**: arma `Assets/Artigas1/Escenas/F1_Rivera.unity` con el módulo, unas 45 bolsas en los racks, tres cargas flotando para practicar, el escáner, luces, el rig de XRI con la locomoción en 0G, la viñeta y la telemetría.
 6. **Telemetría**: en el objeto `Sistemas → TelemetryLogger`, poné la URL del backend de XR Logística Lab en la red del aula (p. ej. `http://192.168.0.10:8000`). El escenario queda como `artigas1-f1-rivera`.
 
+**Tierra (shader `TierraDiaNoche` v2, sin compilar todavía).** La normal se calcula por píxel desde el centro de la esfera, así la sombra del terminador no muestra los polígonos. Además el terminador tiene un borde cálido, el sol brilla sobre el agua (`_BrilloAgua`, 0 lo apaga), las luces de las ciudades son tenues y anaranjadas, y la atmósfera es un borde fino. Al armar el exterior, el menú revisa con los vértices del FBX que el origen del objeto sea el centro de la esfera; si no lo es, ajusta una esfera y pone ese centro en `_Centro` (lo avisa en la consola). Tras la primera compilación, revisá en la consola que no haya errores del shader y mirá la Tierra desde la Cúpula: no deberían verse facetas en la línea día/noche.
+
 Para probar sin visor: importá el sample **XR Device Simulator** de XR Interaction Toolkit y arrastrá su prefab a la escena.
 
 ## Probar en el Quest 2
