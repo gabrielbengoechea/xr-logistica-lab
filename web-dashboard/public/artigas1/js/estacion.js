@@ -14,6 +14,9 @@ const PUERTA_FIJA = /Acople2/;                            // puerto de acople si
 const ES_BARANDA = /Baranda/;
 const ES_CARGA = /^(R_Demo|C_Carga)_/;
 const ES_FLOTANTE = /_Flot_/;                             // objetos sueltos: los anima js/flotantes.js
+/** Piezas del cambio de filtro de CO₂ (js/filtro.js): los filtros se toman y la puerta del rack se abre. */
+const ES_FILTRO = /^T_Filtro_(CO2_instalado|Repuesto_)/;
+const ES_PUERTA_FILTRO = /^T_Puerta_Filtro/;
 const SIN_COLISION = /_Det_|Cartel|Placa_|Etiqueta|Pantalla|Marca_|Esfera_Reloj|Correas_|Aguja|Tablet|Esfera_Agua/;
 const CON_MALLA = /Casco|Rack|Bahia|Anillo|Banco|Red_Cuarentena|Portal|Vidrios/;  // el resto: caja
 const RECORRIDO_PUERTA = 1.25;                            // m que corre la escotilla hacia su alojamiento
@@ -92,6 +95,8 @@ export function armarEstacion(gltf, materialPara) {
   const escotillas = [];
   const cargas = [];
   const flotantes = [];
+  const filtros = [];
+  let puertaFiltro = null;
   const centrados = new Map();      // geometría original -> { geometria centrada, centro, radio }
   const lotes = new Map();           // "modulo|material" -> { material, geometrias }
   const mallas = [];
@@ -108,7 +113,16 @@ export function armarEstacion(gltf, materialPara) {
       escotillas.push(new Escotilla(puerta));
       continue;
     }
-    if (ES_FLOTANTE.test(nombre)) {
+    if (ES_PUERTA_FILTRO.test(nombre)) {
+      // malla propia con el origen en la bisagra, sin colisión: se abre girando
+      const puerta = new THREE.Mesh(o.geometry, materialPara(o.material, 'general'));
+      puerta.name = nombre;
+      o.matrixWorld.decompose(puerta.position, puerta.quaternion, puerta.scale);
+      grupo.add(puerta);
+      puertaFiltro = puerta;
+      continue;
+    }
+    if (ES_FLOTANTE.test(nombre) || ES_FILTRO.test(nombre)) {
       // objeto suelto: malla propia con el origen en su centro (gira sobre sí mismo) y sin colisión estática
       let c = centrados.get(o.geometry);
       if (!c) {
@@ -126,7 +140,7 @@ export function armarEstacion(gltf, materialPara) {
       suelto.position.copy(c.centro).applyMatrix4(o.matrixWorld);
       suelto.userData.radio = c.radio;
       grupo.add(suelto);
-      flotantes.push(suelto);
+      (ES_FILTRO.test(nombre) ? filtros : flotantes).push(suelto);
       continue;
     }
     // --- colisión
@@ -174,7 +188,7 @@ export function armarEstacion(gltf, materialPara) {
 
   colisiones.construir();
   return {
-    grupo, colisiones, barandas, escotillas, cargas, flotantes,
+    grupo, colisiones, barandas, escotillas, cargas, flotantes, filtros, puertaFiltro,
     resumen: { flotantes: flotantes.length, objetosOriginales: mallas.length, lotes: lotes.size, triangulosColision: colisiones.cantidad, barandas: barandas.segmentos.length, escotillas: escotillas.length },
   };
 }

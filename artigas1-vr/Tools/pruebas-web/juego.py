@@ -494,9 +494,10 @@ JS = r"""
   ok('velocidad máxima ajustable', vRapida > vLenta * 2, [+vLenta.toFixed(2), +vRapida.toFixed(2)]);
   A.ajustes.velocidad = 1;
   // las paredes siguen siendo sólidas con el stick
-  // (en z = -5,3: más atrás, las manos chocarían contra la consola de recepción y apretarían INICIAR)
-  ubicar(V(0, 0.5, -5.3)); izq.stick(1, 0); seg(5); izq.stick(0, 0);
+  // contra la consola de recepción de Colonia: las manos chocan con su pantalla, pero en movimiento no aprietan
+  ubicar(V(0, 0.5, -6.0)); izq.stick(1, 0); seg(5); izq.stick(0, 0);
   ok('con el stick tampoco se atraviesan las paredes', cabeza().x <= 1.2 - L.p.radioCabeza + 0.01, +cabeza().x.toFixed(3));
+  ok('paneles: deslizarse contra una consola no aprieta sus botones (en movimiento el dedo no cuenta)', !G.activa, G.activa && G.activa.id);
   // impulso desde una baranda
   const bar = A.estacion.barandas.segmentos.find((s) => s.a.z < -0.5 && s.b.z > -4.5 || s.b.z < -0.5 && s.a.z > -4.5);
   const pb = bar.a.clone().lerp(bar.b, 0.5);
@@ -615,8 +616,8 @@ JS = r"""
     h.grip(0); pasos(2);
     return c.datos.hueco === hueco ? '' : 'no quedó en el hueco';
   };
-  ok('gestor: siete actividades registradas; la caminata espacial arranca bloqueada y el resto disponible', G.lista().length === 7 && E('eva') === 'BLOQUEADA' && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'balance', 'descarga'].every((x) => E(x) === 'DISPONIBLE'), G.lista().map((a) => `${a.id}:${a.estado}`));
-  ok('acceso: hay un terminal físico por actividad (ocho paneles; el balance y la descarga usan las pantallas del kit)', A.terminales.length === 8 && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'eva', 'balance', 'descarga'].every((x) => terminal(x)), A.terminales.map((t) => t.nombre));
+  ok('gestor: ocho actividades registradas; la caminata espacial arranca bloqueada y el resto disponible', G.lista().length === 8 && E('eva') === 'BLOQUEADA' && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'balance', 'descarga', 'filtro'].every((x) => E(x) === 'DISPONIBLE'), G.lista().map((a) => `${a.id}:${a.estado}`));
+  ok('acceso: hay un terminal físico por actividad (nueve paneles; balance, descarga y filtro usan las pantallas del kit)', A.terminales.length === 9 && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'eva', 'balance', 'descarga', 'filtro'].every((x) => terminal(x)), A.terminales.map((t) => t.nombre));
 
   // ---- RECEPCIÓN: se inicia desde el terminal de Colonia
   let term = terminal('recepcion');
@@ -913,15 +914,34 @@ JS = r"""
   const anguloAviso = () => miraNueva.angleTo(pa.position.clone().sub(cabeza()).normalize());
   const antesGiro = anguloAviso(); pasos(4); const enCamino = anguloAviso(); seg(1.2);
   ok('carteles: si el jugador gira, el aviso vuelve suave delante de los ojos', antesGiro > 1 && enCamino > 0.35 && anguloAviso() < 0.45, [+antesGiro.toFixed(2), +enCamino.toFixed(2), +anguloAviso().toFixed(2)]);
+  // frente a un terminal, el aviso no tapa sus botones: se corre arriba de la mirada
+  const tAv = terminal('inventario');
+  A.rig.quaternion.identity(); A.camera.position.set(0, 0, 0);
+  // se mira justo donde el aviso caería sobre el botón INICIAR (17° por encima de él)
+  const bIni = centroBoton(tAv, 'iniciar');
+  const ojo = bIni.clone().addScaledVector(V(0, 0, 1).transformDirection(tAv.malla.matrixWorld), 0.75).add(V(0, 0.05, 0));
+  const miraAv = bIni.clone().add(V(0, Math.tan(0.30) * 0.75, 0));
+  ubicar(ojo); pasos(2);
+  A.rig.quaternion.setFromRotationMatrix(new T.Matrix4().lookAt(cabeza(), miraAv, V(0, 1, 0))); pasos(2);
+  A.scene.getObjectByName('Aviso').visible = false; A.acciones.avisar('Prueba: no tapar botones', 'ok'); pasos(1);
+  const tapados = [];
+  for (const [a, b] of [[0, 0], [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45]]) {
+    const p = V(a * 0.66, b * 0.11, 0).applyMatrix4(pa.matrixWorld);
+    const v = A.paneles.apuntar(cabeza(), p.sub(cabeza()).normalize(), new T.Vector3());
+    if (v && v.boton) tapados.push(`${v.panel.nombre}:${v.boton.id}`);
+  }
+  ok('carteles: frente a un terminal, el aviso no queda encima de sus botones', tapados.length === 0, tapados);
+  A.rig.quaternion.identity();
   // rayo: un terminal del otro lado del mamparo Rivera–Nodo no se aprieta
-  const tPrueba = A.terminales[1].malla, guardado = { p: tPrueba.position.clone(), r: tPrueba.rotation.y };
+  const tInvR = terminal('inventario');
+  const tPrueba = tInvR.malla, guardado = { p: tPrueba.position.clone(), r: tPrueba.rotation.y };
   const origenRayo = V(0.9, 0.3, -0.6), dirRayo = V(0, 0, 1);
   tPrueba.position.set(0.9, 0.3, 1.0); tPrueba.rotation.y = Math.PI; tPrueba.updateMatrixWorld(true);
   const tras = A.paneles.apuntar(origenRayo, dirRayo, new T.Vector3());
   tPrueba.position.set(0.9, 0.3, 0.2); tPrueba.updateMatrixWorld(true);
   const delante = A.paneles.apuntar(origenRayo, dirRayo, new T.Vector3());
   tPrueba.position.copy(guardado.p); tPrueba.rotation.y = guardado.r; tPrueba.updateMatrixWorld(true);
-  ok('rayo: no aprieta un terminal del otro lado de un mamparo, sí uno del mismo lado', (!tras || tras.panel !== A.terminales[1]) && delante && delante.panel === A.terminales[1], [tras && tras.panel.nombre, delante && delante.panel.nombre]);
+  ok('rayo: no aprieta un terminal del otro lado de un mamparo, sí uno del mismo lado', (!tras || tras.panel !== tInvR) && delante && delante.panel === tInvR, [tras && tras.panel.nombre, delante && delante.panel.nombre, ]);
   A.portales().activo = false; pasos(1, 0);           // todos visibles: acá se prueba el rayo, no los portales
   ok('rayo: los terminales de siempre se siguen apretando (están sobre equipos)', A.terminales.every((t) => { t.malla.updateWorldMatrix(true, false); const c = t.malla.getWorldPosition(new T.Vector3()); const n = V(0, 0, 1).transformDirection(t.malla.matrixWorld); const v = A.paneles.apuntar(c.clone().addScaledVector(n, 0.6), n.clone().negate(), new T.Vector3()); return v && v.panel === t; }));
   A.portales().activo = true; pasos(1, 0);
@@ -1051,6 +1071,80 @@ JS = r"""
   apretar(der, term, 'faltante');
   ok('descarga: con todo leído, INFORMAR FALTANTE la completa y la escotilla vuelve a ser libre', E('descarga') === 'COMPLETADA' && act.resultado?.completada && DC.faltanteInformado && !escC.bloqueada, act.resultado);
   cerrarInforme();
+
+  // =========================================================================================== FASE 12
+  fase('FASE 12 · Cambio del filtro de CO₂ (taller)');
+  const CF = A.cambioFiltro(), PS = A.pantallaSoporte();
+  term = terminal('filtro');
+  ok('filtro: el terminal es la pantalla de soporte vital del taller', term === PS);
+  ubicar(frenteA(term, 0.7)); der.en(frenteA(term, 0.4).add(V(0.05, -0.05, 0))); pasos(2);
+  ok('filtro: se inicia desde la pantalla de soporte vital', apretar(der, term, 'iniciar') && E('filtro') === 'ACTIVA');
+  cerrarInforme(); pasos(2);
+  act = G.obtener('filtro');
+  const gastado = CF.filtros.find((f) => f.datos.gastado), repuesto = CF.filtros.find((f) => !f.datos.gastado);
+  ok('filtro: arranca con el gastado adentro (12 %), la puerta cerrada y tres de repuesto en el rack', act.pasos.length === 4 && CF.carga === 12 && !CF.abierta && CF.filtros.length === 4);
+  ubicar(V(-0.45, -0.1, 4.75)); pasos(2);
+  ok('filtro: con la puerta cerrada el cartucho no se ve ni se puede tomar', gastado.oculto && !tomar(izq, gastado));
+  soltar(izq);
+  const enManija = () => { izq.en(CF.manija()); pasos(2); izq.clic(); seg(0.8); };
+  enManija();
+  ok('filtro: gatillo en la manija abre la puerta (sin abrir el mapa) y sale el cartucho', CF.abierta && CF.apertura === 1 && !gastado.oculto && act.pasos[0].hecho && !A.mapa.abierto);
+  const afuera = V(-0.55, 0.15, 4.75);
+  ok('filtro: se saca el gastado', tomar(izq, gastado) && act.pasos[1].hecho && CF.carga === null);
+  izq.en(afuera.clone()); pasos(2); soltar(izq);
+  // volver a poner el gastado es un error
+  const errF = act.errores;
+  tomar(izq, gastado); izq.en(CF.alojamiento.posicion.clone().add(V(0.05, 0, 0))); pasos(2); soltar(izq);
+  ok('filtro: volver a poner el gastado es un error', act.errores === errF + 1 && !act.pasos[2].hecho && CF.enAlojamiento === gastado, A.aviso.texto);
+  tomar(izq, gastado); izq.en(afuera.clone().add(V(0, 0.2, 0))); pasos(2); soltar(izq);
+  ok('filtro: el de repuesto se toma del rack TAC-B1', tomar(izq, repuesto));
+  izq.en(CF.alojamiento.posicion.clone().add(V(0.06, 0.03, 0))); pasos(2); soltar(izq);
+  ok('filtro: soltado junto al alojamiento encastra y la pantalla marca 100 %', CF.enAlojamiento === repuesto && repuesto.fijo && CF.carga === 100 && act.pasos[2].hecho && repuesto.posicion.distanceTo(CF.alojamiento.posicion) < 1e-6);
+  enManija();
+  ok('filtro: al cerrar la puerta el cartucho entra y la actividad se completa', !CF.abierta && repuesto.oculto && E('filtro') === 'COMPLETADA' && act.resultado?.completada, act.resultado);
+  cerrarInforme();
+
+  // =========================================================================================== FASE 13
+  fase('FASE 13 · Bienvenida y práctica guiada');
+  const IND = A.induccion, PBV = A.panelBienvenida, PPR = A.panelPractica;
+  soltar(izq); soltar(der); A.rig.quaternion.identity(); A.camera.rotation.set(0, 0, 0);
+  ubicar(V(0.1, 0.1, -2.0)); pasos(3);
+  try { window.localStorage.removeItem('artigas1.bienvenida'); } catch { /* */ }
+  A.acciones.mostrarBienvenida(); pasos(1);
+  ok('bienvenida: aparece delante, encima de todo, con PRÁCTICA GUIADA y EXPLORAR', PBV.malla.visible && PBV.malla.material.depthTest === false && ['practicar', 'explorar'].every((id) => PBV.botones.some((b) => b.id === id)));
+  der.en(cabeza().add(V(0.15, -0.2, -0.3))); pasos(2);
+  ok('bienvenida: PRÁCTICA GUIADA la cierra, la recuerda y empieza la práctica', apretar(der, PBV, 'practicar') && !PBV.malla.visible && IND.activa && PPR.malla.visible && window.localStorage.getItem('artigas1.bienvenida') === '1');
+  ok('práctica: un paso adelantado no cuenta (se aprende de a uno)', !IND.marcar('mapa') && IND.pasoActual.id === 'agarre');
+  // 1 · agarrarse de una baranda
+  const barP = A.estacion.barandas.segmentos.find((sg) => sg.a.z < -0.5 && sg.b.z > -4.5 || sg.b.z < -0.5 && sg.a.z > -4.5);
+  const pbP = barP.a.clone().lerp(barP.b, 0.5);
+  ubicar(pbP.clone().add(V(pbP.x > 0 ? -0.35 : 0.35, pbP.y > 0 ? -0.3 : 0.3, 0)));
+  der.en(pbP); pasos(2); der.grip(1); pasos(3);
+  ok('práctica: agarrarse cumple el primer paso', IND.hechos.has('agarre'), [...IND.hechos]);
+  // 2 · impulsarse: tirar y soltar
+  for (let i = 0; i < 10; i++) { der.g.position.z += 0.012; pasos(1); }
+  der.grip(0); pasos(3);
+  ok('práctica: tirar de la baranda y soltar cumple el impulso', IND.hechos.has('impulso'), +L.velocidad.length().toFixed(2));
+  // 3 · frenar con A
+  der.boton(4, 1); seg(2.5); der.boton(4, 0); pasos(2);
+  ok('práctica: frenar con A cumple el freno', IND.hechos.has('freno'));
+  // 4 · girar con el stick derecho
+  der.stick(1, 0); seg(0.4); der.stick(0, 0); seg(0.5);
+  ok('práctica: el giro con el stick derecho cumple el paso', IND.hechos.has('giro'), A.ajustes.giro);
+  // 5 · el mapa en la mano
+  ubicar(V(0.1, 0.1, -2.0)); pasos(2);
+  izq.en(cabeza().add(V(-0.16, -0.30, -0.34))); pasos(1); izq.gatillo(1); seg(0.4);
+  ok('práctica: el mapa en la mano cumple el paso', IND.hechos.has('mapa'));
+  izq.gatillo(0); seg(0.4);
+  // 6 · escanear un bulto
+  const esc6 = A.escaneres.find((x) => x.flotante.mano === der.mano) || A.escaneres.find((x) => !x.flotante.mano);
+  if (!esc6.flotante.mano) { ubicar(esc6.flotante.posicion.clone().add(V(-0.3, 0.1, 0.35))); tomar(der, esc6.flotante); seg(0.4); }
+  const bultoP = I.bultos.find((b) => b.legible && b.ubicacion.startsWith('RIV'));
+  leerBulto(der, bultoP);
+  ok('práctica: escanear un bulto la termina; el panel lo dice y se cierra con CERRAR', IND.terminada && !IND.activa && PPR.malla.visible && (PPR.redibujar(), PPR.botones.some((b) => b.id === 'cerrar')), [...IND.hechos]);
+  PPR.botones.find((b) => b.id === 'cerrar').accion(); pasos(1);
+  ok('práctica: CERRAR guarda el panel', !PPR.malla.visible);
+  ok('práctica: se vuelve a abrir desde el menú de la tablet', (() => { const t = A.tablets[0]; t.pagina = 'inicio'; t.panel.redibujar(); return t.panel.botones.some((b) => b.id === 'practica'); })());
 
   // =========================================================================================== FASE 9
   fase('FASE 9 · Telemetría para el panel docente');

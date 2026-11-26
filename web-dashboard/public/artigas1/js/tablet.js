@@ -95,7 +95,10 @@ export class TabletLogistica {
     ctx.font = '23px sans-serif';
     ctx.fillStyle = a ? COLORES.amarillo : COLORES.gris;
     const texto = a ? (a.pasoActual ? `Ahora: ${a.pasoActual.texto}` : '') : 'Abrí ÓRDENES DE TRABAJO para empezar una. El mapa se abre con el gatillo izquierdo.';
-    renglones(ctx, texto, W - 96).slice(0, 2).forEach((r, i) => ctx.fillText(r, 44, 540 + i * 30));
+    // sin actividad, a la derecha: la práctica guiada de los controles (js/induccion.js)
+    const anchoTexto = !a && this.acciones.practica ? W - 96 - 300 : W - 96;
+    renglones(ctx, texto, anchoTexto).slice(0, 2).forEach((r, i) => ctx.fillText(r, 44, 540 + i * 30));
+    if (!a && this.acciones.practica) panel.boton('practica', W - 324, 500, 280, 96, 'PRÁCTICA GUIADA', () => this.acciones.practica(), { estilo: 'aviso' });
     if (a && a.ultimoAviso) { ctx.fillStyle = COLORES.celeste; ctx.fillText(a.ultimoAviso.slice(0, 70), 44, 606); }
     return undefined;
   }
@@ -140,6 +143,7 @@ export class TabletLogistica {
     // con seis actividades las filas se achican para entrar en la pantalla (640 px de alto)
     const fila = Math.min(106, Math.floor((640 - 96) / Math.max(1, lista.length)));
     const bot = Math.min(58, fila - 34);
+    const compacta = fila < 96;                       // con siete o más, sin la línea del concepto
     lista.forEach((a, i) => {
       const y = 92 + i * fila;
       ctx.fillStyle = COLORES.panel;
@@ -147,16 +151,16 @@ export class TabletLogistica {
       ctx.fill();
       ctx.fillStyle = COLORES.blanco;
       ctx.font = 'bold 26px sans-serif';
-      ctx.fillText(a.def.titulo, 32, y + 32);
+      ctx.fillText(a.def.titulo, 32, y + (compacta ? 28 : 32));
       ctx.font = '20px sans-serif';
       ctx.fillStyle = COLORES.gris;
-      ctx.fillText(a.def.concepto, 32, y + Math.round(fila * 0.58));
+      if (!compacta) ctx.fillText(a.def.concepto, 32, y + Math.round(fila * 0.58));
       ctx.fillStyle = a.estado === ESTADO.COMPLETADA ? COLORES.verde : a.estado === ESTADO.FALLIDA ? COLORES.rojo : a.estado === ESTADO.BLOQUEADA ? COLORES.gris : COLORES.amarillo;
       let detalle = ETIQUETA_ESTADO[a.estado];
       if (a.estado === ESTADO.ACTIVA || a.estado === ESTADO.PAUSADA) detalle += ` · ${formatoTiempo(a.tiempo)} · paso ${a.hechos + 1} de ${a.pasos.length} · ${a.errores} errores`;
       else if (a.resultado) detalle += a.resultado.completada ? ` · ${a.resultado.puntaje} puntos en ${formatoTiempo(a.resultado.segundos)} · ${a.resultado.errores} errores` : ` · ${a.resultado.motivo}`;
       else if (a.estado === ESTADO.BLOQUEADA) detalle += ` · ${this.gestor.impedimento(a.id)}`;
-      ctx.fillText(detalle.slice(0, 62), 32, y + fila - 16);
+      ctx.fillText(detalle.slice(0, 62), 32, y + (compacta ? Math.min(58, fila - 15) : fila - 16));
       if (a.estado === ESTADO.ACTIVA) {
         panel.boton(`pausa:${a.id}`, 640, y + 16, 144, bot, 'PAUSAR', () => this.acciones.pausar());
         panel.boton(`dejar:${a.id}`, 796, y + 16, 144, bot, 'DEJAR', () => this.acciones.abandonar());
