@@ -12,6 +12,7 @@
 // que quedan pegadas a la superficie. Costo: 1 llamada de dibujo para la Tierra y la atmósfera, 1 para las
 // estrellas y 1 para el sol.
 import * as THREE from 'three';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 
 /** Centro y radio de la Tierra en el mundo: 400 km de altura a escala (63 m sobre una esfera de 1000 m). */
 export const TIERRA = { centro: new THREE.Vector3(0, -1065.2944, 2.11), radio: 1000 };
@@ -122,18 +123,37 @@ const FRAG_TIERRA = `
  * @param {THREE.LoadingManager} manager
  * @param {number} anisotropia
  */
-export function cargarTexturasTierra(manager, anisotropia = 4) {
+/**
+ * Texturas de la Tierra. Primero prueba las KTX2 (Basis Universal: en el visor quedan comprimidas en la GPU, en
+ * ASTC, y ocupan una cuarta parte o menos que una WebP descomprimida); si el navegador no puede, o con
+ * `?ktx2=no` en la dirección, usa las WebP de siempre. Las KTX2 salen de artigas1-vr/Tools/texturas-ktx2.
+ * @param {THREE.LoadingManager} manager
+ * @param {number} anisotropia
+ * @param {THREE.WebGLRenderer|null} renderer  Hace falta para saber qué formatos comprimidos acepta la GPU.
+ */
+export function cargarTexturasTierra(manager, anisotropia = 4, renderer = null) {
   const loader = new THREE.TextureLoader(manager);
-  const una = (archivo, color) => loader.loadAsync(archivo).then((t) => {
+  const sinKtx2 = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('ktx2') === 'no';
+  const ktx2 = renderer && !sinKtx2 ? new KTX2Loader(manager).setTranscoderPath('./vendor/addons/libs/basis/').detectSupport(renderer) : null;
+  const una = async (nombre, color) => {
+    let t = null;
+    if (ktx2) {
+      try { t = await ktx2.loadAsync(`./${nombre}.ktx2`); } catch (e) { console.warn(`${nombre}.ktx2: ${e.message}; se usa la WebP`); }
+    }
+    if (!t) t = await loader.loadAsync(`./${nombre}.webp`);
     t.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace;   // la de noche lleva datos, no color
     t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
     t.anisotropy = anisotropia;                      // la Tierra se mira casi siempre de costado
+    t.needsUpdate = true;
     return t;
-  });
+  };
   return Promise.all([
-    una('./tierra_base_dia.webp', true), una('./tierra_base_noche.webp', false),
-    una('./tierra_detalle_dia.webp', true), una('./tierra_detalle_noche.webp', false),
-  ]).then(([baseDia, baseNoche, detDia, detNoche]) => ({ baseDia, baseNoche, detDia, detNoche }));
+    una('tierra_base_dia', true), una('tierra_base_noche', false),
+    una('tierra_detalle_dia', true), una('tierra_detalle_noche', false),
+  ]).then(([baseDia, baseNoche, detDia, detNoche]) => {
+    if (ktx2) ktx2.dispose();                        // libera los workers del transcodificador
+    return { baseDia, baseNoche, detDia, detNoche, formato: baseDia.isCompressedTexture ? 'ktx2' : 'webp' };
+  });
 }
 
 function crearTierra(tex) {

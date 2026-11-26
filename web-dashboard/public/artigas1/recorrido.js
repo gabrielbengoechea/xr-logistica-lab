@@ -46,6 +46,7 @@ import { LotesFlotantes } from './js/lotes.js';
 import { VisibilidadModulos } from './js/portales.js';
 import { Telemetria } from './js/telemetria.js';
 import { BalanceRivera, TANQUES, crearPanelBalance, geometriaTanque } from './js/balance.js';
+import { DescargaCarguero, crearPanelManifiesto, crearPanelPresion, crearPanelRfid } from './js/descarga.js';
 
 const INICIO = 'rivera';
 
@@ -144,8 +145,14 @@ let inventario = null;
 let balance = null;
 /** @type {PanelVR | null} */
 let panelBalance = null;
+/** @type {DescargaCarguero | null} */
+let descarga = null;
+/** Paneles del minijuego A: presión, portal RFID y consola de recepción. */
+let panelesDescarga = null;
 /** @type {LotesFlotantes | null} */
 let lotes = null;
+/** Texturas de la Tierra que se cargaron (KTX2 o WebP), para las pruebas. */
+let texTierraCargadas = null;
 /** @type {VisibilidadModulos | null} */
 let portales = null;
 let inspecciones = null;
@@ -408,7 +415,7 @@ function reunirHerramientas() {
 // Armado
 // =====================================================================================================
 const anisotropia = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, anisotropia)]).then(([gEstacion, texTierra]) => {
+Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, anisotropia, renderer)]).then(([gEstacion, texTierra]) => {
   estacion = armarEstacion(gEstacion, materialPara);
   scene.add(estacion.grupo);
   portales = new VisibilidadModulos(estacion);        // no se dibuja lo que queda detrás de una escotilla cerrada
@@ -416,6 +423,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   const etiquetas = crearEtiquetas(legibles, renderer);
   if (etiquetas.malla) scene.add(etiquetas.malla);
   inventario = new Inventario(estacion.cargas, etiquetas.datos, CATEGORIAS);
+  texTierraCargadas = texTierra;
   orbital = crearEntornoOrbital(texTierra);
   scene.add(orbital.grupo);
   portales.agregarDeAfuera(orbital.grupo);
@@ -533,6 +541,20 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   flotantes.alSoltar = (f) => {
     if (f.tipo === 'contenedor' || (f.datos && f.datos.herramienta)) telemetria.registrar('release', nombreTelemetria(f));
     if (f.tipo !== 'contenedor') return;
+    // red de cuarentena de Colonia: lo que se suelta adentro queda retenido ahí
+    if (descarga.dentroDeCuarentena(f.posicion)) {
+      f.fijo = true;
+      f.velocidad.set(0, 0, 0);
+      f.casa.copy(f.posicion);
+      f.datos.cuarentena = true;
+      const manifestado = descarga.manifestado(f.datos.codigo);
+      sonido.tocar(manifestado ? 'aviso' : 'ok');
+      avisar(`${f.datos.codigo} en la red de cuarentena`, manifestado ? 'error' : 'ok');
+      gestor.evento('cuarentena', { codigo: f.datos.codigo, manifestado });
+      telemetria.registrar(manifestado ? 'snap_fail' : 'snap_ok', f.datos.codigo, 'cuarentena', manifestado ? 'estaba en el manifiesto' : null);
+      panelesDescarga.manifiesto.sucio = true;
+      return;
+    }
     const h = inventario.huecoCercano(f.posicion, 0.32);
     if (!h) return;
     f.fijo = true;
@@ -560,6 +582,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
       inventario.retirar(f);
       amarres.quitar(f);
     }
+    if (f.datos && f.datos.cuarentena) f.datos.cuarentena = false;
     if (f.datos && f.datos.tablet) f.datos.tablet.panel.sucio = true;
   };
 
@@ -574,7 +597,46 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   for (const [id, p] of Object.entries(PUNTOS_TALLER)) inspecciones.agregar(id, p.posicion, p.herramienta, p.segundos, p.texto);
   estacion.grupo.add(crearTapaTablero(PUNTOS_TALLER.tapa_tablero.posicion));
   for (const [id, p] of Object.entries(PUNTOS_EVA)) inspecciones.agregar(id, PUNTOS_EXTERIORES[id], p.herramienta, p.segundos, p.texto);
-  definirActividades(gestor, { inventario, inspecciones, balance });
+  // ---- minijuego A: descarga del carguero en Colonia (js/descarga.js)
+  descarga = new DescargaCarguero({ contenedores: inventario.contenedores, escotilla: estacion.escotillas.find((e) => e.malla.name === 'C_Escotilla_HaciaCarguero') });
+  descarga.alIgualar = () => { sonido.tocar('ok'); avisar('Presión igualada: ya se puede abrir la escotilla', 'ok'); gestor.evento('presion_igualada', {}); };
+  descarga.alLeer = (f, manifestado) => {
+    sonido.tocar(manifestado ? 'ok' : 'aviso');
+    manos.vibrarTodas(0.5, 50);
+    if (manifestado) avisar(`RFID: ${f.datos.codigo} recibido`, 'ok');
+    gestor.evento('rfid', { codigo: f.datos.codigo, manifestado });
+    telemetria.registrar('scan', f.datos.codigo, 'portal_rfid', manifestado ? 'rfid · en manifiesto' : 'rfid · no manifestado');
+    panelesDescarga.rfid.sucio = true;
+    panelesDescarga.manifiesto.sucio = true;
+  };
+  panelesDescarga = {
+    presion: crearPanelPresion(descarga, {
+      igualar: () => { if (descarga.igualar()) { sonido.tocar('aviso'); avisar('Igualando la presión…'); } },
+      abrir: () => { if (descarga.abrir()) { sonido.tocar('logro'); avisar('Escotilla del carguero abierta', 'ok'); gestor.evento('escotilla_abierta', {}); } },
+    }),
+    rfid: crearPanelRfid(descarga),
+    manifiesto: crearPanelManifiesto(descarga, {
+      estado: () => gestor.obtener('descarga').estado,
+      puedeIniciar: () => !gestor.impedimento('descarga'),
+      iniciar: () => iniciarActividad('descarga'),
+      faltante: () => {
+        const todoLeido = descarga.todoLeido;
+        if (todoLeido) descarga.faltanteInformado = true;
+        gestor.evento('faltante', { todoLeido });
+        telemetria.registrar(todoLeido ? 'snap_ok' : 'snap_fail', 'faltante', 'consola_recepcion', todoLeido ? 'faltante informado' : 'informado antes de leer toda la carga');
+      },
+      pausar: () => gestor.pausar(),
+      reanudar: () => gestor.reanudar(),
+      abandonar: () => gestor.abandonar(),
+    }),
+  };
+  for (const p of Object.values(panelesDescarga)) {
+    scene.add(p.malla);
+    paneles.agregar(p);
+    portales.agregar(p.malla, p.malla.position);
+  }
+  terminales.push(panelesDescarga.manifiesto);
+  definirActividades(gestor, { inventario, inspecciones, balance, descarga });
 
   eva = new EVAController({
     rig, camara: camera, escena: scene, loco, manos, exterior, transicion, sonido,
@@ -630,6 +692,23 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     if (tipo === 'inicio') {
       sonido.tocar('aviso'); abrirInforme('instrucciones', a); if (mapa) mapa.cerrar();
       // el taller arranca ordenado: las herramientas sueltas de Tacuarembó vuelven a su lugar
+      if (a.id === 'descarga') {
+        // la carga del turno vuelve a la bodega del carguero y la escotilla se traba hasta igualar la presión
+        descarga.preparar();
+        for (const f of descarga.carga) {
+          if (f.mano) { f.mano.sostiene = null; f.mano = null; }
+          if (f.datos.hueco) { inventario.retirar(f); amarres.quitar(f); }
+          f.datos.cuarentena = false;
+          f.posicion.copy(descarga.posicionInicial(f));
+          f.malla.quaternion.identity();
+          f.casa.copy(f.posicion);
+          f.velocidad.set(0, 0, 0);
+          f.libre = false;
+          f.fijo = true;
+          f.datos.zPrevia = null;
+        }
+        for (const p of Object.values(panelesDescarga)) p.sucio = true;
+      }
       if (a.id === 'balance') {
         // los tanques vuelven a esperar junto a la escotilla y se calcula la tolerancia con los huecos libres
         for (const f of balance.tanques) {
@@ -645,6 +724,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     if (tipo === 'error') { sonido.tocar('error'); avisar(dato, 'error'); manos.vibrarTodas(0.8, 90); }
     if (tipo === 'aviso') avisar(dato);
     if (tipo === 'desbloqueo') avisar(`Nueva actividad disponible: ${a.def.titulo}`, 'ok', 5);
+    if ((tipo === 'fin' || tipo === 'abandono') && a.id === 'descarga') { descarga.terminar(); for (const p of Object.values(panelesDescarga)) p.sucio = true; }
     if (tipo === 'fin' || tipo === 'abandono') {
       inspecciones.activar([]);
       if (tipo === 'fin') {
@@ -665,8 +745,8 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   // para las pruebas automáticas y para depurar desde la consola
   window.artigas1 = {
     guanteListo, manosPoses: POSES,
-    THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, flotantes, ir, manosDePrueba,
-    inventario, amarres, medidorFps, lotes: () => lotes, portales: () => portales, telemetria, balance: () => balance, panelBalance: () => panelBalance, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
+    THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, texturasTierra: () => texTierraCargadas, flotantes, ir, manosDePrueba,
+    inventario, amarres, medidorFps, lotes: () => lotes, portales: () => portales, telemetria, balance: () => balance, panelBalance: () => panelBalance, descarga: () => descarga, panelesDescarga: () => panelesDescarga, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
     acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas }, aviso, panelInforme, teclas,
     avanzar: (dt = 1 / 72, dibujar = false) => cuadro(0, null, dt, !dibujar),
   };
@@ -1053,6 +1133,8 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     cuerpo[1].centro.copy(cabeza).addScaledVector(arribaRig.copy(ARRIBA).applyQuaternion(rig.quaternion), -loco.p.alturaTorso);
     flotantes.actualizar(dt, cabeza, cuerpo, loco.velocidad, todasLasManos);
     for (const e of escaneres) e.actualizar(dt);
+    descarga.actualizar(dt);
+    if (descarga.igualando) panelesDescarga.presion.sucio = true;
     for (const t of tablets) t.actualizar(dt);
     inspecciones.actualizar(dt, todasLasManos, camera);
     gestor.tick(dt);
@@ -1066,6 +1148,7 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
       relojTerminales = 0;
       if (gestor.activa) for (const t of terminales) if (t.malla.position.distanceToSquared(cabeza) < 16) t.sucio = true;
       if (panelBalance.malla.visible && panelBalance.malla.position.distanceToSquared(cabeza) < 16) panelBalance.sucio = true;   // medición en vivo
+      for (const p of Object.values(panelesDescarga)) if (p.malla.visible && p.malla.position.distanceToSquared(cabeza) < 25) p.sucio = true;
     }
     manos.mostrar(dt);
     if (loco.ultimoChoque > 0.35) manos.vibrarTodas(Math.min(1, loco.ultimoChoque / 2), 30);

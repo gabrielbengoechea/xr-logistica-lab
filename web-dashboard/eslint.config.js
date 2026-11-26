@@ -5,7 +5,8 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage'] },
+  // public/artigas1/vendor: three.js y sus addons copiados tal cual (código de terceros)
+  { ignores: ['dist', 'coverage', 'public/artigas1/vendor'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.strict],
     files: ['**/*.{ts,tsx}'],

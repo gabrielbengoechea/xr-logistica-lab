@@ -1,0 +1,8 @@
+{
+  "name": "artigas1-texturas-ktx2",
+  "private": true,
+  "type": "module",
+  "description": "Convierte las texturas de la Tierra del recorrido web a KTX2 (Basis Universal)",
+  "scripts": { "convertir": "node convertir.mjs" },
+  "dependencies": { "ktx2-encoder": "0.6.0", "sharp": "^0.34.0" }
+}

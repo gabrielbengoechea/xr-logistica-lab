@@ -61,11 +61,13 @@ class Escotilla {
     this.colision.agregarCaja(malla.geometry.boundingBox, malla.matrixWorld);
     this.colision.construir();
     this.avance = 0;                                      // 0 cerrada, 1 abierta
+    /** Cerrada aunque el astronauta se acerque (la del carguero, hasta igualar la presión en el minijuego A). */
+    this.bloqueada = false;
   }
 
   actualizar(dt, cabeza) {
     const d = this.centro.distanceTo(cabeza);
-    const meta = d < 1.7 ? 1 : d > 2.3 ? 0 : this.avance > 0.5 ? 1 : 0;
+    const meta = this.bloqueada ? 0 : d < 1.7 ? 1 : d > 2.3 ? 0 : this.avance > 0.5 ? 1 : 0;
     if (meta === this.avance) return;
     this.avance = THREE.MathUtils.clamp(this.avance + Math.sign(meta - this.avance) * dt / 0.9, 0, 1);
     const k = this.avance * this.avance * (3 - 2 * this.avance);

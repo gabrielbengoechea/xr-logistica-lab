@@ -7,8 +7,9 @@
 // escotillas abiertas (o abriéndose), en cadena.
 //
 // Lo de afuera (la Tierra, las estrellas y el sol) solo se ve por las ventanas de la Cúpula: adentro de los
-// otros módulos no se dibuja. La Tierra se calcula por píxel y se dibuja antes que la estación, así que, aunque
-// las paredes la tapen, su costo por píxel se pagaba igual en todos los módulos.
+// otros módulos no se dibuja. La Tierra es transparente, así que se dibuja después de la estación y la prueba de
+// profundidad descarta casi todos sus píxeles tapados; lo que se ahorra son las llamadas de dibujo y lo que la
+// GPU hace antes de esa prueba.
 //
 // Afuera (caminata espacial) el casco exterior tapa el interior salvo las ventanas de la Cúpula: se dibujan la
 // Cúpula y el Nodo (la esclusa da al Nodo). Si la cabeza está en un lugar que no es de ningún módulo, se
