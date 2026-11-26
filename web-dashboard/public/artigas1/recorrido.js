@@ -39,6 +39,9 @@ import { TabletLogistica } from './js/tablet.js';
 import { ESCLUSA, PUNTOS_EXTERIORES, RUTAS_EXTERIORES, crearExterior } from './js/exterior.js';
 import { CAPA_TERCERA_PERSONA, EVAController, StationTransitionManager } from './js/eva.js';
 import { Confort, ORDEN_TUNEL } from './js/confort.js';
+import { PARAMETROS_AVISO, UbicadorCartel, distanciaLibre, siempreVisible } from './js/avisos.js';
+import { Amarres, DIENTES } from './js/amarre.js';
+import { MedidorFps } from './js/rendimiento.js';
 
 const INICIO = 'rivera';
 
@@ -110,11 +113,17 @@ manos.calibrar(ajustes.calibracionManos);
 // el guante de Blender llega aparte: mientras tanto (o si no llega) se ven las manos de cápsulas
 const guanteListo = manos.cargarGuante('./', entorno).catch((e) => { console.warn('guante:', e.message); return null; });
 const paneles = new SistemaPaneles(scene, sonido);
+// el rayo de los controles no aprieta terminales del otro lado de un mamparo
+const RAYO_PANELES = { ...PARAMETROS_AVISO, paso: 0.04, radioPrueba: 0.02 };
+paneles.obstaculo = (o, d, hasta) => distanciaLibre(colisionadores(), o, d, hasta, RAYO_PANELES);
 const transicion = new StationTransitionManager(camera);
 const confort = new Confort(camera);
+// fps: siempre en la consola cada 10 s; con ?fps en la dirección, también un contador en la vista
+const medidorFps = new MedidorFps(camera, new URLSearchParams(window.location.search).has('fps'));
 const gestor = new GestorActividades();
 const navegacion = new Navegacion(scene);
 const fabrica = new FabricaHerramientas(entorno);
+const amarres = new Amarres(sonido, (m, fuerza, ms) => manos.vibrar(m, fuerza, ms));
 
 /** @type {Locomocion0G | null} */
 let loco = null;
@@ -168,22 +177,21 @@ const panelAviso = new PanelVR({ ancho: 0.66, alto: 0.11, px: 1080, nombre: 'Avi
 } });
 panelAviso.interactivo = false;
 panelAviso.malla.visible = false;
-panelAviso.malla.renderOrder = 7;
+siempreVisible(panelAviso.malla, 991);   // ni una pared, ni una bolsa, ni la mano lo tapan (ver js/avisos.js)
 scene.add(panelAviso.malla);
+const ubicadorAviso = new UbicadorCartel(panelAviso.malla, colisionadores);
 
-/** Cartel breve delante del astronauta, quieto en el espacio (no pegado a la cámara). */
+/**
+ * Cartel breve delante del astronauta. Queda antes de la primera pared, se dibuja encima de todo y, si el
+ * jugador gira, vuelve despacio delante de los ojos (no va pegado a la cámara).
+ */
 function avisar(texto, tono = 'info', segundos = 3.5) {
   aviso.texto = texto;
   aviso.tono = tono;
   aviso.tiempo = segundos;
-  camera.getWorldPosition(cabeza);
-  camera.getWorldDirection(mirada);
-  const m = panelAviso.malla;
-  camera.getWorldQuaternion(_q);
-  m.up.set(0, 1, 0).applyQuaternion(_q);
-  m.position.copy(cabeza).addScaledVector(mirada, 0.95).addScaledVector(m.up, -0.30);
-  m.lookAt(cabeza);
-  m.visible = true;
+  // un aviso nuevo con el anterior todavía a la vista no salta de lugar: solo cambia el texto
+  if (!panelAviso.malla.visible) ubicadorAviso.colocar(camera);
+  panelAviso.malla.visible = true;
   panelAviso.redibujar();
 }
 
@@ -234,25 +242,17 @@ const panelInforme = new PanelVR({ ancho: 0.74, alto: 0.48, px: 1110, nombre: 'I
   p.boton('cerrar', W - 350, H - 110, 320, 80, fin ? 'CERRAR' : 'ENTENDIDO', () => cerrarInforme());
 } });
 panelInforme.malla.visible = false;
-panelInforme.malla.renderOrder = 6;
+siempreVisible(panelInforme.malla, 990);
 scene.add(panelInforme.malla);
 paneles.agregar(panelInforme);
+// el informe tiene botones: se ubica antes de la primera pared y queda quieto para poder apuntarle
+const ubicadorInforme = new UbicadorCartel(panelInforme.malla, colisionadores, { seguir: false, bajar: 0 });
 
 function abrirInforme(modo, actividad) {
   informe.modo = modo;
   informe.actividad = actividad;
-  camera.getWorldPosition(cabeza);
-  camera.getWorldDirection(mirada);
-  const m = panelInforme.malla;
-  camera.getWorldQuaternion(_q);
-  m.up.set(0, 1, 0).applyQuaternion(_q);
-  let d = 0.9;
-  if (estacion && !(eva && eva.afuera)) {
-    for (; d > 0.5; d -= 0.07) if (estacion.colisiones.puntoMasCercano(_v.copy(cabeza).addScaledVector(mirada, d), 0.28, _pos) === Infinity) break;
-  }
-  m.position.copy(cabeza).addScaledVector(mirada, d);
-  m.lookAt(cabeza);
-  m.visible = true;
+  ubicadorInforme.colocar(camera);
+  panelInforme.malla.visible = true;
   panelInforme.sucio = true;
 }
 
@@ -359,6 +359,29 @@ function ir(id) {
   if (loco) loco.teletransportar(_pos); else rig.position.copy(_pos);
 }
 
+/**
+ * Tapa del tablero eléctrico del taller (punto del destornillador): placa con cuatro tornillos, montada en la
+ * pared de estribor de Tacuarembó, mirando al centro del módulo.
+ */
+function crearTapaTablero(posicion) {
+  const g = new THREE.Group();
+  g.name = 'Taller_Tapa_Tablero';
+  const placa = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.16, 0.22), new THREE.MeshStandardMaterial({ color: 0x8c96a3, roughness: 0.55, metalness: 0.6 }));
+  g.add(placa);
+  const cartel = new THREE.Mesh(new THREE.BoxGeometry(0.002, 0.03, 0.12), new THREE.MeshStandardMaterial({ color: 0xfcd116, roughness: 0.7 }));
+  cartel.position.set(-0.007, 0.05, 0);
+  g.add(cartel);
+  const tornillo = new THREE.CylinderGeometry(0.009, 0.009, 0.008, 8).rotateZ(Math.PI / 2);
+  const matTornillo = new THREE.MeshStandardMaterial({ color: 0x3a3f46, roughness: 0.4, metalness: 0.9 });
+  for (const [y, z] of [[-0.065, -0.095], [-0.065, 0.095], [0.065, -0.095], [0.065, 0.095]]) {
+    const t = new THREE.Mesh(tornillo, matTornillo);
+    t.position.set(-0.009, y, z);
+    g.add(t);
+  }
+  g.position.copy(posicion).add(new THREE.Vector3(0.025, 0, 0));
+  return g;
+}
+
 function reunirHerramientas() {
   for (const f of flotantes.objetos) if (f.datos && f.datos.herramienta) flotantes.guardar(f);
   avisar('Las herramientas volvieron a su lugar', 'ok');
@@ -463,9 +486,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   ponerHerramienta('inspector', V(2.08, 0.36, 2.86), -1.2);        // soporte exterior de la esclusa
   ponerHerramienta('llave', V(2.08, 0.08, 2.92), -1.2);
 
-  // ---- soltar y tomar: los contenedores quedan asegurados en los huecos del rack
-  const correa = new THREE.BoxGeometry(1, 1, 1);
-  const matCorrea = new THREE.MeshStandardMaterial({ color: 0xe8730c, roughness: 0.8 });
+  // ---- soltar y tomar: el contenedor queda apoyado en el hueco y se amarra con el trinquete (js/amarre.js)
   flotantes.alSoltar = (f) => {
     if (f.tipo !== 'contenedor') return;
     const h = inventario.huecoCercano(f.posicion, 0.32);
@@ -475,23 +496,22 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     f.posicion.copy(h.posicion);
     f.malla.quaternion.copy(h.giro);
     f.casa.copy(h.posicion);
-    if (!f.datos.correa) {
-      f.malla.geometry.computeBoundingBox();
-      const t = f.malla.geometry.boundingBox.getSize(new THREE.Vector3());
-      f.datos.correa = new THREE.Mesh(correa, matCorrea);
-      f.datos.correa.scale.set(0.035, t.y + 0.012, t.z + 0.012);
-      f.malla.add(f.datos.correa);
-    }
-    f.datos.correa.visible = true;
+    amarres.apoyar(f);
     const correcto = inventario.colocar(f, h);
     sonido.tocar(correcto ? 'ok' : 'aviso');
-    avisar(correcto ? `${f.datos.codigo} asegurado en ${h.codigo}` : `${f.datos.codigo} quedó en ${h.codigo}, pero su lugar es ${f.datos.destino}`, correcto ? 'ok' : 'error');
+    avisar(correcto ? `${f.datos.codigo} apoyado en ${h.codigo}. Amarralo: mano libre junto al trinquete naranja y ${DIENTES} veces el gatillo` : `${f.datos.codigo} quedó en ${h.codigo}, pero su lugar es ${f.datos.destino}`, correcto ? 'ok' : 'error', correcto ? 5 : 3.5);
     gestor.evento('colocado', { codigo: f.datos.codigo, hueco: h.codigo, destino: f.datos.destino, correcto });
+  };
+  amarres.alAmarrar = (f) => {
+    const h = f.datos.hueco;
+    const correcto = !!h && h.codigo === f.datos.destino;
+    avisar(correcto ? `${f.datos.codigo} amarrado en ${h.codigo}` : `${f.datos.codigo} amarrado, pero en un hueco que no es el suyo`, correcto ? 'ok' : 'error');
+    gestor.evento('amarrado', { codigo: f.datos.codigo, hueco: h ? h.codigo : '', destino: f.datos.destino, correcto });
   };
   flotantes.alTomar = (f) => {
     if (f.tipo === 'contenedor' && f.datos.hueco) {
       inventario.retirar(f);
-      if (f.datos.correa) f.datos.correa.visible = false;
+      amarres.quitar(f);
     }
     if (f.datos && f.datos.tablet) f.datos.tablet.panel.sucio = true;
   };
@@ -502,6 +522,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     if (tipo === 'inspeccion') { sonido.tocar('ok'); manos.vibrarTodas(0.6, 60); }
   });
   for (const [id, p] of Object.entries(PUNTOS_TALLER)) inspecciones.agregar(id, p.posicion, p.herramienta, p.segundos, p.texto);
+  estacion.grupo.add(crearTapaTablero(PUNTOS_TALLER.tapa_tablero.posicion));
   for (const [id, p] of Object.entries(PUNTOS_EVA)) inspecciones.agregar(id, PUNTOS_EXTERIORES[id], p.herramienta, p.segundos, p.texto);
   definirActividades(gestor, { inventario, inspecciones });
 
@@ -514,7 +535,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
       avisar(fase === 'afuera' ? 'Estás afuera. Avanzá de pasamanos en pasamanos.' : 'De vuelta en el Nodo Montevideo', 'ok');
     },
   });
-  mapa = new MapaEstacion({ paneles, escena: scene, navegacion, gestor, acciones: { guiar, trasladar, iniciar: iniciarActividad, cancelarGuia: () => navegacion.cancelar() }, estado: () => ({ afuera: eva.afuera }) });
+  mapa = new MapaEstacion({ paneles, escena: scene, camara: camera, navegacion, gestor, acciones: { guiar, trasladar, iniciar: iniciarActividad, cancelarGuia: () => navegacion.cancelar() }, estado: () => ({ afuera: eva.afuera }) });
 
   crearTerminal('almacenamiento', V(0.86, 0.36, 0.615), Math.PI);
   crearTerminal('inventario', V(0.86, -0.02, 0.615), Math.PI);
@@ -527,7 +548,11 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     for (const t of terminales) t.sucio = true;
     for (const t of tablets) t.panel.sucio = true;
     if (mapa) mapa.panel.sucio = true;
-    if (tipo === 'inicio') { sonido.tocar('aviso'); abrirInforme('instrucciones', a); if (mapa) mapa.cerrar(); }
+    if (tipo === 'inicio') {
+      sonido.tocar('aviso'); abrirInforme('instrucciones', a); if (mapa) mapa.cerrar();
+      // el taller arranca ordenado: las herramientas sueltas de Tacuarembó vuelven a su lugar
+      if (a.id === 'mantenimiento') for (const f of flotantes.objetos) if (f.datos && f.datos.herramienta && !f.mano && f.reposo.posicion.z > 3.6) flotantes.guardar(f);
+    }
     if (tipo === 'paso') { sonido.tocar('logro'); if (a.pasoActual) avisar(`✔ ${dato.texto}`, 'ok'); }
     if (tipo === 'error') { sonido.tocar('error'); avisar(dato, 'error'); manos.vibrarTodas(0.8, 90); }
     if (tipo === 'aviso') avisar(dato);
@@ -553,7 +578,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   window.artigas1 = {
     guanteListo, manosPoses: POSES,
     THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, flotantes, ir, manosDePrueba,
-    inventario, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
+    inventario, amarres, medidorFps, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
     acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas }, aviso, panelInforme, teclas,
     avanzar: (dt = 1 / 72, dibujar = false) => cuadro(0, null, dt, !dibujar),
   };
@@ -896,7 +921,9 @@ const reloj = new THREE.Clock();
 let relojTerminales = 0;
 /** Un cuadro del juego. Las pruebas lo llaman con un `dt` fijo y sin dibujar (window.artigas1.avanzar). */
 function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
-  const dt = dtFijo ?? Math.min(reloj.getDelta(), 0.05);
+  const dtReal = dtFijo ?? reloj.getDelta();
+  const dt = dtFijo ?? Math.min(dtReal, 0.05);
+  if (dtFijo === null) medidorFps.cuadro(dtReal);
   if (loco) {
     const enVisor = renderer.xr.isPresenting;
     empuje.set(0, 0, 0);
@@ -914,6 +941,7 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     }
     paneles.actualizar(dt, todasLasManos, puntero);
     mouse.clic = false;
+    amarres.actualizar(dt, todasLasManos);              // un gatillo junto al trinquete no abre el mapa
     if (enVisor) entradaXR(dt); else entradaTeclado();
     empuje.clampLength(0, 1.8);
     // --- agarre y herramientas
@@ -943,6 +971,7 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     mapa.actualizar(dt, cabeza, mirada);
     marcas();
     if (aviso.tiempo > 0) { aviso.tiempo -= dt; if (aviso.tiempo <= 0) panelAviso.malla.visible = false; }
+    ubicadorAviso.actualizar(dt, camera);
     relojTerminales += dt;
     if (relojTerminales > 0.5) {
       relojTerminales = 0;
