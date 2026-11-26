@@ -616,8 +616,8 @@ JS = r"""
     h.grip(0); pasos(2);
     return c.datos.hueco === hueco ? '' : 'no quedó en el hueco';
   };
-  ok('gestor: siete actividades registradas; la caminata espacial arranca bloqueada y el resto disponible', G.lista().length === 7 && E('eva') === 'BLOQUEADA' && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'balance', 'descarga'].every((x) => E(x) === 'DISPONIBLE'), G.lista().map((a) => `${a.id}:${a.estado}`));
-  ok('acceso: hay un terminal físico por actividad (ocho paneles; el balance y la descarga usan las pantallas del kit)', A.terminales.length === 8 && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'eva', 'balance', 'descarga'].every((x) => terminal(x)), A.terminales.map((t) => t.nombre));
+  ok('gestor: ocho actividades registradas; la caminata espacial arranca bloqueada y el resto disponible', G.lista().length === 8 && E('eva') === 'BLOQUEADA' && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'balance', 'descarga', 'filtro'].every((x) => E(x) === 'DISPONIBLE'), G.lista().map((a) => `${a.id}:${a.estado}`));
+  ok('acceso: hay un terminal físico por actividad (nueve paneles; balance, descarga y filtro usan las pantallas del kit)', A.terminales.length === 9 && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'eva', 'balance', 'descarga', 'filtro'].every((x) => terminal(x)), A.terminales.map((t) => t.nombre));
 
   // ---- RECEPCIÓN: se inicia desde el terminal de Colonia
   let term = terminal('recepcion');
@@ -933,14 +933,15 @@ JS = r"""
   ok('carteles: frente a un terminal, el aviso no queda encima de sus botones', tapados.length === 0, tapados);
   A.rig.quaternion.identity();
   // rayo: un terminal del otro lado del mamparo Rivera–Nodo no se aprieta
-  const tPrueba = A.terminales[1].malla, guardado = { p: tPrueba.position.clone(), r: tPrueba.rotation.y };
+  const tInvR = terminal('inventario');
+  const tPrueba = tInvR.malla, guardado = { p: tPrueba.position.clone(), r: tPrueba.rotation.y };
   const origenRayo = V(0.9, 0.3, -0.6), dirRayo = V(0, 0, 1);
   tPrueba.position.set(0.9, 0.3, 1.0); tPrueba.rotation.y = Math.PI; tPrueba.updateMatrixWorld(true);
   const tras = A.paneles.apuntar(origenRayo, dirRayo, new T.Vector3());
   tPrueba.position.set(0.9, 0.3, 0.2); tPrueba.updateMatrixWorld(true);
   const delante = A.paneles.apuntar(origenRayo, dirRayo, new T.Vector3());
   tPrueba.position.copy(guardado.p); tPrueba.rotation.y = guardado.r; tPrueba.updateMatrixWorld(true);
-  ok('rayo: no aprieta un terminal del otro lado de un mamparo, sí uno del mismo lado', (!tras || tras.panel !== A.terminales[1]) && delante && delante.panel === A.terminales[1], [tras && tras.panel.nombre, delante && delante.panel.nombre]);
+  ok('rayo: no aprieta un terminal del otro lado de un mamparo, sí uno del mismo lado', (!tras || tras.panel !== tInvR) && delante && delante.panel === tInvR, [tras && tras.panel.nombre, delante && delante.panel.nombre, ]);
   A.portales().activo = false; pasos(1, 0);           // todos visibles: acá se prueba el rayo, no los portales
   ok('rayo: los terminales de siempre se siguen apretando (están sobre equipos)', A.terminales.every((t) => { t.malla.updateWorldMatrix(true, false); const c = t.malla.getWorldPosition(new T.Vector3()); const n = V(0, 0, 1).transformDirection(t.malla.matrixWorld); const v = A.paneles.apuntar(c.clone().addScaledVector(n, 0.6), n.clone().negate(), new T.Vector3()); return v && v.panel === t; }));
   A.portales().activo = true; pasos(1, 0);
@@ -1069,6 +1070,38 @@ JS = r"""
   ubicar(frenteA(term, 0.8)); der.en(frenteA(term, 0.45).add(V(0.1, -0.1, 0))); pasos(2);
   apretar(der, term, 'faltante');
   ok('descarga: con todo leído, INFORMAR FALTANTE la completa y la escotilla vuelve a ser libre', E('descarga') === 'COMPLETADA' && act.resultado?.completada && DC.faltanteInformado && !escC.bloqueada, act.resultado);
+  cerrarInforme();
+
+  // =========================================================================================== FASE 12
+  fase('FASE 12 · Cambio del filtro de CO₂ (taller)');
+  const CF = A.cambioFiltro(), PS = A.pantallaSoporte();
+  term = terminal('filtro');
+  ok('filtro: el terminal es la pantalla de soporte vital del taller', term === PS);
+  ubicar(frenteA(term, 0.7)); der.en(frenteA(term, 0.4).add(V(0.05, -0.05, 0))); pasos(2);
+  ok('filtro: se inicia desde la pantalla de soporte vital', apretar(der, term, 'iniciar') && E('filtro') === 'ACTIVA');
+  cerrarInforme(); pasos(2);
+  act = G.obtener('filtro');
+  const gastado = CF.filtros.find((f) => f.datos.gastado), repuesto = CF.filtros.find((f) => !f.datos.gastado);
+  ok('filtro: arranca con el gastado adentro (12 %), la puerta cerrada y tres de repuesto en el rack', act.pasos.length === 4 && CF.carga === 12 && !CF.abierta && CF.filtros.length === 4);
+  ubicar(V(-0.45, -0.1, 4.75)); pasos(2);
+  ok('filtro: con la puerta cerrada el cartucho no se ve ni se puede tomar', gastado.oculto && !tomar(izq, gastado));
+  soltar(izq);
+  const enManija = () => { izq.en(CF.manija()); pasos(2); izq.clic(); seg(0.8); };
+  enManija();
+  ok('filtro: gatillo en la manija abre la puerta (sin abrir el mapa) y sale el cartucho', CF.abierta && CF.apertura === 1 && !gastado.oculto && act.pasos[0].hecho && !A.mapa.abierto);
+  const afuera = V(-0.55, 0.15, 4.75);
+  ok('filtro: se saca el gastado', tomar(izq, gastado) && act.pasos[1].hecho && CF.carga === null);
+  izq.en(afuera.clone()); pasos(2); soltar(izq);
+  // volver a poner el gastado es un error
+  const errF = act.errores;
+  tomar(izq, gastado); izq.en(CF.alojamiento.posicion.clone().add(V(0.05, 0, 0))); pasos(2); soltar(izq);
+  ok('filtro: volver a poner el gastado es un error', act.errores === errF + 1 && !act.pasos[2].hecho && CF.enAlojamiento === gastado, A.aviso.texto);
+  tomar(izq, gastado); izq.en(afuera.clone().add(V(0, 0.2, 0))); pasos(2); soltar(izq);
+  ok('filtro: el de repuesto se toma del rack TAC-B1', tomar(izq, repuesto));
+  izq.en(CF.alojamiento.posicion.clone().add(V(0.06, 0.03, 0))); pasos(2); soltar(izq);
+  ok('filtro: soltado junto al alojamiento encastra y la pantalla marca 100 %', CF.enAlojamiento === repuesto && repuesto.fijo && CF.carga === 100 && act.pasos[2].hecho && repuesto.posicion.distanceTo(CF.alojamiento.posicion) < 1e-6);
+  enManija();
+  ok('filtro: al cerrar la puerta el cartucho entra y la actividad se completa', !CF.abierta && repuesto.oculto && E('filtro') === 'COMPLETADA' && act.resultado?.completada, act.resultado);
   cerrarInforme();
 
   // =========================================================================================== FASE 9

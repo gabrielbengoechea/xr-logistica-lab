@@ -24,7 +24,7 @@ export const PUNTOS_EVA = {
  * @param {{inventario: import('./inventario.js').Inventario, inspecciones: import('./inspeccion.js').Inspecciones}} mundo
  */
 export function definirActividades(gestor, mundo) {
-  const { inventario, inspecciones, balance, descarga } = mundo;
+  const { inventario, inspecciones, balance, descarga, filtro } = mundo;
   const delCarguero = inventario.bultos.filter((b) => b.legible && b.ubicacion.startsWith('CR01')).sort((a, b) => a.codigo.localeCompare(b.codigo));
   const manifiesto = delCarguero.filter((_, i) => i % Math.max(1, Math.floor(delCarguero.length / 5)) === 0).slice(0, 5);
 
@@ -88,6 +88,32 @@ export function definirActividades(gestor, mundo) {
       } else a.error(`${d.codigo} es de ${d.ubicacion}, fuera del conteo de ${a.datos.estante}`);
     },
   });
+
+  if (filtro) {
+    gestor.registrar({
+      id: 'filtro', titulo: 'Cambio del filtro de CO₂', modulo: 'tacuarembo', concepto: 'Mantenimiento de soporte vital y repuestos',
+      instrucciones: 'El filtro de CO₂ del soporte vital está al 12 %. Abrí su puerta (mano libre en la manija y gatillo), sacá el filtro gastado, tomá uno de repuesto del rack TAC-B1, encastralo soltándolo en su lugar y cerrá la puerta.',
+      referencia: 150,
+      pasos: () => [
+        { id: 'abrir', texto: 'Abrí la puerta del filtro (gatillo en la manija)' },
+        { id: 'sacar', texto: 'Sacá el filtro gastado' },
+        { id: 'instalar', texto: 'Poné un filtro de repuesto del rack TAC-B1' },
+        { id: 'cerrar', texto: 'Cerrá la puerta' },
+      ],
+      alEvento(a, tipo, d) {
+        if (tipo === 'filtro_puerta' && d.abierta) a.completarPaso('abrir');
+        if (tipo === 'filtro_puerta' && !d.abierta) {
+          if (d.conFiltro && !d.gastado) a.completarPaso('cerrar');
+          else a.aviso(d.conFiltro ? 'La puerta quedó cerrada con el filtro gastado' : 'La puerta quedó cerrada sin filtro');
+        }
+        if (tipo === 'filtro_sacado' && d.gastado) a.completarPaso('sacar');
+        if (tipo === 'filtro_puesto') {
+          if (d.gastado) a.error('Ese es el filtro gastado: poné uno de repuesto del rack TAC-B1');
+          else a.completarPaso('instalar');
+        }
+      },
+    });
+  }
 
   if (descarga) {
     gestor.registrar({
