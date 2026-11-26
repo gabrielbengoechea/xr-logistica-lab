@@ -170,7 +170,7 @@ JS = r"""
   der.en(cabeza().add(V(0.3, 0.2, -1.1))); pasos(2);
   const sobreLaRecta = md.codo.clone().sub(md.hombro).normalize().dot(md.muneca.clone().sub(md.hombro).normalize());
   ok('cuerpo: con la mano más lejos que el brazo, el brazo se estira y no se despega', sobreLaRecta > 0.9999 && md.hombro.distanceTo(md.muneca) > 0.6, +sobreLaRecta.toFixed(5));
-  M.malla.getMatrixAt(63, mm); const torso = new T.Vector3().setFromMatrixPosition(mm);
+  M.torso.updateMatrixWorld(true); const torso = new T.Box3().setFromObject(M.torso).getCenter(new T.Vector3());   // torso torneado (malla propia)
   M.malla.getMatrixAt(63 + 5, mm); const pierna = new T.Vector3().setFromMatrixPosition(mm);
   ok('cuerpo: torso y piernas debajo de la cabeza', torso.y < cabeza().y - 0.3 && Math.hypot(torso.x - cabeza().x, torso.z - cabeza().z) < 0.1 && pierna.y < torso.y - 0.4, [+(torso.y - cabeza().y).toFixed(2), +(pierna.y - cabeza().y).toFixed(2)]);
   const c1 = new T.Color(), c2 = new T.Color(); M.malla.getColorAt(21 + 18, c1); M.malla.getColorAt(21 + 5, c2);

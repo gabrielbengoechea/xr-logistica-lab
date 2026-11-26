@@ -66,8 +66,10 @@ const MANOS_MAX = 3;                                                           /
 /** Torso, unidad de control del pecho, cadera, dos muslos, dos piernas y dos botas. */
 export const PIEZAS_CUERPO = 9;
 /** Rodamientos de aluminio del traje (anillos): dos por brazo (hombro y sobre el codo) y el de la cintura. */
-const AROS = MANOS_MAX * 2 + 1;
+const AROS = MANOS_MAX * 2 + 1 + 4;
 const ARO_CINTURA = MANOS_MAX * 2;
+/** Rodamientos de las piernas: sobre cada rodilla y en el tobillo, donde empieza la bota. */
+const AROS_PIERNA = ARO_CINTURA + 1;
 /** Medidas del cuerpo (metros), desde los ojos. */
 export const CUERPO = { hombroAbajo: 0.20, hombroAncho: 0.185, brazo: 0.30, antebrazo: 0.27, radioBrazo: 0.052, radioAntebrazo: 0.044 };
 const COLOR_TRAJE = 0xe9e9e4;
@@ -260,6 +262,7 @@ function crearPechoYParche() {
   const inclinacion = 0.55;
   sumar(new THREE.BoxGeometry(0.24, 0.10, 0.075), 0x9aa0a6, T(0, 0, 0));
   sumar(new THREE.BoxGeometry(0.25, 0.012, 0.085), 0x6e757d, T(0, 0.056, 0));                              // tapa
+  sumar(new THREE.BoxGeometry(0.15, 0.06, 0.08), 0x7b838d, T(0, -0.01, 0.075));                            // soporte contra el pecho
   // perillas de temperatura y de modo, válvula de purga (roja) y conectores de agua y oxígeno a los costados
   for (const [x, hex] of [[-0.09, 0x2b3038], [0.09, 0x2b3038], [0.0, 0xc8102e]]) sumar(new THREE.CylinderGeometry(0.012, 0.014, 0.016, 12), hex, T(x, 0.07, -0.028));
   for (const s of [-1, 1]) {
@@ -310,6 +313,56 @@ function crearPechoYParche() {
   return { pecho, parche };
 }
 
+/**
+ * Torso rígido del traje (fibra de vidrio), calzón y aro del cuello, torneados con un perfil y aplastados de adelante
+ * hacia atrás. Marco local: origen en los ojos, X a la derecha del cuerpo, Y arriba, -Z adelante.
+ *
+ * El torso cierra arriba, debajo del mentón, sin aro del cuello: el aro queda dentro del casco (que en primera persona
+ * no se dibuja), y a 20 cm de los ojos tapaba el pecho. Así, al mirar hacia abajo se ven el pecho y el módulo de
+ * control. Los hombros salen de una pieza transversal (el yugo) que llega hasta las mangas.
+ */
+function crearTorso() {
+  const tela = [], metal = [];
+  const color = new THREE.Color();
+  const sumar = (lista, g, hex, m = null) => {
+    const geo = g.index ? g.toNonIndexed() : g;
+    if (m) geo.applyMatrix4(m);
+    color.setHex(hex, THREE.SRGBColorSpace);
+    const n = geo.getAttribute('position').count, c = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) c.set([color.r, color.g, color.b], i * 3);
+    geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    if (geo.getAttribute('uv')) geo.deleteAttribute('uv');
+    lista.push(geo);
+  };
+  const PROFUNDO = 0.70;                                    // el torso es más ancho que profundo
+  const aplastar = new THREE.Matrix4().makeScale(1, 1, PROFUNDO);
+  const V2 = (r, y) => new THREE.Vector2(r, y);
+  // torso rígido, del aro del cuello a la cintura (radio, altura desde los ojos); el torno va de abajo hacia arriba
+  // para que las normales queden hacia afuera
+  const perfilTorso = [V2(0.0, -0.248), V2(0.09, -0.252), V2(0.14, -0.262), V2(0.178, -0.278), V2(0.200, -0.30), V2(0.212, -0.34), V2(0.212, -0.40), V2(0.200, -0.47), V2(0.184, -0.54), V2(0.172, -0.585)];
+  sumar(tela, new THREE.LatheGeometry(perfilTorso.reverse(), 28), 0xe9e9e4, aplastar);
+  // calzón (debajo del rodamiento de la cintura) hasta la cadera
+  const perfilCalzon = [V2(0.170, -0.595), V2(0.172, -0.64), V2(0.160, -0.69), V2(0.130, -0.73), V2(0.07, -0.755)];
+  sumar(tela, new THREE.LatheGeometry(perfilCalzon.reverse(), 24), 0xdfe0da, new THREE.Matrix4().makeScale(1, 1, 0.78));
+  // costuras horizontales del torso y franja de la cintura
+  for (const [r, y] of [[0.212, -0.37], [0.192, -0.50]]) sumar(tela, new THREE.TorusGeometry(r + 0.001, 0.0028, 4, 40).rotateX(Math.PI / 2), 0xb8bab4, new THREE.Matrix4().makeTranslation(0, y, 0).premultiply(aplastar));
+  // yugo de los hombros: une el torso con las mangas (los hombros del cuerpo están a 0,185 m del centro)
+  sumar(tela, new THREE.CapsuleGeometry(0.052, 0.26, 4, 12).rotateZ(Math.PI / 2), 0xe9e9e4, new THREE.Matrix4().makeScale(1, 0.8, 0.9).setPosition(0, -0.262, 0.045));
+  // anclajes del cable de seguridad a los costados de la cintura
+  for (const s of [-1, 1]) sumar(metal, new THREE.TorusGeometry(0.016, 0.004, 6, 14).rotateY(Math.PI / 2), 0x8c939b, new THREE.Matrix4().makeTranslation(s * 0.178, -0.62, -0.02));
+  const grupo = new THREE.Group();
+  grupo.name = 'Traje_Torso';
+  grupo.matrixAutoUpdate = false;
+  // las normales de cada pieza ya vienen suaves (y applyMatrix4 las transforma): no se recalculan
+  const gTela = mergeGeometries(tela, false);
+  const gMetal = mergeGeometries(metal, false);
+  grupo.add(new THREE.Mesh(gTela, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0 })));
+  grupo.add(new THREE.Mesh(gMetal, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.8 })));
+  for (const m of grupo.children) m.frustumCulled = false;
+  grupo.visible = false;
+  return grupo;
+}
+
 export class Manos {
   /**
    * @param {THREE.WebGLRenderer} renderer @param {THREE.Object3D} rig @param {THREE.Scene} escena
@@ -329,17 +382,37 @@ export class Manos {
     this._frente = new THREE.Vector3(0, 0, -1);
     this._material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.82, metalness: 0.0 });
     // rugosidad y metalicidad por pieza (atributo por instancia): la tela es mate, los rodamientos brillan
+    // Tercer valor del atributo (costuras de la tela): 0 sin costuras; 0,5 dos costuras; ±1 además el fuelle de la
+    // articulación (los pliegues de tela del codo y la rodilla) en el extremo +Z o -Z de la cápsula. Se calcula en
+    // las coordenadas de la cápsula unitaria (Z de -2,5 a 2,5): no hace falta textura ni UV.
     this._material.onBeforeCompile = (sh) => {
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 aRugMetal;\nvarying vec2 vRugMetal;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRugMetal = aRugMetal;');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vRugMetal;')
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 aRugMetal;\nvarying vec3 vRugMetal;\nvarying float vLargo;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRugMetal = aRugMetal;\nvLargo = position.z;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+varying vec3 vRugMetal;
+varying float vLargo;
+float banda(float z, float c, float a) { float w = max(fwidth(z), 1e-4); return 1.0 - smoothstep(a - w, a + w, abs(z - c)); }`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+        if (vRugMetal.z != 0.0) {
+          float costura = max(banda(vLargo, -0.7, 0.035), banda(vLargo, 0.7, 0.035));
+          diffuseColor.rgb *= 1.0 - 0.22 * costura;
+          if (abs(vRugMetal.z) > 0.75) {
+            // fuelle: pliegues cada 0,22 unidades entre 0,9 y 1,9 del extremo; el sombreado sigue el pliegue
+            float z = vLargo * sign(vRugMetal.z);
+            float dentro = smoothstep(0.85, 1.0, z) * (1.0 - smoothstep(1.8, 1.95, z));
+            float w = fwidth(z) * 4.0;
+            float pliegue = 0.5 + 0.5 * cos(z * 6.2831853 / 0.22);
+            pliegue = mix(pliegue, 0.5, clamp(w / 0.22, 0.0, 1.0));      // lejos, el pliegue se funde (sin titileo)
+            diffuseColor.rgb *= 1.0 - 0.20 * dentro * pliegue;
+          }
+        }`)
         .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vRugMetal.x;')
         .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vRugMetal.y;');
     };
     const capsula = new THREE.CapsuleGeometry(1, 3, 3, 8);
     capsula.rotateX(Math.PI / 2);                 // a lo largo de Z
     const total = MANOS_MAX * PIEZAS_POR_LADO + PIEZAS_CUERPO;
-    const rugMetal = new THREE.InstancedBufferAttribute(new Float32Array(total * 2), 2);
+    const rugMetal = new THREE.InstancedBufferAttribute(new Float32Array(total * 3), 3);
     capsula.setAttribute('aRugMetal', rugMetal);
     this.malla = new THREE.InstancedMesh(capsula, this._material, total);
     this.malla.name = 'Manos_y_Cuerpo';
@@ -353,13 +426,16 @@ export class Manos {
         const yema = i >= PIEZAS_PALMA.length && i < PIEZAS_POR_MANO && (i - PIEZAS_PALMA.length) % 3 === 2;
         const goma = i === 0 || i === 1 || yema, puno = i === PIEZAS_POR_MANO;
         this.malla.setColorAt(base + i, _color.set(goma ? COLOR_GOMA : puno ? COLOR_PUNO : COLOR_TRAJE));
-        rugMetal.setXY(base + i, ...MATERIAL_PIEZA[goma ? 'goma' : puno ? 'puno' : 'tela']);
+        // antebrazo (codo en -Z) y brazo (codo en +Z): fuelle del lado del codo
+        const costuras = i === PIEZAS_POR_MANO + 1 ? -1 : i === PIEZAS_POR_MANO + 2 ? 1 : 0;
+        rugMetal.setXYZ(base + i, ...MATERIAL_PIEZA[goma ? 'goma' : puno ? 'puno' : 'tela'], costuras);
       }
     }
     const cuerpo = MANOS_MAX * PIEZAS_POR_LADO;
-    const piezas = [['tela', COLOR_TRAJE], ['equipo', COLOR_EQUIPO], ['tela', COLOR_TRAJE], ['tela', COLOR_TRAJE], ['tela', COLOR_TRAJE],
-      ['tela', COLOR_TRAJE], ['tela', COLOR_TRAJE], ['bota', COLOR_BOTA], ['bota', COLOR_BOTA]];
-    piezas.forEach(([tipo, c], i) => { this.malla.setColorAt(cuerpo + i, _color.set(c)); rugMetal.setXY(cuerpo + i, ...MATERIAL_PIEZA[tipo]); });
+    // muslos con la rodilla en +Z y piernas con la rodilla en -Z (el fuelle va del lado de la rodilla)
+    const piezas = [['tela', COLOR_TRAJE, 0.5], ['equipo', COLOR_EQUIPO, 0], ['tela', COLOR_TRAJE, 0], ['tela', COLOR_TRAJE, 1], ['tela', COLOR_TRAJE, 1],
+      ['tela', COLOR_TRAJE, -1], ['tela', COLOR_TRAJE, -1], ['bota', COLOR_BOTA, 0], ['bota', COLOR_BOTA, 0]];
+    piezas.forEach(([tipo, c, costuras], i) => { this.malla.setColorAt(cuerpo + i, _color.set(c)); rugMetal.setXYZ(cuerpo + i, ...MATERIAL_PIEZA[tipo], costuras); });
     this.malla.instanceColor.needsUpdate = true;
     escena.add(this.malla);
     // rodamientos: anillos de aluminio en una malla instanciada aparte (una llamada de dibujo)
@@ -373,7 +449,8 @@ export class Manos {
     const { pecho, parche } = crearPechoYParche();
     this.pecho = pecho;
     this.parche = parche;
-    escena.add(pecho, parche);
+    this.torso = crearTorso();
+    escena.add(pecho, parche, this.torso);
 
     for (let i = 0; i < 2; i++) {
       const agarre = renderer.xr.getControllerGrip(i);
@@ -619,18 +696,27 @@ export class Manos {
   _cuerpo(ojos, arriba, frente, derecha, g) {
     const base = MANOS_MAX * PIEZAS_POR_LADO;
     if (!this.cuerpoVisible) {
-      if (this._cuerpoDibujado !== false) { for (let i = 0; i < PIEZAS_CUERPO; i++) this.malla.setMatrixAt(base + i, _cero); this.aros.setMatrixAt(ARO_CINTURA, _cero); this._cuerpoDibujado = false; }
+      if (this._cuerpoDibujado !== false) {
+        for (let i = 0; i < PIEZAS_CUERPO; i++) this.malla.setMatrixAt(base + i, _cero);
+        for (let i = ARO_CINTURA; i < AROS; i++) this.aros.setMatrixAt(i, _cero);
+        this._cuerpoDibujado = false;
+      }
       this.pecho.visible = false;
+      this.torso.visible = false;
       return;
     }
     this._cuerpoDibujado = true;
     const P = (out, abajo, adelante, alCostado) => out.copy(ojos).addScaledVector(arriba, -abajo).addScaledVector(frente, adelante).addScaledVector(derecha, alCostado);
-    // torso ovalado, del cuello a la cintura (más ancho que profundo)
-    this.malla.setMatrixAt(base, capsulaEntre(_c, P(_w, 0.26, -0.04, 0), P(_e, 0.56, -0.05, 0), 0.165 * g, 0.115 * g, derecha));
+    // torso rígido y calzón: malla torneada propia (ver crearTorso), en el marco del cuerpo con origen en los ojos
+    this.malla.setMatrixAt(base, _cero);
+    _z.copy(frente).negate();
+    this.torso.matrix.makeBasis(derecha, arriba, _z).multiply(_s.makeScale(g, 1, g)).setPosition(P(_w, 0, -0.045, 0));
+    this.torso.matrixWorldNeedsUpdate = true;
+    this.torso.visible = true;
     // unidad de control sobre el pecho: malla propia con pantalla, perillas y conectores (la cápsula queda apagada)
     this.malla.setMatrixAt(base + 1, _cero);
     _z.copy(frente).negate();
-    this.pecho.matrix.makeBasis(derecha, arriba, _z).setPosition(P(_w, 0.37, 0.075 * g + 0.075, 0));
+    this.pecho.matrix.makeBasis(derecha, arriba, _z).setPosition(P(_w, 0.385, 0.075 * g + 0.105, 0));
     this.pecho.matrixWorldNeedsUpdate = true;
     this.pecho.visible = true;
     // rodamiento de la cintura, entre el torso y la cadera
@@ -638,8 +724,8 @@ export class Manos {
     _y.crossVectors(arriba, derecha);
     _c.makeBasis(derecha, _y, arriba).multiply(_s.makeScale(0.168 * g, 0.12 * g, 0.16)).setPosition(P(_w, 0.59, -0.05, 0));
     this.aros.setMatrixAt(ARO_CINTURA, _c);
-    // cadera
-    this.malla.setMatrixAt(base + 2, capsulaEntre(_c, P(_w, 0.66, -0.07, -0.07), P(_e, 0.66, -0.07, 0.07), 0.105 * g, 0.10 * g, arriba));
+    // la cadera la cubre el calzón del torso
+    this.malla.setMatrixAt(base + 2, _cero);
     // piernas: en gravedad cero quedan flexionadas, con las rodillas adelante y los pies atrás
     for (let i = 0; i < 2; i++) {
       const lado = i ? 1 : -1;
@@ -648,6 +734,11 @@ export class Manos {
       this.malla.setMatrixAt(base + 3 + i, capsulaEntre(_c, cadera, rodilla, 0.078 * g));
       const tobillo = P(_w, 1.30, -0.16, lado * 0.11);
       this.malla.setMatrixAt(base + 5 + i, capsulaEntre(_c, rodilla, tobillo, 0.062 * g));
+      // rodamientos: sobre la rodilla (en el muslo) y en el tobillo, donde empieza la bota
+      _d.subVectors(rodilla, cadera).normalize();
+      this.aros.setMatrixAt(AROS_PIERNA + i * 2, aroEn(_c, _v.copy(rodilla).addScaledVector(_d, -0.12), _d, 0.079 * g));
+      _d.subVectors(tobillo, rodilla).normalize();
+      this.aros.setMatrixAt(AROS_PIERNA + i * 2 + 1, aroEn(_c, _v.copy(tobillo).addScaledVector(_d, -0.035), _d, 0.058 * g));
       this.malla.setMatrixAt(base + 7 + i, capsulaEntre(_c, tobillo, P(_e, 1.34, -0.02, lado * 0.11), 0.052 * g, 0.045 * g, derecha));
     }
   }
@@ -656,6 +747,7 @@ export class Manos {
   ocultarParaTercera(ocultar) {
     this.malla.visible = !ocultar;
     this.aros.visible = !ocultar;
+    if (ocultar) { this._torsoAntes = this.torso.visible; this.torso.visible = false; } else this.torso.visible = this._torsoAntes ?? this.torso.visible;
     if (ocultar) { this._pechoAntes = this.pecho.visible; this._parcheAntes = this.parche.visible; this.pecho.visible = false; this.parche.visible = false; } else { this.pecho.visible = this._pechoAntes ?? this.pecho.visible; this.parche.visible = this._parcheAntes ?? this.parche.visible; }
     if (!this.guantes) return;
     for (const g of this.guantes) {
