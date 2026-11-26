@@ -40,10 +40,11 @@ export function crearEntorno(renderer) {
  * @param {{juntas?: number, sol?: THREE.Vector3|null, colorSol?: THREE.Color}} o
  *   juntas: intensidad de las juntas de panel (0 = sin juntas). sol: dirección hacia el sol en el mundo.
  */
-export function conDetalle(material, { juntas = 0, sol = null, colorSol = new THREE.Color(1, 0.95, 0.85) } = {}) {
+export function conDetalle(material, { juntas = 0, sol = null, colorSol = new THREE.Color(1, 0.95, 0.85), interior = false } = {}) {
   const m = material.clone();
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uJuntas = { value: juntas };
+    shader.uniforms.uInterior = { value: interior ? 1 : 0 };
     shader.uniforms.uSol = { value: sol ? sol.clone() : new THREE.Vector3(0, 1, 0) };
     shader.uniforms.uSolColor = { value: sol ? colorSol : new THREE.Color(0, 0, 0) };
     shader.vertexShader = shader.vertexShader
@@ -53,6 +54,7 @@ export function conDetalle(material, { juntas = 0, sol = null, colorSol = new TH
       .replace('#include <common>', `#include <common>
 varying vec3 vArtigasMundo;
 uniform float uJuntas;
+uniform float uInterior;
 uniform vec3 uSol;
 uniform vec3 uSolColor;
 float artigasJunta(vec3 wp, vec3 n) {
@@ -69,11 +71,21 @@ float artigasJ = uJuntas > 0.0 ? artigasJunta(vArtigasMundo, artigasN) * uJuntas
 // cepillado: vetas finas a lo largo del eje de la estación, solo en la rugosidad
 float artigasVeta = sin(vArtigasMundo.x * 310.0 + sin(vArtigasMundo.y * 23.0) * 2.0) * sin(vArtigasMundo.y * 270.0);
 roughnessFactor = clamp(roughnessFactor + artigasJ * 0.25 + artigasVeta * 0.035, 0.04, 1.0);
-diffuseColor.rgb *= 1.0 - artigasJ * 0.45;`)
+diffuseColor.rgb *= 1.0 - artigasJ * 0.45;
+// Iluminación funcional del interior (sin luces ni texturas): la única luz de escena es pareja y los módulos
+// se veían planos. Los módulos son cilindros alrededor del eje Z (radio interior 1,2 m):
+//  - el fondo de los nichos de los racks (más allá de 1,24 m del eje) recibe menos luz: oclusión aproximada;
+//  - de arriba (donde están las tiras LED) hacia el piso, la luz baja un poco.
+if (uInterior > 0.5) {
+  float artigasR = length(vArtigasMundo.xy);
+  float artigasFondo = smoothstep(1.24, 1.42, artigasR) * (1.0 - smoothstep(1.55, 1.7, artigasR));
+  float artigasAltura = mix(0.82, 1.04, smoothstep(-1.15, 0.95, vArtigasMundo.y));
+  diffuseColor.rgb *= (1.0 - 0.50 * artigasFondo) * artigasAltura;
+}`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
 totalEmissiveRadiance += diffuseColor.rgb * uSolColor * max(dot(artigasN, uSol), 0.0);`);
   };
-  m.customProgramCacheKey = () => `artigas-detalle-${juntas > 0 ? 1 : 0}-${sol ? 1 : 0}`;
+  m.customProgramCacheKey = () => `artigas-detalle-${juntas > 0 ? 1 : 0}-${sol ? 1 : 0}-${interior ? 1 : 0}`;
   return m;
 }
 
@@ -144,9 +156,9 @@ export function crearBiblioteca(renderer, entorno, sol, colorSol = new THREE.Col
     } else if (nombre.includes('Paleta')) {
       original.envMap = entorno;
       original.envMapIntensity = 0.9;
-      if (uso === 'estructura') m = conDetalle(original, { juntas: 1 });
+      if (uso === 'estructura') m = conDetalle(original, { juntas: 1, interior: true });
       else if (uso === 'cupula') m = conDetalle(original, { sol, colorSol });
-      else m = original;
+      else m = conDetalle(original, { interior: true });
       m.name = `${nombre}_${uso}`;
     } else {
       // carteles y placas de vinilo
