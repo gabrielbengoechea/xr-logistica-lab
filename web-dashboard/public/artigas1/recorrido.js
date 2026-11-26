@@ -1281,7 +1281,12 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     camera.getWorldDirection(mirada);
     camaraExterna.position.copy(cabeza).addScaledVector(mirada, -2.6).addScaledVector(ARRIBA, 0.9);
     camaraExterna.lookAt(cabeza);
+    // en la caminata se ve el traje completo (js/exterior.js): los brazos y el cuerpo de primera persona
+    // quedarían repetidos, así que se ocultan solo para esta vista
+    const conTraje = eva.afuera;
+    if (conTraje) manos.ocultarParaTercera(true);
     renderer.render(scene, camaraExterna);
+    if (conTraje) manos.ocultarParaTercera(false);
   } else {
     renderer.render(scene, camera);
   }
