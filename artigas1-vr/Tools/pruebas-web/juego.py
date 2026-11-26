@@ -25,6 +25,7 @@ JS = r"""
   A.renderer.setAnimationLoop(null);                  // las pruebas manejan el tiempo
   A.sonido.tocar = () => {};
   const R = [];
+  window.__pruebas = R;                               // si una prueba revienta, se ve hasta dónde llegó
   const ok = (nombre, pasa, dato = '') => R.push({ nombre, pasa: !!pasa, dato });
   const fase = (nombre) => R.push({ fase: nombre });
   const V = (x, y, z) => new T.Vector3(x, y, z);
@@ -493,7 +494,8 @@ JS = r"""
   ok('velocidad máxima ajustable', vRapida > vLenta * 2, [+vLenta.toFixed(2), +vRapida.toFixed(2)]);
   A.ajustes.velocidad = 1;
   // las paredes siguen siendo sólidas con el stick
-  ubicar(V(0, 0.5, -6.0)); izq.stick(1, 0); seg(5); izq.stick(0, 0);
+  // (en z = -5,3: más atrás, las manos chocarían contra la consola de recepción y apretarían INICIAR)
+  ubicar(V(0, 0.5, -5.3)); izq.stick(1, 0); seg(5); izq.stick(0, 0);
   ok('con el stick tampoco se atraviesan las paredes', cabeza().x <= 1.2 - L.p.radioCabeza + 0.01, +cabeza().x.toFixed(3));
   // impulso desde una baranda
   const bar = A.estacion.barandas.segmentos.find((s) => s.a.z < -0.5 && s.b.z > -4.5 || s.b.z < -0.5 && s.a.z > -4.5);
@@ -613,8 +615,8 @@ JS = r"""
     h.grip(0); pasos(2);
     return c.datos.hueco === hueco ? '' : 'no quedó en el hueco';
   };
-  ok('gestor: seis actividades registradas; la caminata espacial arranca bloqueada y el resto disponible', G.lista().length === 6 && E('eva') === 'BLOQUEADA' && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'balance'].every((x) => E(x) === 'DISPONIBLE'), G.lista().map((a) => `${a.id}:${a.estado}`));
-  ok('acceso: hay un terminal físico por actividad (siete paneles; el del balance es su propio panel)', A.terminales.length === 7 && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'eva', 'balance'].every((x) => terminal(x)), A.terminales.map((t) => t.nombre));
+  ok('gestor: siete actividades registradas; la caminata espacial arranca bloqueada y el resto disponible', G.lista().length === 7 && E('eva') === 'BLOQUEADA' && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'balance', 'descarga'].every((x) => E(x) === 'DISPONIBLE'), G.lista().map((a) => `${a.id}:${a.estado}`));
+  ok('acceso: hay un terminal físico por actividad (ocho paneles; el balance y la descarga usan las pantallas del kit)', A.terminales.length === 8 && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'eva', 'balance', 'descarga'].every((x) => terminal(x)), A.terminales.map((t) => t.nombre));
 
   // ---- RECEPCIÓN: se inicia desde el terminal de Colonia
   let term = terminal('recepcion');
@@ -996,6 +998,60 @@ JS = r"""
   ok('balance: CONFIRMAR la completa, con su resumen', E('balance') === 'COMPLETADA' && act.resultado?.completada && A.panelInforme.malla.visible, act.resultado);
   cerrarInforme();
 
+  // =========================================================================================== FASE 11
+  fase('FASE 11 · Descarga del carguero (minijuego A)');
+  const DC = A.descarga(), PD = A.panelesDescarga();
+  const escC = A.estacion.escotillas.find((e) => e.malla.name === 'C_Escotilla_HaciaCarguero');
+  term = terminal('descarga');
+  ok('descarga: el terminal es la consola de recepción de Colonia (pantalla del manifiesto)', term === PD.manifiesto);
+  ubicar(frenteA(term, 0.8)); der.en(frenteA(term, 0.45).add(V(0.1, -0.1, 0))); pasos(2);
+  ok('descarga: se inicia desde la consola de recepción', apretar(der, term, 'iniciar') && E('descarga') === 'ACTIVA');
+  cerrarInforme(); pasos(2);
+  act = G.obtener('descarga');
+  ok('descarga: siete pasos (presión, abrir, tres lecturas, cuarentena y faltante)', act.pasos.length === 7, act.pasos.map((p) => p.id));
+  ok('descarga: la carga del turno espera en la bodega, sin meterse en la estructura', DC.carga.length === 4 && DC.carga.every((f) => f.posicion.z < -9 && f.fijo && A.estacion.colisiones.puntoMasCercano(f.posicion, 0.05, new T.Vector3()) === Infinity));
+  // la escotilla del carguero queda trabada aunque uno se acerque
+  ubicar(V(0.1, 0.1, -7.6)); seg(1.5);
+  ok('descarga: la escotilla del carguero queda trabada hasta igualar la presión', escC.bloqueada && escC.avance === 0 && escC.colision.activo);
+  ubicar(frenteA(PD.presion, 0.5)); der.en(frenteA(PD.presion, 0.3).add(V(0.05, -0.02, 0))); pasos(2);
+  ok('descarga: ABRIR no anda antes de igualar', !apretar(der, PD.presion, 'abrir') && !DC.abierta);
+  ok('descarga: IGUALAR baja la diferencia de presión hasta cero', apretar(der, PD.presion, 'igualar') && (seg(3.5), DC.igualada) && act.pasos[0].hecho, +DC.presion.toFixed(2));
+  ok('descarga: ABRIR destraba la escotilla y se abre al acercarse', apretar(der, PD.presion, 'abrir') && !escC.bloqueada && act.pasos[1].hecho && (ubicar(V(0.1, 0.1, -8.0)), seg(1.5), escC.avance === 1), escC.avance);
+  // informar el faltante antes de leer todo es un error
+  ubicar(frenteA(term, 0.8)); der.en(frenteA(term, 0.45).add(V(0.1, -0.1, 0))); pasos(2);
+  let errD = act.errores;
+  apretar(der, term, 'faltante');
+  ok('descarga: informar el faltante antes de pasar toda la carga es un error', act.errores === errD + 1 && !act.pasos[6].hecho, A.aviso.texto);
+  // cada contenedor de la bodega a Colonia, por el aro del portal
+  const pasarPorPortal = (f) => {
+    ubicar(V(0.05, 0.05, -9.0)); pasos(2);
+    if (!tomar(izq, f)) return `no se tomó ${f.datos.codigo}`;
+    izq.en(V(0.15, -0.1, -8.75)); pasos(2);
+    izq.en(V(0.15, -0.1, -8.1)); pasos(2);
+    return '';
+  };
+  const fallasD = [];
+  for (const f of DC.carga) { const r = pasarPorPortal(f); if (r) fallasD.push(r); if (f.datos.codigo !== 'CNT-0004') soltar(izq); }
+  const sobrante = DC.carga.find((f) => f.datos.codigo === 'CNT-0004');
+  ok('descarga: el portal RFID lee los cuatro al pasar y cumple los tres del manifiesto', fallasD.length === 0 && DC.leidos.length === 4 && act.pasos.slice(2, 5).every((p) => p.hecho), [fallasD, DC.leidos]);
+  ok('descarga: el no manifestado se avisa (no es error) y la pantalla del portal lo marca', DC.ultima && DC.ultima.codigo === 'CNT-0004' && !DC.ultima.manifestado && act.errores === errD + 1);
+  // un contenedor del manifiesto en la red de cuarentena es un error
+  const cuarentena = V(-0.95, -0.36, -6.41);
+  const delManifiesto = DC.carga[0];
+  soltar(izq);
+  ubicar(V(-0.3, 0.0, -6.4)); pasos(2);
+  tomar(izq, delManifiesto); izq.en(cuarentena.clone()); pasos(2); soltar(izq);
+  errD = act.errores;
+  ok('descarga: un contenedor del manifiesto en la red de cuarentena es un error', delManifiesto.datos.cuarentena && act.errores === errD && /cuarentena/.test(A.aviso.texto) && !act.pasos[5].hecho, A.aviso.texto);
+  tomar(izq, delManifiesto); izq.en(V(-0.2, 0.3, -6.0)); pasos(2); soltar(izq);
+  ok('descarga: al sacarlo de la red deja de estar en cuarentena', !delManifiesto.datos.cuarentena);
+  tomar(izq, sobrante); izq.en(cuarentena.clone()); pasos(2); soltar(izq);
+  ok('descarga: el no manifestado en la red de cuarentena cumple su paso y queda retenido', sobrante.datos.cuarentena && sobrante.fijo && act.pasos[5].hecho && (seg(1), DC.dentroDeCuarentena(sobrante.posicion)));
+  ubicar(frenteA(term, 0.8)); der.en(frenteA(term, 0.45).add(V(0.1, -0.1, 0))); pasos(2);
+  apretar(der, term, 'faltante');
+  ok('descarga: con todo leído, INFORMAR FALTANTE la completa y la escotilla vuelve a ser libre', E('descarga') === 'COMPLETADA' && act.resultado?.completada && DC.faltanteInformado && !escC.bloqueada, act.resultado);
+  cerrarInforme();
+
   // =========================================================================================== FASE 9
   fase('FASE 9 · Telemetría para el panel docente');
   const TL = A.telemetria;
@@ -1037,6 +1093,8 @@ async def main():
             res = await pg.evaluate(JS)
         except Exception as e:  # noqa: BLE001
             print("ERROR EN LAS PRUEBAS:", str(e)[:3000])
+            hechas = await pg.evaluate("(window.__pruebas || []).slice(-6)")
+            print("Últimas antes del error:", json.dumps(hechas, ensure_ascii=False)[:1500])
             await b.close()
             raise SystemExit(2)
         # quien ya había jugado la versión anterior (giro suave guardado en el navegador) pasa al modo de confort

@@ -3,6 +3,7 @@
 // Acá solo están las reglas; el reloj, los estados y el puntaje los lleva js/actividades.js.
 import * as THREE from 'three';
 import { NOMBRE_HERRAMIENTA } from './inspeccion.js';
+import { FALTANTE, MANIFIESTO } from './descarga.js';
 
 /** Puntos de trabajo del taller (interior). Los del exterior están en js/exterior.js. */
 export const PUNTOS_TALLER = {
@@ -23,7 +24,7 @@ export const PUNTOS_EVA = {
  * @param {{inventario: import('./inventario.js').Inventario, inspecciones: import('./inspeccion.js').Inspecciones}} mundo
  */
 export function definirActividades(gestor, mundo) {
-  const { inventario, inspecciones, balance } = mundo;
+  const { inventario, inspecciones, balance, descarga } = mundo;
   const delCarguero = inventario.bultos.filter((b) => b.legible && b.ubicacion.startsWith('CR01')).sort((a, b) => a.codigo.localeCompare(b.codigo));
   const manifiesto = delCarguero.filter((_, i) => i % Math.max(1, Math.floor(delCarguero.length / 5)) === 0).slice(0, 5);
 
@@ -54,7 +55,7 @@ export function definirActividades(gestor, mundo) {
     pasos: (a) => {
       // los tres más cercanos al almacén que todavía no están en su lugar
       const centro = new THREE.Vector3(0, 0, -2.1);
-      const elegidos = inventario.contenedores.filter((f) => !f.datos.lastre && (!f.datos.hueco || f.datos.hueco.codigo !== f.datos.destino))
+      const elegidos = inventario.contenedores.filter((f) => !f.datos.lastre && !f.datos.cuarentena && (!f.datos.hueco || f.datos.hueco.codigo !== f.datos.destino))
         .sort((x, y) => x.posicion.distanceToSquared(centro) - y.posicion.distanceToSquared(centro)).slice(0, 3);
       a.datos.codigos = elegidos.map((f) => f.datos.codigo);
       return elegidos.map((f) => ({ id: f.datos.codigo, texto: `Llevá ${f.datos.codigo} a ${f.datos.destino} y amarralo` }));
@@ -87,6 +88,37 @@ export function definirActividades(gestor, mundo) {
       } else a.error(`${d.codigo} es de ${d.ubicacion}, fuera del conteo de ${a.datos.estante}`);
     },
   });
+
+  if (descarga) {
+    gestor.registrar({
+      id: 'descarga', titulo: 'Descarga del carguero', modulo: 'colonia', concepto: 'Recepción con RFID, discrepancias y cuarentena',
+      instrucciones: `Llegó el Charrúa con su manifiesto. En el panel de presión junto a la escotilla del carguero, IGUALAR y después ABRIR. Pasá cada contenedor de la bodega a Colonia por el aro del portal RFID: se lee solo. El que no está en el manifiesto va a la red de cuarentena (babor de Colonia). Cuando todo lo que llegó esté leído, INFORMAR FALTANTE en la consola de recepción.`,
+      referencia: 300,
+      pasos: () => [
+        { id: 'igualar', texto: 'Igualá la presión de la bodega (panel de presión)' },
+        { id: 'abrir', texto: 'Abrí la escotilla del carguero' },
+        ...MANIFIESTO.filter((c) => c !== FALTANTE).map((c) => ({ id: `rfid:${c}`, texto: `Pasá ${c} por el portal RFID` })),
+        { id: 'cuarentena', texto: 'Dejá el contenedor no manifestado en la red de cuarentena' },
+        { id: 'faltante', texto: 'Informá el faltante en la consola de recepción' },
+      ],
+      alEvento(a, tipo, d) {
+        if (tipo === 'presion_igualada') a.completarPaso('igualar');
+        if (tipo === 'escotilla_abierta') a.completarPaso('abrir');
+        if (tipo === 'rfid') {
+          if (d.manifestado) a.completarPaso(`rfid:${d.codigo}`);
+          else a.aviso(`${d.codigo} no está en el manifiesto: llevalo a la red de cuarentena`);
+        }
+        if (tipo === 'cuarentena') {
+          if (d.manifestado) a.error(`${d.codigo} está en el manifiesto: no va a cuarentena`);
+          else a.completarPaso('cuarentena');
+        }
+        if (tipo === 'faltante') {
+          if (!d.todoLeido) a.error('Antes de informar un faltante, pasá toda la carga por el portal');
+          else a.completarPaso('faltante');
+        }
+      },
+    });
+  }
 
   if (balance) {
     gestor.registrar({
