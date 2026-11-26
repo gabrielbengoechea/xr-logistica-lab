@@ -253,7 +253,7 @@ JS = r"""
 
   // ---- contenedores
   const cont = I.contenedores[0], destino = I.huecos.find((h) => h.codigo === cont.datos.destino);
-  ok('contenedores: cada uno tiene código y hueco de destino libre', I.contenedores.length >= 3 && I.contenedores.every((c) => c.datos.codigo && I.huecos.some((h) => h.codigo === c.datos.destino && !h.ocupado)), I.contenedores.map((c) => `${c.datos.codigo}→${c.datos.destino}`));
+  ok('contenedores: cada uno tiene código y hueco de destino libre (los tanques de lastre van en cualquiera)', I.contenedores.length >= 3 && I.contenedores.filter((c) => !c.datos.lastre).every((c) => c.datos.codigo && I.huecos.some((h) => h.codigo === c.datos.destino && !h.ocupado)), I.contenedores.map((c) => `${c.datos.codigo}→${c.datos.destino}`));
   ubicar(cont.posicion.clone().add(V(0, 0.1, 0.5)));
   izq.en(cont.posicion.clone().add(V(0, 0, cont.radio * 0.5))); pasos(2);
   ok('contenedores: se toman con el grip (izquierdo)', (() => { izq.grip(1); pasos(2); return izq.mano.sostiene === cont; })());
@@ -613,8 +613,8 @@ JS = r"""
     h.grip(0); pasos(2);
     return c.datos.hueco === hueco ? '' : 'no quedó en el hueco';
   };
-  ok('gestor: cinco actividades registradas; la caminata espacial arranca bloqueada y el resto disponible', G.lista().length === 5 && E('eva') === 'BLOQUEADA' && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento'].every((x) => E(x) === 'DISPONIBLE'), G.lista().map((a) => `${a.id}:${a.estado}`));
-  ok('acceso: hay un terminal físico por actividad (seis paneles)', A.terminales.length === 6 && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'eva'].every((x) => terminal(x)), A.terminales.map((t) => t.nombre));
+  ok('gestor: seis actividades registradas; la caminata espacial arranca bloqueada y el resto disponible', G.lista().length === 6 && E('eva') === 'BLOQUEADA' && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'balance'].every((x) => E(x) === 'DISPONIBLE'), G.lista().map((a) => `${a.id}:${a.estado}`));
+  ok('acceso: hay un terminal físico por actividad (siete paneles; el del balance es su propio panel)', A.terminales.length === 7 && ['recepcion', 'almacenamiento', 'inventario', 'mantenimiento', 'eva', 'balance'].every((x) => terminal(x)), A.terminales.map((t) => t.nombre));
 
   // ---- RECEPCIÓN: se inicia desde el terminal de Colonia
   let term = terminal('recepcion');
@@ -920,9 +920,102 @@ JS = r"""
   const delante = A.paneles.apuntar(origenRayo, dirRayo, new T.Vector3());
   tPrueba.position.copy(guardado.p); tPrueba.rotation.y = guardado.r; tPrueba.updateMatrixWorld(true);
   ok('rayo: no aprieta un terminal del otro lado de un mamparo, sí uno del mismo lado', (!tras || tras.panel !== A.terminales[1]) && delante && delante.panel === A.terminales[1], [tras && tras.panel.nombre, delante && delante.panel.nombre]);
+  A.portales().activo = false; pasos(1, 0);           // todos visibles: acá se prueba el rayo, no los portales
   ok('rayo: los terminales de siempre se siguen apretando (están sobre equipos)', A.terminales.every((t) => { t.malla.updateWorldMatrix(true, false); const c = t.malla.getWorldPosition(new T.Vector3()); const n = V(0, 0, 1).transformDirection(t.malla.matrixWorld); const v = A.paneles.apuntar(c.clone().addScaledVector(n, 0.6), n.clone().negate(), new T.Vector3()); return v && v.panel === t; }));
+  A.portales().activo = true; pasos(1, 0);
   A.rig.quaternion.identity();
-  return { R };
+
+  // =========================================================================================== FASE 8
+  fase('FASE 8 · Rendimiento: lotes de objetos sueltos y visibilidad por módulos');
+  const LF = A.lotes(), PV = A.portales();
+  ok('lotes: los objetos sueltos y las herramientas se dibujan en dos lotes (uno por material)', LF.lotes.length === 2 && LF.agrupados >= 30, [LF.lotes.length, LF.agrupados]);
+  // un objeto del lote sigue a su malla: se toma, se mueve y el lote lo dibuja donde está
+  const fl = F.objetos.find((f) => f.dibujoEnLote && f.datos && f.datos.herramienta && !f.mano);
+  const entrada = LF.lotes.flatMap((l) => l.entradas.map((e) => ({ ...e, lote: l.lote }))).find((e) => e.f === fl);
+  ubicar(fl.posicion.clone().add(V(-0.4, 0.1, 0.2))); tomar(der, fl); seg(0.3);
+  der.en(der.mano.posicion.clone().add(V(0.05, 0.08, -0.06))); pasos(1);
+  const mLote = new T.Matrix4(); entrada.lote.getMatrixAt(entrada.id, mLote);
+  ok('lotes: el lote dibuja la herramienta donde la lleva la mano, en el mismo cuadro', new T.Vector3().setFromMatrixPosition(mLote).distanceTo(fl.posicion) < 1e-5 && fl.malla.material.visible === false && entrada.lote.getVisibleAt(entrada.id));
+  soltar(der); A.acciones.reunirHerramientas(); pasos(2);
+  // portales: con las escotillas cerradas no se dibuja el resto de la estación, y la imagen es la misma
+  A.renderer.xr.isPresenting = false;
+  const W8 = 320, H8 = 180; A.renderer.setSize(W8, H8, false); A.camera.aspect = W8 / H8; A.camera.updateProjectionMatrix();
+  const gl = A.renderer.getContext();
+  const leer = () => { const b = new Uint8Array(W8 * H8 * 4); gl.readPixels(0, 0, W8, H8, gl.RGBA, gl.UNSIGNED_BYTE, b); return b; };
+  const difPortales = [], llamadasPortal = {};
+  for (const id of ['tacuarembo', 'nodo', 'cupula', 'rivera', 'colonia', 'carguero']) for (const yaw of [0, Math.PI]) {
+    A.ir(id); A.rig.quaternion.setFromAxisAngle(V(0, 1, 0), yaw); A.camera.rotation.set(0, 0, 0); pasos(4, DT);
+    PV.activo = true; pasos(1, 0); A.renderer.render(A.scene, A.camera); const a = leer(); const n = A.renderer.info.render.calls;
+    PV.activo = false; pasos(1, 0); A.renderer.render(A.scene, A.camera); const b = leer(); const nTodo = A.renderer.info.render.calls; PV.activo = true;
+    let dif = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30) dif++;
+    if (dif > 3) difPortales.push(`${id} ${yaw ? 'atrás' : 'adelante'}: ${dif} px`);
+    llamadasPortal[`${id}${yaw ? '_atras' : ''}`] = `${nTodo}→${n}`;
+  }
+  pasos(1, 0);
+  ok('portales: lo que se deja de dibujar detrás de las escotillas cerradas no cambia la imagen (12 vistas)', difPortales.length === 0, difPortales);
+  const tac = llamadasPortal.tacuarembo.split('→').map(Number);
+  ok('portales: el taller de Tacuarembó baja a menos de 40 llamadas de dibujo', tac[1] < 40 && tac[1] < tac[0], llamadasPortal);
+  A.ir('rivera'); pasos(3);
+  const cieloRivera = A.orbital.grupo.visible;
+  A.ir('cupula'); pasos(3);
+  ok('portales: la Tierra y el cielo se dibujan solo si se ven (en la Cúpula sí, en Rivera no)', !cieloRivera && A.orbital.grupo.visible);
+  A.renderer.xr.isPresenting = true; A.renderer.setSize(640, 360, false); A.camera.aspect = 640 / 360; A.camera.updateProjectionMatrix();
+
+  // =========================================================================================== FASE 10
+  fase('FASE 10 · Balance de masas (minijuego B)');
+  const B = A.balance(), PB = A.panelBalance();
+  const tanques = B.tanques;
+  ok('balance: los tres tanques esperan ocultos hasta que empieza la actividad', tanques.length === 3 && tanques.every((f) => f.oculto && !f.malla.visible));
+  term = terminal('balance');
+  ubicar(frenteA(term, 0.9)); der.en(frenteA(term, 0.5).add(V(0.1, -0.1, 0))); pasos(2);
+  ok('balance: el terminal es el panel de balance del Nodo y se inicia desde ahí', term === PB && apretar(der, term, 'iniciar') && E('balance') === 'ACTIVA');
+  cerrarInforme(); pasos(2);
+  act = G.obtener('balance');
+  ok('balance: cuatro pasos (tres tanques y confirmar); la carga arranca corrida fuera de la tolerancia', act.pasos.length === 4 && !B.dentro && B.tolerancia >= 0.03 && B.mejor.desvio < B.tolerancia, [+(B.desvio * 100).toFixed(1), +(B.tolerancia * 100).toFixed(1), +(B.mejor.desvio * 100).toFixed(1)]);
+  ok('balance: los tanques aparecen junto a la escotilla, sin meterse en la estructura', tanques.every((f) => !f.oculto && A.estacion.colisiones.puntoMasCercano(f.posicion, 0.05, new T.Vector3()) === Infinity));
+  // todos del mismo lado (estribor): queda fuera de la tolerancia
+  const estribor = B.huecosLibres().filter((h) => /^RIV-E/.test(h.codigo)).slice(0, 3);
+  const fallasB = [];
+  tanques.forEach((c, i) => { const r = colocar(izq, c, estribor[i]); if (r) fallasB.push(`${c.datos.codigo}: ${r}`); if (!amarrar(izq, c)) fallasB.push(`${c.datos.codigo}: sin amarrar`); });
+  ok('balance: los tres tanques se ubican y se amarran (cada uno cumple su paso)', fallasB.length === 0 && act.hechos === 3, fallasB);
+  ubicar(frenteA(PB, 0.8)); der.en(frenteA(PB, 0.45).add(V(0.1, -0.1, 0))); pasos(2);
+  const errAntes = act.errores;
+  apretar(der, PB, 'confirmar');
+  ok('balance: con los tres del mismo lado, CONFIRMAR da error de tolerancia', act.errores === errAntes + 1 && E('balance') === 'ACTIVA' && /tolerancia/.test(A.aviso.texto), A.aviso.texto);
+  // se reubican según la mejor distribución
+  for (const f of tanques) { I.retirar(f); A.amarres.quitar(f); F.guardar(f); }
+  const plan = B.mejor.huecos.map((c) => I.huecos.find((h) => h.codigo === c));
+  tanques.forEach((c, i) => { const r = colocar(izq, c, plan[i]); if (r) fallasB.push(`${c.datos.codigo}: ${r}`); amarrar(izq, c); });
+  B.medir();
+  ok('balance: redistribuidos, el centro de masa entra en el círculo', fallasB.length === 0 && B.dentro, [+(B.desvio * 100).toFixed(1), fallasB]);
+  ubicar(frenteA(PB, 0.8)); der.en(frenteA(PB, 0.45).add(V(0.1, -0.1, 0))); pasos(2);
+  apretar(der, PB, 'confirmar');
+  ok('balance: CONFIRMAR la completa, con su resumen', E('balance') === 'COMPLETADA' && act.resultado?.completada && A.panelInforme.malla.visible, act.resultado);
+  cerrarInforme();
+
+  // =========================================================================================== FASE 9
+  fase('FASE 9 · Telemetría para el panel docente');
+  const TL = A.telemetria;
+  const tiposTL = new Set(TL.eventos.map((e) => e.type));
+  const esperados = ['session_start', 'activity_start', 'scan', 'grab', 'release', 'snap_ok', 'snap_fail', 'strap', 'inspect', 'hint', 'activity_end'];
+  ok('telemetría: lo jugado quedó registrado (escaneos, agarres, huecos, amarres, mantenimiento, pistas y actividades)', esperados.every((t) => tiposTL.has(t)), esperados.filter((t) => !tiposTL.has(t)));
+  ok('telemetría: los eventos están en orden de tiempo', TL.eventos.every((e, i) => i === 0 || e.t >= TL.eventos[i - 1].t));
+  const fins = TL.eventos.filter((e) => e.type === 'activity_end').map((e) => `${e.part}: ${e.detail}`);
+  ok('telemetría: cada actividad terminada manda su resultado', fins.some((x) => /almacenamiento: completada/.test(x)) && fins.some((x) => /mantenimiento: completada/.test(x)), fins);
+  const enviadas = [];
+  const fetchOriginal = window.fetch;
+  window.fetch = (url, op) => { enviadas.push({ url: String(url), cuerpo: JSON.parse(op.body), clave: op.headers['X-API-Key'] || '' }); return Promise.resolve(new Response('{}', { status: 201 })); };
+  TL.config = { ...TL.config, backend: 'http://aula.local:8000', clave: 'secreta' };
+  TL.registrar('hint', 'prueba', null, 'evento en vivo');
+  TL.enviar(true);
+  window.fetch = fetchOriginal;
+  TL.config = { ...TL.config, backend: null };
+  const sesion = enviadas.find((x) => x.url.endsWith('/api/v1/telemetry/session'));
+  const vivo = enviadas.find((x) => x.url.endsWith('/api/v1/telemetry/event'));
+  ok('telemetría: manda el evento en vivo y la sesión al backend configurado, con la clave', !!sesion && !!vivo && sesion.clave === 'secreta' && vivo.cuerpo.event.type === 'hint', enviadas.map((x) => x.url));
+  const inf = sesion && sesion.cuerpo;
+  ok('telemetría: la sesión cuenta los pasos de las actividades como piezas y termina con session_end', inf && inf.parts_total > 0 && inf.parts_placed <= inf.parts_total && inf.parts_placed > 0 && inf.events[inf.events.length - 1].type === 'session_end' && inf.scenario === 'artigas1-web', inf && [inf.parts_placed, inf.parts_total, inf.assembly_errors, inf.hints_used]);
+  return { R, informeTelemetria: inf };
 }
 """
 
@@ -960,6 +1053,19 @@ async def main():
         aj = await pg2.evaluate("(() => { const a = window.artigas1.ajustes; return [a.giro, a.giroVertical, a.tunel, a.limiteInclinacion, a.version]; })()")
         res["R"].append({"nombre": "confort: los ajustes de la versión anterior encienden la vista vertical y conservan el túnel elegido", "pasa": aj == ["pasos", True, "fuerte", 80, 3], "dato": aj})
         await pg2.close()
+        # el informe de telemetría se valida con el modelo del backend (la fuente de verdad del contrato)
+        if res.get("informeTelemetria"):
+            import sys
+            sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "backend"))
+            nombre = "telemetría: la sesión es válida para el backend (SessionReport de backend/app/schemas.py)"
+            try:
+                from app.schemas import SessionReport
+                SessionReport.model_validate(res["informeTelemetria"])
+                res["R"].append({"nombre": nombre, "pasa": True, "dato": len(res["informeTelemetria"]["events"])})
+            except ImportError:
+                print("(sin pydantic: no se valida el informe contra el backend)")
+            except Exception as e:  # noqa: BLE001
+                res["R"].append({"nombre": nombre, "pasa": False, "dato": str(e)[:800]})
         mal = total = 0
         for r in res["R"]:
             if "fase" in r:

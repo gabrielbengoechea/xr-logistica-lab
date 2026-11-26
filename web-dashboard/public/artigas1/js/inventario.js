@@ -144,7 +144,8 @@ export class Inventario {
     hueco.ocupado = true;
     hueco.contenedor = flotante;
     flotante.datos.hueco = hueco;
-    return flotante.datos.destino === hueco.codigo;
+    // sin destino (los tanques de lastre del balance): cualquier hueco libre es correcto
+    return !flotante.datos.destino || flotante.datos.destino === hueco.codigo;
   }
 
   retirar(flotante) {

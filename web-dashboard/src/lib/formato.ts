@@ -83,6 +83,11 @@ export const NOMBRE_EVENTO: Record<EventType, string> = {
   assemble: 'Ensambló',
   hint: 'Pidió una pista',
   session_end: 'Terminó la sesión',
+  scan: 'Escaneó',
+  strap: 'Amarró una carga',
+  inspect: 'Completó un punto de mantenimiento',
+  activity_start: 'Empezó una actividad',
+  activity_end: 'Terminó una actividad',
 }
 
 /** Nodo de Blender → texto: «Part_Placa_OBC» → «Placa OBC». */

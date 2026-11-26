@@ -124,6 +124,12 @@ class EventType(str, Enum):
     assemble = "assemble"
     hint = "hint"
     session_end = "session_end"
+    # Artigas-1: escáner, amarre con trinquete, puntos de mantenimiento y actividades
+    scan = "scan"
+    strap = "strap"
+    inspect = "inspect"
+    activity_start = "activity_start"
+    activity_end = "activity_end"
 
 
 class InteractionMode(str, Enum):

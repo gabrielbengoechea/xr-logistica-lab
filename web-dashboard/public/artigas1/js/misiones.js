@@ -23,7 +23,7 @@ export const PUNTOS_EVA = {
  * @param {{inventario: import('./inventario.js').Inventario, inspecciones: import('./inspeccion.js').Inspecciones}} mundo
  */
 export function definirActividades(gestor, mundo) {
-  const { inventario, inspecciones } = mundo;
+  const { inventario, inspecciones, balance } = mundo;
   const delCarguero = inventario.bultos.filter((b) => b.legible && b.ubicacion.startsWith('CR01')).sort((a, b) => a.codigo.localeCompare(b.codigo));
   const manifiesto = delCarguero.filter((_, i) => i % Math.max(1, Math.floor(delCarguero.length / 5)) === 0).slice(0, 5);
 
@@ -54,7 +54,7 @@ export function definirActividades(gestor, mundo) {
     pasos: (a) => {
       // los tres más cercanos al almacén que todavía no están en su lugar
       const centro = new THREE.Vector3(0, 0, -2.1);
-      const elegidos = inventario.contenedores.filter((f) => !f.datos.hueco || f.datos.hueco.codigo !== f.datos.destino)
+      const elegidos = inventario.contenedores.filter((f) => !f.datos.lastre && (!f.datos.hueco || f.datos.hueco.codigo !== f.datos.destino))
         .sort((x, y) => x.posicion.distanceToSquared(centro) - y.posicion.distanceToSquared(centro)).slice(0, 3);
       a.datos.codigos = elegidos.map((f) => f.datos.codigo);
       return elegidos.map((f) => ({ id: f.datos.codigo, texto: `Llevá ${f.datos.codigo} a ${f.datos.destino} y amarralo` }));
@@ -87,6 +87,29 @@ export function definirActividades(gestor, mundo) {
       } else a.error(`${d.codigo} es de ${d.ubicacion}, fuera del conteo de ${a.datos.estante}`);
     },
   });
+
+  if (balance) {
+    gestor.registrar({
+      id: 'balance', titulo: 'Balance de masas', modulo: 'nodo', concepto: 'Distribución de la carga y centro de masa',
+      instrucciones: 'Llegaron tres tanques de agua (lastre) y esperan en Rivera, junto a la escotilla del Nodo. Ubicalos en huecos libres de los racks y amarralos, de modo que el centro de masa de la carga quede dentro del círculo del panel de balance del Nodo. Los tanques pesados van del lado contrario al que está corrido el punto. Después apretá CONFIRMAR en el panel.',
+      referencia: 300,
+      pasos: () => [
+        ...balance.tanques.map((f) => ({ id: f.datos.codigo, texto: `Ubicá y amarrá el tanque ${f.datos.codigo} (${f.datos.pesoKg} kg)` })),
+        { id: 'confirmar', texto: 'Con el punto dentro del círculo, CONFIRMAR en el panel de balance' },
+      ],
+      alEvento(a, tipo, d) {
+        if (tipo === 'amarrado' && balance.tanques.some((f) => f.datos.codigo === d.codigo)) {
+          a.completarPaso(d.codigo);
+          balance.medir();
+          a.aviso(`Desvío: ${(balance.desvio * 100).toFixed(1)} cm (tolerancia ${(balance.tolerancia * 100).toFixed(1)} cm)`);
+        }
+        if (tipo !== 'balance_confirmar') return;
+        if (d.amarrados < balance.tanques.length) a.aviso(`Faltan amarrar ${balance.tanques.length - d.amarrados} tanques`);
+        else if (!d.dentro) a.error(`Fuera de tolerancia: ${(d.desvio * 100).toFixed(1)} cm (máximo ${(d.tolerancia * 100).toFixed(1)} cm). Cambiá algún tanque de lado.`);
+        else a.completarPaso('confirmar');
+      },
+    });
+  }
 
   const conPuntos = (puntos) => ({
     pasos: () => {

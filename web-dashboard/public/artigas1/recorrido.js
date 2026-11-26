@@ -42,6 +42,10 @@ import { Confort, ORDEN_TUNEL } from './js/confort.js';
 import { PARAMETROS_AVISO, UbicadorCartel, distanciaLibre, siempreVisible } from './js/avisos.js';
 import { Amarres, DIENTES } from './js/amarre.js';
 import { MedidorFps } from './js/rendimiento.js';
+import { LotesFlotantes } from './js/lotes.js';
+import { VisibilidadModulos } from './js/portales.js';
+import { Telemetria } from './js/telemetria.js';
+import { BalanceRivera, TANQUES, crearPanelBalance, geometriaTanque } from './js/balance.js';
 
 const INICIO = 'rivera';
 
@@ -119,6 +123,10 @@ paneles.obstaculo = (o, d, hasta) => distanciaLibre(colisionadores(), o, d, hast
 const transicion = new StationTransitionManager(camera);
 const confort = new Confort(camera);
 // fps: siempre en la consola cada 10 s; con ?fps en la dirección, también un contador en la vista
+// sesión para el panel docente (js/telemetria.js: ?alumno=…&backend=…)
+const telemetria = new Telemetria();
+window.addEventListener('pagehide', () => telemetria.enviar(true));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') telemetria.enviar(false); });
 const medidorFps = new MedidorFps(camera, new URLSearchParams(window.location.search).has('fps'));
 const gestor = new GestorActividades();
 const navegacion = new Navegacion(scene);
@@ -132,6 +140,14 @@ let orbital = null;
 /** @type {SistemaFlotantes | null} */
 let flotantes = null;
 let inventario = null;
+/** @type {BalanceRivera | null} */
+let balance = null;
+/** @type {PanelVR | null} */
+let panelBalance = null;
+/** @type {LotesFlotantes | null} */
+let lotes = null;
+/** @type {VisibilidadModulos | null} */
+let portales = null;
 let inspecciones = null;
 let exterior = null;
 /** @type {EVAController | null} */
@@ -312,6 +328,7 @@ function crearTerminal(idActividad, posicion, giroY, extra = null) {
   scene.add(panel.malla);
   paneles.agregar(panel);
   terminales.push(panel);
+  portales.agregar(panel.malla, posicion);
   return panel;
 }
 
@@ -394,12 +411,14 @@ const anisotropia = Math.min(4, renderer.capabilities.getMaxAnisotropy());
 Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, anisotropia)]).then(([gEstacion, texTierra]) => {
   estacion = armarEstacion(gEstacion, materialPara);
   scene.add(estacion.grupo);
+  portales = new VisibilidadModulos(estacion);        // no se dibuja lo que queda detrás de una escotilla cerrada
   const legibles = estacion.cargas.filter((c) => c.legible);
   const etiquetas = crearEtiquetas(legibles, renderer);
   if (etiquetas.malla) scene.add(etiquetas.malla);
   inventario = new Inventario(estacion.cargas, etiquetas.datos, CATEGORIAS);
   orbital = crearEntornoOrbital(texTierra);
   scene.add(orbital.grupo);
+  portales.agregarDeAfuera(orbital.grupo);
   exterior = crearExterior(SOL, COLOR_SOL);
   scene.add(exterior.grupo);
   for (const p of exterior.pasamanos) estacion.barandas.segmentos.push(p);
@@ -486,8 +505,33 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   ponerHerramienta('inspector', V(2.08, 0.36, 2.86), -1.2);        // soporte exterior de la esclusa
   ponerHerramienta('llave', V(2.08, 0.08, 2.92), -1.2);
 
+  // ---- tanques de lastre del balance de masas (js/balance.js): esperan ocultos hasta que empieza la actividad
+  balance = new BalanceRivera(inventario);
+  const geoTanque = geometriaTanque();
+  geoTanque.computeBoundingSphere();
+  for (const t of TANQUES) {
+    const malla = new THREE.Mesh(geoTanque, fabrica.material);
+    malla.name = `Tanque_${t.codigo}`;
+    malla.position.set(...t.posicion);
+    estacion.grupo.add(malla);
+    const f = flotantes.agregar(malla, geoTanque.boundingSphere.radius, {
+      tipo: 'contenedor', agarre: agarreLibre(geoTanque.boundingSphere.radius), fijo: true,
+      datos: { codigo: t.codigo, descripcion: `Lastre de agua ${t.pesoKg} kg`, pesoKg: t.pesoKg, destino: '', hueco: null, escaneado: false, lastre: true },
+    });
+    f.oculto = true;
+    inventario.contenedores.push(f);
+    balance.tanques.push(f);
+  }
+
+  // ---- un lote de dibujo por material para todos los objetos sueltos (js/lotes.js)
+  lotes = new LotesFlotantes(scene);
+  lotes.armar(flotantes.objetos);
+
   // ---- soltar y tomar: el contenedor queda apoyado en el hueco y se amarra con el trinquete (js/amarre.js)
+  /** Nombre de un objeto para la telemetría: el código de la carga o el tipo de herramienta. */
+  const nombreTelemetria = (f) => (f.datos && f.datos.codigo) || f.tipo || f.malla.name;
   flotantes.alSoltar = (f) => {
+    if (f.tipo === 'contenedor' || (f.datos && f.datos.herramienta)) telemetria.registrar('release', nombreTelemetria(f));
     if (f.tipo !== 'contenedor') return;
     const h = inventario.huecoCercano(f.posicion, 0.32);
     if (!h) return;
@@ -501,14 +545,17 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     sonido.tocar(correcto ? 'ok' : 'aviso');
     avisar(correcto ? `${f.datos.codigo} apoyado en ${h.codigo}. Amarralo: mano libre junto al trinquete naranja y ${DIENTES} veces el gatillo` : `${f.datos.codigo} quedó en ${h.codigo}, pero su lugar es ${f.datos.destino}`, correcto ? 'ok' : 'error', correcto ? 5 : 3.5);
     gestor.evento('colocado', { codigo: f.datos.codigo, hueco: h.codigo, destino: f.datos.destino, correcto });
+    telemetria.registrar(correcto ? 'snap_ok' : 'snap_fail', f.datos.codigo, h.codigo, correcto ? null : `va en ${f.datos.destino}`);
   };
   amarres.alAmarrar = (f) => {
     const h = f.datos.hueco;
-    const correcto = !!h && h.codigo === f.datos.destino;
+    const correcto = !!h && (!f.datos.destino || h.codigo === f.datos.destino);   // los tanques de lastre van en cualquier hueco
     avisar(correcto ? `${f.datos.codigo} amarrado en ${h.codigo}` : `${f.datos.codigo} amarrado, pero en un hueco que no es el suyo`, correcto ? 'ok' : 'error');
     gestor.evento('amarrado', { codigo: f.datos.codigo, hueco: h ? h.codigo : '', destino: f.datos.destino, correcto });
+    telemetria.registrar('strap', f.datos.codigo, h ? h.codigo : null, correcto ? null : 'hueco equivocado');
   };
   flotantes.alTomar = (f) => {
+    if (f.tipo === 'contenedor' || (f.datos && f.datos.herramienta)) telemetria.registrar('grab', nombreTelemetria(f));
     if (f.tipo === 'contenedor' && f.datos.hueco) {
       inventario.retirar(f);
       amarres.quitar(f);
@@ -519,12 +566,15 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   // ---- actividades, puntos de trabajo, navegación y mapa
   inspecciones = new Inspecciones(scene, (tipo, datos) => {
     gestor.evento(tipo, datos);
+    if (tipo === 'inspeccion') telemetria.registrar('inspect', datos.punto, null, datos.herramienta);
+    if (tipo === 'herramienta_incorrecta') telemetria.registrar('snap_fail', datos.punto, datos.pide, `herramienta incorrecta: ${datos.herramienta}`);
+    if (tipo === 'pista') { telemetria.pistas++; telemetria.registrar('hint', datos.punto, null, datos.texto); }
     if (tipo === 'inspeccion') { sonido.tocar('ok'); manos.vibrarTodas(0.6, 60); }
   });
   for (const [id, p] of Object.entries(PUNTOS_TALLER)) inspecciones.agregar(id, p.posicion, p.herramienta, p.segundos, p.texto);
   estacion.grupo.add(crearTapaTablero(PUNTOS_TALLER.tapa_tablero.posicion));
   for (const [id, p] of Object.entries(PUNTOS_EVA)) inspecciones.agregar(id, PUNTOS_EXTERIORES[id], p.herramienta, p.segundos, p.texto);
-  definirActividades(gestor, { inventario, inspecciones });
+  definirActividades(gestor, { inventario, inspecciones, balance });
 
   eva = new EVAController({
     rig, camara: camera, escena: scene, loco, manos, exterior, transicion, sonido,
@@ -541,16 +591,54 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   crearTerminal('inventario', V(0.86, -0.02, 0.615), Math.PI);
   crearTerminal('recepcion', V(0.86, 0.30, -4.955), Math.PI);
   crearTerminal('mantenimiento', V(0.86, 0.30, 3.625), 0);
+  // el panel de balance del Nodo es también el terminal de su actividad (js/balance.js)
+  panelBalance = crearPanelBalance(balance, {
+    confirmar: () => {
+      const d = balance.medir();
+      gestor.evento('balance_confirmar', { dentro: balance.dentro, desvio: d, tolerancia: balance.tolerancia, amarrados: balance.amarrados() });
+      telemetria.registrar(balance.dentro ? 'snap_ok' : 'snap_fail', 'balance', null, `desvío ${(d * 100).toFixed(1)} cm · tolerancia ${(balance.tolerancia * 100).toFixed(1)} cm`);
+    },
+    estado: () => gestor.obtener('balance').estado,
+    puedeIniciar: () => !gestor.impedimento('balance'),
+    iniciar: () => iniciarActividad('balance'),
+    pausar: () => gestor.pausar(),
+    reanudar: () => gestor.reanudar(),
+    abandonar: () => gestor.abandonar(),
+  });
+  panelBalance.malla.position.set(-1.141, 0.18, 2.105);   // sobre la pantalla del panel de balance del kit
+  panelBalance.malla.rotation.y = Math.PI / 2;
+  scene.add(panelBalance.malla);
+  paneles.agregar(panelBalance);
+  terminales.push(panelBalance);
+  portales.agregar(panelBalance.malla, panelBalance.malla.position);
   crearTerminal('eva', V(1.175, 0.02, 3.02), -Math.PI / 2, { texto: () => 'SALIR AL EXTERIOR', accion: () => { camera.getWorldPosition(cabeza); const m = eva.salir(cabeza); if (m) avisar(m, 'error'); } });
   crearTerminal('eva', V(1.80, 0.0, 1.25), Math.PI / 2, { texto: () => 'ENTRAR A LA ESTACIÓN', accion: () => { camera.getWorldPosition(cabeza); const m = eva.entrar(cabeza); if (m) avisar(m, 'error'); } });
 
   gestor.escuchar((tipo, a, dato) => {
+    // telemetría: inicio y fin de cada actividad, y su avance
+    if (tipo === 'inicio') telemetria.registrar('activity_start', a.id);
+    if (tipo === 'paso' || tipo === 'error') telemetria.progreso(a.pasos.length, a.hechos, a.errores);
+    if (tipo === 'fin' || tipo === 'abandono') {
+      const r = a.resultado;
+      telemetria.registrar('activity_end', a.id, null, tipo === 'abandono' ? 'abandonada' : r && r.completada ? `completada · ${r.puntaje} puntos · ${Math.round(r.segundos)} s` : `no superada · ${r ? r.motivo : ''}`);
+      telemetria.cerrarActividad(a.pasos.length, a.hechos, a.errores);
+      telemetria.enviar(false);
+    }
     for (const t of terminales) t.sucio = true;
     for (const t of tablets) t.panel.sucio = true;
     if (mapa) mapa.panel.sucio = true;
     if (tipo === 'inicio') {
       sonido.tocar('aviso'); abrirInforme('instrucciones', a); if (mapa) mapa.cerrar();
       // el taller arranca ordenado: las herramientas sueltas de Tacuarembó vuelven a su lugar
+      if (a.id === 'balance') {
+        // los tanques vuelven a esperar junto a la escotilla y se calcula la tolerancia con los huecos libres
+        for (const f of balance.tanques) {
+          if (f.datos.hueco) { inventario.retirar(f); amarres.quitar(f); }
+          flotantes.guardar(f);
+          f.oculto = false;
+        }
+        balance.preparar();
+      }
       if (a.id === 'mantenimiento') for (const f of flotantes.objetos) if (f.datos && f.datos.herramienta && !f.mano && f.reposo.posicion.z > 3.6) flotantes.guardar(f);
     }
     if (tipo === 'paso') { sonido.tocar('logro'); if (a.pasoActual) avisar(`✔ ${dato.texto}`, 'ok'); }
@@ -578,7 +666,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   window.artigas1 = {
     guanteListo, manosPoses: POSES,
     THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, flotantes, ir, manosDePrueba,
-    inventario, amarres, medidorFps, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
+    inventario, amarres, medidorFps, lotes: () => lotes, portales: () => portales, telemetria, balance: () => balance, panelBalance: () => panelBalance, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
     acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas }, aviso, panelInforme, teclas,
     avanzar: (dt = 1 / 72, dibujar = false) => cuadro(0, null, dt, !dibujar),
   };
@@ -593,6 +681,7 @@ function alLeer(l) {
   else avisar(`${l.texto}. ${l.detalle}.`, 'error', 2.5);
   manos.vibrarTodas(l.ok ? 0.6 : 1, l.ok ? 50 : 140);
   gestor.evento('escaneo', l);
+  telemetria.registrar('scan', l.ok ? l.codigo : (l.bulto && l.bulto.codigo) || null, null, l.ok ? 'ok' : l.motivo);
 }
 
 // =====================================================================================================
@@ -976,11 +1065,16 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     if (relojTerminales > 0.5) {
       relojTerminales = 0;
       if (gestor.activa) for (const t of terminales) if (t.malla.position.distanceToSquared(cabeza) < 16) t.sucio = true;
+      if (panelBalance.malla.visible && panelBalance.malla.position.distanceToSquared(cabeza) < 16) panelBalance.sucio = true;   // medición en vivo
     }
     manos.mostrar(dt);
     if (loco.ultimoChoque > 0.35) manos.vibrarTodas(Math.min(1, loco.ultimoChoque / 2), 30);
     for (const e of estacion.escotillas) e.actualizar(dt, cabeza);
+    portales.actualizar(cabeza, eva.afuera);
+    lotes.actualizar();                                // al final: ya se movió todo lo que se mueve
     orbital.actualizar(dt);
+    telemetria.enVisor = enVisor;
+    telemetria.actualizar(dt);
   }
   if (sinDibujar) return;
   if (terceraPersona && !renderer.xr.isPresenting && loco) {

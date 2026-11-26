@@ -22,7 +22,7 @@ const _e = new THREE.Euler();
 const _color = new THREE.Color();
 const ESPEJO = new THREE.Matrix4().makeScale(-1, 1, 1);
 
-class Armado {
+export class Armado {
   constructor() { this.partes = []; }
 
   _sumar(g, color, pos, rot) {

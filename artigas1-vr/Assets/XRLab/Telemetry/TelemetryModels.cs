@@ -19,6 +19,12 @@ namespace XRLab.Telemetry
         Assemble,
         Hint,
         SessionEnd,
+        // Artigas-1: escáner, amarre con trinquete, puntos de mantenimiento y actividades
+        Scan,
+        Strap,
+        Inspect,
+        ActivityStart,
+        ActivityEnd,
     }
 
     /// <summary>Dispositivo (campo "device").</summary>
@@ -53,6 +59,11 @@ namespace XRLab.Telemetry
                 case TelemetryEventType.Assemble: return "assemble";
                 case TelemetryEventType.Hint: return "hint";
                 case TelemetryEventType.SessionEnd: return "session_end";
+                case TelemetryEventType.Scan: return "scan";
+                case TelemetryEventType.Strap: return "strap";
+                case TelemetryEventType.Inspect: return "inspect";
+                case TelemetryEventType.ActivityStart: return "activity_start";
+                case TelemetryEventType.ActivityEnd: return "activity_end";
                 default: throw new ArgumentOutOfRangeException(nameof(t), t, null);
             }
         }
