@@ -26,6 +26,8 @@ Base: rama `feature/artigas1-sprint01-02` (PR #24, Sprints 01 y 02). Alcance: el
 
 **B23: los botones van por índice.** En modo zurdo, X/Y y A/B cambian de rol junto con los sticks (moverse, subir y bajar en la mano derecha; girar, frenar y enderezar en la izquierda).
 
+**CI en GitHub: prueba de portales con Chrome 157.** La primera corrida del workflow (PR #24) falló en una sola prueba: 6 píxeles distintos en «Rivera adelante» que en local (Chrome 153) dan 0. Como el entorno no puede descargar artefactos, la prueba ahora informa coordenadas y colores: los 6 están sobre el borde diagonal de la escotilla del fondo y cambian 10 a 12 niveles por canal (suavizado del borde según lo que se dibuja detrás), apenas por encima del umbral anterior (suma > 30). El criterio pasó a perceptual: algún canal con más de 24/255. Se comprobó que un objeto que desaparece de verdad sigue haciendo fallar la prueba (504 px, 80 a 180 niveles). Con eso el CI quedó en verde en GitHub (física, juego y visión). La corrección también se llevó a la rama del PR #24.
+
 **Pruebas: correcciones en `juego.py` que destapó la variación.** Con el sobrante al azar aparecieron supuestos de la prueba: tomaba `DC.carga[0]` como «uno del manifiesto», soltaba todos los contenedores en el mismo punto (el agarre tomaba cualquiera) y armaba mal las direcciones con parámetros (`?semilla=4?alumno=31`). Las tres cosas se corrigieron; la del armado de direcciones también afectaba a la prueba de texturas con `?ktx2=no`.
 
 ## Archivos
@@ -46,7 +48,7 @@ Modificados: `recorrido.js` (oyente sin preparación de actividades, progreso, a
 | Backend pytest (sin cambios) | Automatizada | 31 de 31 |
 | Progreso con el backend FastAPI real: 101 completa en un navegador, lo recupera en otro navegador limpio; 202 no ve nada | Manual | Correcto |
 | Capturas: Tierra de día y de noche desde la Cúpula, panel de la órbita, ajustes con 10 filas, bienvenida zurda | Manual | Correcto |
-| Workflow de CI en GitHub | — | Pendiente de la primera corrida en el PR |
+| Workflow de CI en GitHub (`navegador`: física, juego, visión) | Automatizada en GitHub | En verde en el PR #26 (Chrome 157 del runner) |
 | Todo en el visor | Pendiente en Quest 2 | — |
 
 ## Limitaciones conocidas
