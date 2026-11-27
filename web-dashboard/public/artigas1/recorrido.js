@@ -30,6 +30,8 @@ import { FabricaHerramientas, REEMPLAZOS, agarreLibre, agarrePlano } from './js/
 import { Inventario } from './js/inventario.js';
 import { Escaner } from './js/escaner.js';
 import { Sonido } from './js/sonido.js';
+import { Ambiente } from './js/ambiente.js';
+import { crearPanelOrbita } from './js/orbita.js';
 import { COLORES, PanelVR, SistemaPaneles, rectRedondo, renglones } from './js/paneles.js';
 import { ESTADO, ETIQUETA_ESTADO, GestorActividades, formatoTiempo } from './js/actividades.js';
 import { PUNTOS_EVA, PUNTOS_TALLER, definirActividades } from './js/misiones.js';
@@ -54,6 +56,8 @@ import { PASO_SESION, SesionEstudiante, conectarTelemetria, crearPanelSesion, re
 import { traducirBotonVR } from './js/entrada.js';
 import { consejos, contenido, pasosCortos } from './js/debrief.js';
 import { esServidorLocal, torsoOcultoEnCupula } from './js/vista.js';
+import { crearEscenarios } from './js/escenarios.js';
+import { ProgresoLocal, progresoDelBackend } from './js/progreso.js';
 
 const INICIO = 'rivera';
 
@@ -64,7 +68,7 @@ const INICIO = 'rivera';
 const VERSION_AJUSTES = 3;
 const AJUSTES_BASE = {
   version: VERSION_AJUSTES, giro: 'pasos', sensibilidad: 1, velocidad: 1, giroVertical: true, limiteInclinacion: 80,
-  zonaMuerta: 0.2, frenoAsistido: false, tunel: 'medio', calibracionManos: 0, volumen: 1,
+  zonaMuerta: 0.2, frenoAsistido: false, tunel: 'medio', calibracionManos: 0, volumen: 1, zurdo: false,
 };
 /** Límites de los ajustes numéricos que se cambian desde la tablet. */
 const RANGOS_AJUSTES = { sensibilidad: [0.5, 2], velocidad: [0.5, 1.5], zonaMuerta: [0.1, 0.4], volumen: [0, 1] };
@@ -122,6 +126,7 @@ loader.setMeshoptDecoder(MeshoptDecoder);        // estacion.glb va comprimido c
 
 const sonido = new Sonido();
 sonido.factor = ajustes.volumen;
+const ambiente = new Ambiente(sonido);          // ventilación y equipos por módulo; respiración en la EVA (B09)
 const manos = new Manos(renderer, rig, scene, camera);
 manos.calibrar(ajustes.calibracionManos);
 // el guante de Blender llega aparte: mientras tanto (o si no llega) se ven las manos de cápsulas
@@ -144,6 +149,11 @@ const medidorFps = new MedidorFps(camera, new URLSearchParams(window.location.se
 const gestor = new GestorActividades();
 conectarTelemetria(gestor, telemetria);
 // el estudiante de esta carga: consentimiento, código y cambio de estudiante (B02 y B06)
+// progreso por estudiante (B15): solo con registro aceptado; en este visor y, si hay, en el backend
+const progresoLocal = new ProgresoLocal((() => { try { return window.localStorage; } catch { return null; } })());
+gestor.escuchar((tipo, a) => {
+  if (tipo === 'fin' && a.resultado && a.resultado.completada && telemetria.consentimiento === 'aceptado') progresoLocal.guardar(telemetria.config.alumno, a.id, a.resultado.puntaje);
+});
 const sesion = new SesionEstudiante({
   telemetria, gestor, sugerido: telemetria.config.alumnoSugerido,
   almacen: (() => { try { return window.localStorage; } catch { return null; } })(),
@@ -156,6 +166,8 @@ const amarres = new Amarres(sonido, (m, fuerza, ms) => manos.vibrar(m, fuerza, m
 let loco = null;
 let estacion = null;
 let orbital = null;
+/** Ganchos que se arman con la estación ya cargada (órbita de la Cúpula, B28). */
+const depuracionExtra = {};
 /** @type {SistemaFlotantes | null} */
 let flotantes = null;
 let inventario = null;
@@ -398,13 +410,14 @@ const induccion = new Induccion();
 const panelBienvenida = crearPanelBienvenida({
   practicar: () => { cerrarBienvenida(); empezarPractica(); },
   explorar: () => { cerrarBienvenida(); avisar('Explorá libre. La práctica guiada está en el menú de la tablet.'); },
+  zurdo: () => !!ajustes.zurdo,
 });
 siempreVisible(panelBienvenida.malla, 988);
 panelBienvenida.malla.visible = false;
 scene.add(panelBienvenida.malla);
 paneles.agregar(panelBienvenida);
 const ubicadorBienvenida = new UbicadorCartel(panelBienvenida.malla, colisionadores, { seguir: false, bajar: 0.05 });
-const panelPractica = crearPanelInduccion(induccion, { cerrar: () => induccion.cerrar() });
+const panelPractica = crearPanelInduccion(induccion, { cerrar: () => induccion.cerrar(), zurdo: () => !!ajustes.zurdo });
 siempreVisible(panelPractica.malla, 988);
 panelPractica.malla.visible = false;
 scene.add(panelPractica.malla);
@@ -436,11 +449,28 @@ sesion.alCambiar = (paso) => {
   for (const t of tablets) t.panel.sucio = true;
   if (paso === PASO_SESION.LISTA) {
     panelSesion.malla.visible = false;
+    if (telemetria.consentimiento === 'aceptado') recuperarProgreso(telemetria.config.alumno);
     avisar(telemetria.consentimiento === 'aceptado' ? `Sesión de ${telemetria.config.alumno}: se registra tu actividad` : 'Modo anónimo: no se envía nada', 'ok', 4);
     if (renderer.xr.isPresenting && !sesion.bienvenidaVista) bienvenidaPendiente = true;
   }
 };
 actualizarSesionHtml();
+/** Restaura lo que este código ya completó: primero lo de este visor y, si hay backend, lo de otras sesiones. */
+function recuperarProgreso(codigo) {
+  const aplicar = (p) => {
+    const n = gestor.restaurar(p);
+    if (!n) return;
+    avisar(`Progreso recuperado: ${n} ${n === 1 ? 'actividad completada' : 'actividades completadas'}`, 'ok', 5);
+    for (const t of terminales) t.sucio = true;
+    for (const t of tablets) t.panel.sucio = true;
+    if (mapa) mapa.panel.sucio = true;
+  };
+  aplicar(progresoLocal.leer(codigo));
+  telemetria.comprobarBackend()
+    .then((estado) => (estado === 'disponible' ? progresoDelBackend({ backend: telemetria.config.backend, clave: telemetria.config.clave, codigo }) : null))
+    .then((p) => { if (p) aplicar(p); })
+    .catch(() => null);
+}
 /** Para las pruebas: la recarga se puede reemplazar. */
 const reinicio = { recargar: (url) => window.location.replace(url) };
 let cambiandoEstudiante = false;
@@ -608,6 +638,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
           ajustes[clave] = typeof valor === 'number' && r ? Math.round(THREE.MathUtils.clamp(valor, r[0], r[1]) * 100) / 100 : valor;
           guardarAjustes();
           if (clave === 'volumen') { sonido.factor = ajustes.volumen; sonido.tocar('clic'); }
+          if (clave === 'zurdo') { panelBienvenida.sucio = true; panelPractica.sucio = true; avisar(ajustes.zurdo ? 'Modo zurdo: te movés con el stick derecho y girás con el izquierdo' : 'Te movés con el stick izquierdo y girás con el derecho', 'ok', 5); }
           t.panel.sucio = true;
         },
         siguienteInclinacion: () => {
@@ -833,6 +864,10 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   terminales.push(pantallaSoporte);
   definirActividades(gestor, {
     inventario, inspecciones, balance, descarga, filtro: cambioFiltro,
+    escenarios: crearEscenarios({
+      inventario, amarres, flotantes, descarga, balance, filtro: cambioFiltro,
+      redibujar: () => { if (pantallaSoporte) pantallaSoporte.sucio = true; for (const p of Object.values(panelesDescarga || {})) p.sucio = true; },
+    }),
     // B07: semilla de la sesión; con ?semilla=123 se reproduce un caso que reportó un docente
     semilla: /^\d+$/.test(new URLSearchParams(window.location.search).get('semilla') || '') ? Number(new URLSearchParams(window.location.search).get('semilla')) : undefined,
     // Almacenamiento repetido con todo ya guardado: estos contenedores vuelven sueltos a su lugar de origen,
@@ -892,41 +927,12 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     if (mapa) mapa.panel.sucio = true;
     if (tipo === 'inicio') {
       sonido.tocar('aviso'); abrirInforme('instrucciones', a); if (mapa) mapa.cerrar();
-      // el taller arranca ordenado: las herramientas sueltas de Tacuarembó vuelven a su lugar
-      if (a.id === 'filtro') { cambioFiltro.preparar(); pantallaSoporte.sucio = true; }
-      if (a.id === 'descarga') {
-        // la carga del turno vuelve a la bodega del carguero y la escotilla se traba hasta igualar la presión
-        descarga.preparar();
-        for (const f of descarga.carga) {
-          if (f.mano) { f.mano.sostiene = null; f.mano = null; }
-          if (f.datos.hueco) { inventario.retirar(f); amarres.quitar(f); }
-          f.datos.cuarentena = false;
-          f.posicion.copy(descarga.posicionInicial(f));
-          f.malla.quaternion.identity();
-          f.casa.copy(f.posicion);
-          f.velocidad.set(0, 0, 0);
-          f.libre = false;
-          f.fijo = true;
-          f.datos.zPrevia = null;
-        }
-        for (const p of Object.values(panelesDescarga)) p.sucio = true;
-      }
-      if (a.id === 'balance') {
-        // los tanques vuelven a esperar junto a la escotilla y se calcula la tolerancia con los huecos libres
-        for (const f of balance.tanques) {
-          if (f.datos.hueco) { inventario.retirar(f); amarres.quitar(f); }
-          flotantes.guardar(f);
-          f.oculto = false;
-        }
-        balance.preparar();
-      }
-      if (a.id === 'mantenimiento') for (const f of flotantes.objetos) if (f.datos && f.datos.herramienta && !f.mano && f.reposo.posicion.z > 3.6) flotantes.guardar(f);
+      // (el escenario de cada actividad lo arma su preparar(): js/escenarios.js)
     }
     if (tipo === 'paso') { sonido.tocar('logro'); if (a.pasoActual) avisar(`✔ ${dato.texto}`, 'ok'); }
     if (tipo === 'error') { sonido.tocar('error'); avisar(dato, 'error'); manos.vibrarTodas(0.8, 90); }
     if (tipo === 'aviso') avisar(dato);
     if (tipo === 'desbloqueo') avisar(`Nueva actividad disponible: ${a.def.titulo}`, 'ok', 5);
-    if ((tipo === 'fin' || tipo === 'abandono') && a.id === 'descarga') { descarga.terminar(); for (const p of Object.values(panelesDescarga)) p.sucio = true; }
     if (tipo === 'fin' || tipo === 'abandono') {
       inspecciones.activar([]);
       if (tipo === 'fin') {
@@ -937,7 +943,23 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     }
   });
   navegacion.alLlegar = (id) => { sonido.tocar('ok'); avisar(`Llegaste: ${LUGAR[id].nombre}`, 'ok'); };
+  // B28: en la Cúpula, el panel para acelerar la órbita; al salir, todo vuelve al tiempo real
+  const panelOrbita = crearPanelOrbita(orbital, { cerrar: () => { panelOrbita.malla.visible = false; } });
+  siempreVisible(panelOrbita.malla, 987);
+  panelOrbita.malla.visible = false;
+  scene.add(panelOrbita.malla);
+  paneles.agregar(panelOrbita);
+  const ubicadorOrbita = new UbicadorCartel(panelOrbita.malla, colisionadores, { seguir: false, bajar: 0.25 });
+  let relojOrbita = 0;
+  depuracionExtra.panelOrbita = panelOrbita;
+  depuracionExtra.alCuadroOrbita = (dt) => {
+    if (!panelOrbita.malla.visible || !orbital.acelerada) return;
+    relojOrbita += dt;
+    if (relojOrbita > 0.5) { relojOrbita = 0; panelOrbita.sucio = true; }
+  };
   navegacion.alCambiarModulo = (id, nuevo) => {
+    if (id === 'cupula') { ubicadorOrbita.colocar(camera); panelOrbita.malla.visible = true; panelOrbita.sucio = true; }
+    else if (panelOrbita.malla.visible || orbital.acelerada) { panelOrbita.malla.visible = false; orbital.acelerar(false); }
     if (LUGAR[id] && nuevo) avisar(`${LUGAR[id].nombre} · ${LUGAR[id].rol}`);
     for (const b of document.querySelectorAll('#modulos button')) b.setAttribute('aria-pressed', String(b.dataset.id === id));
   };
@@ -952,7 +974,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, texturasTierra: () => texTierraCargadas, flotantes, ir, manosDePrueba,
     inventario, amarres, medidorFps, lotes: () => lotes, portales: () => portales, telemetria, balance: () => balance, panelBalance: () => panelBalance, descarga: () => descarga, panelesDescarga: () => panelesDescarga, cambioFiltro: () => cambioFiltro, pantallaSoporte: () => pantallaSoporte, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
     acciones: { guiar, trasladar, iniciarActividad, avisar, reunirHerramientas, mostrarBienvenida, empezarPractica, mostrarPanelSesion, nuevoEstudiante }, induccion, panelBienvenida, panelPractica, aviso, panelInforme, teclas,
-    sesion, panelSesion, reinicio,
+    sesion, panelSesion, reinicio, progresoLocal, ambiente, extra: depuracionExtra,
     avanzar: (dt = 1 / 72, dibujar = false) => cuadro(0, null, dt, !dibujar),
   };
   const local = esServidorLocal(window.location);
@@ -1183,8 +1205,9 @@ function enderezar() {
  */
 function entradaXR(dt) {
   ejes();
-  const izq = manos.mano('left');
-  const der = manos.mano('right');
+  // B23: en modo zurdo los roles de los controles se intercambian (los botones van por índice: X/Y ↔ A/B)
+  const izq = manos.mano(ajustes.zurdo ? 'right' : 'left');      // la que mueve, sube, baja y sostiene el mapa
+  const der = manos.mano(ajustes.zurdo ? 'left' : 'right');      // la que gira, frena y endereza
   if (izq) {
     const [x, y] = izq.ejes;
     if (Math.abs(x) > 0.15) empuje.addScaledVector(derecha, x);
@@ -1366,6 +1389,7 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     inspecciones.actualizar(dt, todasLasManos, camera);
     gestor.tick(dt);
     navegacion.actualizar(dt, cabeza, eva.afuera);
+    ambiente.actualizar(navegacion.actual, eva.afuera);
     mapa.actualizar(dt, cabeza, mirada);
     marcas();
     if (aviso.tiempo > 0) { aviso.tiempo -= dt; if (aviso.tiempo <= 0) panelAviso.malla.visible = false; }
@@ -1387,6 +1411,7 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
     portales.actualizar(cabeza, eva.afuera);
     lotes.actualizar();                                // al final: ya se movió todo lo que se mueve
     orbital.actualizar(dt);
+    if (depuracionExtra.alCuadroOrbita) depuracionExtra.alCuadroOrbita(dt);
     telemetria.enVisor = enVisor;
     telemetria.actualizar(dt);
   }

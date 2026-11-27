@@ -50,6 +50,11 @@ export class DescargaCarguero {
     this.contenedores = contenedores;
     this.escotilla = escotilla;
     this.carga = [];                                     // flotantes del turno, en el orden de CARGA_CARGUERO
+    // Variante del turno (Sprint 03, B07 en la descarga): cuál llegó sin estar en el manifiesto y cuál faltó.
+    // Por defecto, la de siempre.
+    this.sobrante = SOBRANTE;
+    this.faltante = FALTANTE;
+    this.manifiesto = MANIFIESTO.slice();
     this.presion = 0;                                    // kPa de diferencia (0: igualada)
     this.igualando = false;
     this.abierta = true;
@@ -66,8 +71,15 @@ export class DescargaCarguero {
     this.cajaCuarentena = _caja.clone();
   }
 
-  /** Al empezar: la carga vuelve a la bodega, la escotilla se traba y la presión queda sin igualar. */
-  preparar() {
+  /**
+   * Al empezar: la carga vuelve a la bodega, la escotilla se traba y la presión queda sin igualar.
+   * @param {{sobrante?: string, faltante?: string}} [variante]  Sin variante, la de siempre.
+   */
+  preparar(variante = {}) {
+    const codigos = CARGA_CARGUERO.map((c) => c.codigo);
+    this.sobrante = codigos.includes(variante.sobrante) ? variante.sobrante : SOBRANTE;
+    this.faltante = variante.faltante && !codigos.includes(variante.faltante) ? variante.faltante : FALTANTE;
+    this.manifiesto = [...codigos.filter((c) => c !== this.sobrante), this.faltante].sort();
     this.carga = CARGA_CARGUERO.map((c) => this.contenedores.find((f) => f.datos.codigo === c.codigo)).filter(Boolean);
     this.presion = PRESION_INICIAL;
     this.igualando = false;
@@ -107,7 +119,7 @@ export class DescargaCarguero {
     return true;
   }
 
-  manifestado(codigo) { return MANIFIESTO.includes(codigo); }
+  manifestado(codigo) { return this.manifiesto.includes(codigo); }
 
   /** Del manifiesto, los que llegaron y ya se leyeron. */
   get leidosDelManifiesto() { return this.leidos.filter((c) => this.manifestado(c)); }
@@ -184,7 +196,7 @@ export function crearPanelRfid(d) {
     ctx.font = 'bold 26px sans-serif';
     ctx.fillText('PORTAL RFID', 14, 34);
     ctx.font = 'bold 40px monospace';
-    ctx.fillText(`${d.leidosDelManifiesto.length}/${MANIFIESTO.length} del manifiesto`, 14, 100);
+    ctx.fillText(`${d.leidosDelManifiesto.length}/${d.manifiesto.length} del manifiesto`, 14, 100);
     ctx.font = '26px sans-serif';
     ctx.fillStyle = !u ? COLORES.gris : u.manifestado ? COLORES.verde : COLORES.amarillo;
     ctx.fillText(!u ? 'Esperando carga' : `${u.codigo} · ${u.manifestado ? 'en manifiesto' : 'NO MANIFESTADO'}`, 14, 160);
@@ -224,9 +236,9 @@ export function crearPanelManifiesto(d, acciones) {
     ctx.textAlign = 'left';
     let y = 104;
     ctx.font = '28px monospace';
-    for (const codigo of MANIFIESTO) {
+    for (const codigo of d.manifiesto) {
       const leido = d.leidos.includes(codigo);
-      const informado = codigo === FALTANTE && d.faltanteInformado;
+      const informado = codigo === d.faltante && d.faltanteInformado;
       ctx.fillStyle = leido ? COLORES.verde : informado ? COLORES.rojo : COLORES.blanco;
       ctx.fillText(`${leido ? '✔' : informado ? '✕' : '·'} ${codigo}  ${leido ? 'recibido' : informado ? 'FALTANTE informado' : 'pendiente'}`, 24, y);
       y += 42;

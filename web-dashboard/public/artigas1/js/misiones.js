@@ -3,7 +3,7 @@
 // Acá solo están las reglas; el reloj, los estados y el puntaje los lleva js/actividades.js.
 import * as THREE from 'three';
 import { NOMBRE_HERRAMIENTA } from './inspeccion.js';
-import { FALTANTE, MANIFIESTO } from './descarga.js';
+import { CARGA_CARGUERO } from './descarga.js';
 import { crearAzar, elegirDistinto, semillaNueva } from './variacion.js';
 
 /** Puntos de trabajo del taller (interior). Los del exterior están en js/exterior.js. */
@@ -34,6 +34,8 @@ export const RUTA_SUGERIDA = ['recepcion', 'almacenamiento', 'inventario', 'desc
 export function definirActividades(gestor, mundo) {
   // reacomodarContenedores(lista) → cuántos devolvió a su lugar de origen (opcional: lo da recorrido.js)
   const { inventario, inspecciones, balance, descarga, filtro, reacomodarContenedores } = mundo;
+  // escenario de cada actividad (js/escenarios.js, B13): opcional, para probar sin el mundo 3D
+  const esc = mundo.escenarios || {};
   const delCarguero = inventario.bultos.filter((b) => b.legible && b.ubicacion.startsWith('CR01')).sort((a, b) => a.codigo.localeCompare(b.codigo));
   // Variación entre intentos (B07): cada intento saca su generador de la semilla de la sesión
   const semilla = Number.isFinite(mundo.semilla) ? mundo.semilla >>> 0 : semillaNueva();
@@ -131,6 +133,7 @@ export function definirActividades(gestor, mundo) {
   if (filtro) {
     gestor.registrar({
       id: 'filtro', titulo: 'Cambio del filtro de CO₂', modulo: 'tacuarembo', concepto: 'Mantenimiento de soporte vital y repuestos',
+      preparar: () => esc.filtro && esc.filtro.preparar(),
       instrucciones: 'El filtro de CO₂ del soporte vital está al 12 %. Abrí su puerta (mano libre en la manija y gatillo), sacá el filtro gastado, tomá uno de repuesto del rack TAC-B1, encastralo soltándolo en su lugar y cerrá la puerta.',
       referencia: 150,
       pasos: () => [
@@ -157,12 +160,23 @@ export function definirActividades(gestor, mundo) {
   if (descarga) {
     gestor.registrar({
       id: 'descarga', titulo: 'Descarga del carguero', modulo: 'colonia', concepto: 'Recepción con RFID, discrepancias y cuarentena',
+      // Variación (Sprint 03): en cada intento cambia cuál contenedor llegó sin manifestar y qué código faltó
+      preparar: (a) => {
+        const azar = azarDe(a);
+        const codigos = CARGA_CARGUERO.map((c) => c.codigo);
+        const [sobrante] = elegirDistinto(codigos, 1, azar, (c) => c, a.datos.sobrante ? [a.datos.sobrante] : null);
+        const faltante = `CNT-00${90 + Math.floor(azar() * 10)}`;
+        a.datos.sobrante = sobrante;
+        if (esc.descarga) esc.descarga.preparar({ sobrante, faltante });
+        else descarga.preparar({ sobrante, faltante });
+      },
+      limpiar: () => (esc.descarga ? esc.descarga.limpiar() : descarga.terminar()),
       instrucciones: `Llegó el Charrúa con su manifiesto. En el panel de presión junto a la escotilla del carguero, IGUALAR y después ABRIR. Pasá cada contenedor de la bodega a Colonia por el aro del portal RFID: se lee solo. El que no está en el manifiesto va a la red de cuarentena (babor de Colonia). Cuando todo lo que llegó esté leído, INFORMAR FALTANTE en la consola de recepción.`,
       referencia: 300,
       pasos: () => [
         { id: 'igualar', texto: 'Igualá la presión de la bodega (panel de presión)' },
         { id: 'abrir', texto: 'Abrí la escotilla del carguero' },
-        ...MANIFIESTO.filter((c) => c !== FALTANTE).map((c) => ({ id: `rfid:${c}`, texto: `Pasá ${c} por el portal RFID` })),
+        ...descarga.manifiesto.filter((c) => c !== descarga.faltante).map((c) => ({ id: `rfid:${c}`, texto: `Pasá ${c} por el portal RFID` })),
         { id: 'cuarentena', texto: 'Dejá el contenedor no manifestado en la red de cuarentena' },
         { id: 'faltante', texto: 'Informá el faltante en la consola de recepción' },
       ],
@@ -188,6 +202,7 @@ export function definirActividades(gestor, mundo) {
   if (balance) {
     gestor.registrar({
       id: 'balance', titulo: 'Balance de masas', modulo: 'nodo', concepto: 'Distribución de la carga y centro de masa',
+      preparar: () => esc.balance && esc.balance.preparar(),
       instrucciones: 'Llegaron tres tanques de agua (lastre) y esperan en Rivera, junto a la escotilla del Nodo. Ubicalos en huecos libres de los racks y amarralos, de modo que el centro de masa de la carga quede dentro del círculo del panel de balance del Nodo. Los tanques pesados van del lado contrario al que está corrido el punto. Después apretá CONFIRMAR en el panel.',
       referencia: 300,
       pasos: () => [
@@ -222,6 +237,7 @@ export function definirActividades(gestor, mundo) {
 
   gestor.registrar({
     id: 'mantenimiento', titulo: 'Mantenimiento del taller', modulo: 'tacuarembo', concepto: 'Mantenimiento y uso de herramientas',
+    preparar: () => esc.mantenimiento && esc.mantenimiento.preparar(),
     instrucciones: 'Ronda de mantenimiento en Tacuarembó. Las herramientas están junto al banco de trabajo; la linterna, al fondo del módulo. Cada punto tiene un aro y un cartel con la herramienta que pide. Tomala, apuntala o apoyala en el punto y mantené apretado el gatillo hasta que la barra se llene y el aro se ponga verde.',
     referencia: 250,
     ...conPuntos(PUNTOS_TALLER),

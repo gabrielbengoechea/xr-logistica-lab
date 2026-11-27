@@ -304,6 +304,24 @@ function crearSol(distancia = 2200) {
   return sol;
 }
 
+/**
+ * Órbita acelerada (Sprint 03, B28), para la Cúpula: una vuelta real de unos 92 minutos pasa en 30 segundos
+ * (×184), así se ven el día y la noche sobre Uruguay. En la ISS hay unos 16 amaneceres por día.
+ * Simplificación: solo se mueven el sol del cielo y el terminador de la Tierra; la luz de la estación queda en
+ * el atardecer de siempre y el terreno no se corre (Uruguay sigue a la vista).
+ */
+export const PERIODO_ORBITA_MIN = 92;
+export const SEGUNDOS_POR_VUELTA = 30;
+export const FACTOR_ORBITA = Math.round((PERIODO_ORBITA_MIN * 60) / SEGUNDOS_POR_VUELTA);
+/** Eje de la órbita: perpendicular al avance hacia el este, o sea el eje norte-sur (Z). */
+const EJE_ORBITA = new THREE.Vector3(0, 0, 1);
+
+/** Dirección del sol después de recorrer `fase` radianes de órbita (0 = el atardecer de siempre). */
+export function direccionSol(fase, destino = new THREE.Vector3()) {
+  // la estación avanza hacia el este: el sol se ve correr hacia el oeste
+  return destino.copy(SOL).applyAxisAngle(EJE_ORBITA, fase);
+}
+
 /** Deriva máxima del terreno bajo la estación (grados) y su velocidad (grados por minuto). */
 const DERIVA_MAX = 6;
 const DERIVA_POR_MINUTO = 0.3;
@@ -318,8 +336,16 @@ export function crearEntornoOrbital(texturas) {
   grupo.name = 'Entorno_Orbital';
   const { malla, giro } = crearTierra(texturas);
   const estrellas = crearEstrellas();
-  grupo.add(estrellas, crearSol(), malla);
+  const sol = crearSol();
+  grupo.add(estrellas, sol, malla);
   let angulo = 0;
+  let fase = 0;
+  let acelerada = false;
+  const aplicarSol = () => {
+    direccionSol(fase, malla.material.uniforms.uSol.value);
+    sol.position.copy(malla.material.uniforms.uSol.value).multiplyScalar(2200);
+    sol.lookAt(0, 0, 0);
+  };
   const aplicar = () => {
     // La estación avanza hacia el este: el terreno corre hacia el oeste. Giro alrededor del eje norte-sur.
     const c = Math.cos(angulo);
@@ -332,8 +358,18 @@ export function crearEntornoOrbital(texturas) {
     estrellas,
     tierra: malla,
     deriva: () => THREE.MathUtils.radToDeg(angulo),
+    /** ¿Está acelerada la órbita? (B28) */
+    get acelerada() { return acelerada; },
+    /** Fracción de la vuelta recorrida (0 a 1). */
+    get vuelta() { return (fase / (Math.PI * 2)) % 1; },
+    /** Acelera la órbita o vuelve al tiempo real (el sol vuelve al atardecer de siempre). */
+    acelerar(si) {
+      acelerada = !!si;
+      if (!acelerada) { fase = 0; aplicarSol(); }
+    },
     /** La deriva es lenta y se detiene a los 6°: Uruguay no se va de la vista durante la sesión. */
     actualizar(dt) {
+      if (acelerada) { fase = (fase + (Math.PI * 2 * dt) / SEGUNDOS_POR_VUELTA) % (Math.PI * 2); aplicarSol(); }
       const tope = THREE.MathUtils.degToRad(DERIVA_MAX);
       if (angulo >= tope) return;
       angulo = Math.min(tope, angulo + THREE.MathUtils.degToRad(DERIVA_POR_MINUTO) * dt / 60);
