@@ -37,6 +37,8 @@ export function formatoTiempo(segundos) {
  * @property {(a: Actividad) => {id: string, texto: string}[]} pasos
  * @property {(a: Actividad, tipo: string, datos: object) => void} alEvento
  * @property {(a: Actividad) => string} [sinPasos]  Mensaje para cuando no hay pasos que hacer.
+ * @property {(a: Actividad) => void} [preparar]  Arma su escenario al iniciar, antes de calcular los pasos (B13).
+ * @property {(a: Actividad, tipo: 'fin'|'abandono') => void} [limpiar]  Deja el mundo en orden al terminar (B13).
  */
 
 export class Actividad {
@@ -120,6 +122,10 @@ export class GestorActividades {
   escuchar(f) { this._oyentes.push(f); }
 
   _emitir(tipo, actividad, dato) {
+    // al terminar o abandonar, la actividad deja el mundo en orden antes que nadie se entere (B13)
+    if ((tipo === 'fin' || tipo === 'abandono') && actividad.def.limpiar) {
+      try { actividad.def.limpiar(actividad, tipo); } catch (e) { console.error(`actividad ${actividad.id}: no se pudo limpiar`, e); }
+    }
     for (const f of this._oyentes) f(tipo, actividad, dato);
   }
 
@@ -153,6 +159,8 @@ export class GestorActividades {
     const a = this.actividades.get(id);
     let pasos;
     try {
+      // cada actividad arma su escenario (B13): antes de los pasos, que pueden depender de él
+      if (a.def.preparar) a.def.preparar(a);
       pasos = (a.def.pasos(a) || []).filter((p) => p && typeof p.id === 'string' && p.id);
     } catch (e) {
       console.error(`actividad ${id}: no se pudieron armar los pasos`, e);
@@ -228,15 +236,37 @@ export class GestorActividades {
       puntaje: estado === ESTADO.COMPLETADA ? puntaje(a.tiempo, a.errores, a.def.referencia) : 0,
     };
     if (this.activa === a) this.activa = null;
-    if (estado === ESTADO.COMPLETADA) {
-      for (const otra of this.actividades.values()) {
-        if (otra.estado !== ESTADO.BLOQUEADA) continue;
-        if ((otra.def.requiere || []).every((r) => this.actividades.get(r)?.estado === ESTADO.COMPLETADA)) {
-          otra.estado = ESTADO.DISPONIBLE;
-          this._emitir('desbloqueo', otra);
-        }
+    if (estado === ESTADO.COMPLETADA) this._desbloquear();
+    this._emitir('fin', a);
+  }
+
+  /** Habilita las actividades bloqueadas cuyos requisitos ya están completos. */
+  _desbloquear(avisar = true) {
+    for (const otra of this.actividades.values()) {
+      if (otra.estado !== ESTADO.BLOQUEADA) continue;
+      if ((otra.def.requiere || []).every((r) => this.actividades.get(r)?.estado === ESTADO.COMPLETADA)) {
+        otra.estado = ESTADO.DISPONIBLE;
+        if (avisar) this._emitir('desbloqueo', otra);
       }
     }
-    this._emitir('fin', a);
+  }
+
+  /**
+   * Progreso guardado de un estudiante (B15): las actividades que ya completó en otra sesión quedan COMPLETADAS
+   * con su mejor puntaje (y se desbloquea lo que dependía de ellas). No toca la actividad en curso ni manda
+   * telemetría: es el punto de partida de esta sesión. Devuelve cuántas restauró.
+   * @param {Record<string, {mejor: number}>} progreso
+   */
+  restaurar(progreso) {
+    let n = 0;
+    for (const [id, p] of Object.entries(progreso || {})) {
+      const a = this.actividades.get(id);
+      if (!a || a.estado === ESTADO.ACTIVA || a.estado === ESTADO.PAUSADA || a.estado === ESTADO.COMPLETADA) continue;
+      a.estado = ESTADO.COMPLETADA;
+      a.resultado = { completada: true, restaurado: true, motivo: '', segundos: 0, errores: 0, pasos: 0, total: 0, puntaje: Math.max(0, Math.min(100, Math.round(p.mejor || 0))) };
+      n++;
+    }
+    if (n) this._desbloquear(false);
+    return n;
   }
 }

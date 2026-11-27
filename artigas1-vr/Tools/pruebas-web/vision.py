@@ -132,6 +132,11 @@ async () => {
   // los avisos siguen a la mirada (js/avisos.js) y las pruebas teletransportan la cabeza cada 0,1 s: el aviso
   // se correría con cada salto. Acá se mide la luz del exterior, así que se lo apaga.
   A.aviso.tiempo = 0; A.scene.getObjectByName('Aviso').visible = false;
+  // Las alas arrancan desalineadas 51° y maniobran ~23 s a 2,2°/s (js/exterior.js). Durante la maniobra, el marco
+  // del ala (una línea clara más fina que un píxel a esta resolución) barre los píxeles: oscuro → claro → oscuro,
+  // que esta medida no distingue de un parpadeo (Sprint 03). Se mide el régimen normal: maniobra terminada, con el
+  // seguimiento fino de las alas, las antenas y las balizas en movimiento.
+  A.exterior.paneles.angulo = A.exterior.paneles.objetivo;
   const ultimoSalto = new Int8Array(W * H), edad = new Uint8Array(W * H).fill(255);
   let previa = dibujarOjo(ojoIzq), idaYVuelta = 0, peor = 0;
   for (let k = 0; k < 40; k++) {

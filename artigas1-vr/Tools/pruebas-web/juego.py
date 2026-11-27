@@ -1061,13 +1061,14 @@ async () => {
     return '';
   };
   const fallasD = [];
-  for (const f of DC.carga) { const r = pasarPorPortal(f); if (r) fallasD.push(r); if (f.datos.codigo !== 'CNT-0004') soltar(izq); }
-  const sobrante = DC.carga.find((f) => f.datos.codigo === 'CNT-0004');
+  // el no manifestado va último (Sprint 03: cambia en cada intento) para seguir con él en la mano hasta la cuarentena
+  for (const f of [...DC.carga].sort((x, y) => (x.datos.codigo === DC.sobrante) - (y.datos.codigo === DC.sobrante))) { const r = pasarPorPortal(f); if (r) fallasD.push(r); if (f.datos.codigo !== DC.sobrante) { izq.en(V(-0.45 + 0.3 * fallasD.length + 0.3 * DC.leidos.length, 0.35, -7.3)); pasos(2); soltar(izq); } }
+  const sobrante = DC.carga.find((f) => f.datos.codigo === DC.sobrante);
   ok('descarga: el portal RFID lee los cuatro al pasar y cumple los tres del manifiesto', fallasD.length === 0 && DC.leidos.length === 4 && act.pasos.slice(2, 5).every((p) => p.hecho), [fallasD, DC.leidos]);
-  ok('descarga: el no manifestado se avisa (no es error) y la pantalla del portal lo marca', DC.ultima && DC.ultima.codigo === 'CNT-0004' && !DC.ultima.manifestado && act.errores === errD + 1);
+  ok('descarga: el no manifestado se avisa (no es error) y la pantalla del portal lo marca', DC.ultima && DC.ultima.codigo === DC.sobrante && !DC.ultima.manifestado && act.errores === errD + 1);
   // un contenedor del manifiesto en la red de cuarentena es un error
   const cuarentena = V(-0.95, -0.36, -6.41);
-  const delManifiesto = DC.carga[0];
+  const delManifiesto = DC.carga.find((f) => f.datos.codigo !== DC.sobrante);
   soltar(izq);
   ubicar(V(-0.3, 0.0, -6.4)); pasos(2);
   tomar(izq, delManifiesto); izq.en(cuarentena.clone()); pasos(2); soltar(izq);
@@ -1075,7 +1076,11 @@ async () => {
   ok('descarga: un contenedor del manifiesto en la red de cuarentena es un error', delManifiesto.datos.cuarentena && act.errores === errD && /cuarentena/.test(A.aviso.texto) && !act.pasos[5].hecho, A.aviso.texto);
   tomar(izq, delManifiesto); izq.en(V(-0.2, 0.3, -6.0)); pasos(2); soltar(izq);
   ok('descarga: al sacarlo de la red deja de estar en cuarentena', !delManifiesto.datos.cuarentena);
-  tomar(izq, sobrante); izq.en(cuarentena.clone()); pasos(2); soltar(izq);
+  // ir a buscarlo donde quedó (cerca del portal) y volver con él a la red
+  ubicar(sobrante.posicion.clone().add(V(0, 0, 0.45))); pasos(2);
+  tomar(izq, sobrante);
+  ubicar(V(-0.3, 0.0, -6.4)); pasos(2);
+  izq.en(cuarentena.clone()); pasos(2); soltar(izq);
   ok('descarga: el no manifestado en la red de cuarentena cumple su paso y queda retenido', sobrante.datos.cuarentena && sobrante.fijo && act.pasos[5].hecho && (seg(1), DC.dentroDeCuarentena(sobrante.posicion)));
   ubicar(frenteA(term, 0.8)); der.en(frenteA(term, 0.45).add(V(0.1, -0.1, 0))); pasos(2);
   apretar(der, term, 'faltante');
@@ -1220,14 +1225,46 @@ async () => {
   A.rig.quaternion.identity(); A.camera.rotation.set(-1.4, 0, 0); pasos(2);
   const oculto15 = !A.manos.torso.visible && A.manos.ocultarTorso;
   A.camera.rotation.set(0, 0, 0); pasos(2);
+  // B28: al entrar a la Cúpula aparece el panel de la órbita; acelerada, el sol de la Tierra gira
+  const PO = A.extra.panelOrbita, uSol = A.orbital.tierra.material.uniforms.uSol.value;
+  const solAntes = uSol.clone();
+  const panelVisible = PO.malla.visible;
+  PO.redibujar(); PO.botones.find((b) => b.id === 'orbita').accion();
+  seg(15);                                                 // media vuelta a ×184
+  // giro en el plano de la órbita (el componente norte-sur del sol no cambia)
+  const giro = V(solAntes.x, solAntes.y, 0).angleTo(V(uSol.x, uSol.y, 0));
+  ok('B28: en la Cúpula, ACELERAR ÓRBITA hace pasar media vuelta (día ↔ noche) en 15 s', panelVisible && A.orbital.acelerada && giro > 3.0 && Math.abs(uSol.z - solAntes.z) < 1e-6, [panelVisible, +giro.toFixed(2)]);
   ok('B17: en la Cúpula, mirando abajo, el torso se oculta y vuelve al mirar al frente', A.navegacion.actual === 'cupula' && oculto15 && A.manos.torso.visible, [A.navegacion.actual, oculto15]);
   A.ir('rivera'); pasos(3);
+  ok('B28: al salir de la Cúpula la órbita vuelve al tiempo real y el panel se cierra', !A.orbital.acelerada && !A.extra.panelOrbita.malla.visible && A.orbital.tierra.material.uniforms.uSol.value.distanceTo(solAntes) < 1e-6);
   // B23: volumen en AJUSTES de la tablet; es un ajuste del visor (queda guardado)
   const tabV = A.tablets[0]; tabV.ir('ajustes'); tabV.panel.redibujar();
   const volAntes = A.ajustes.volumen;
   tabV.panel.botones.find((b) => b.id === 'vol-').accion();
   ok('B23: el volumen baja desde AJUSTES, se aplica al sonido y se guarda', A.ajustes.volumen === volAntes - 0.25 && A.sonido.factor === A.ajustes.volumen && JSON.parse(window.localStorage.getItem('artigas1.ajustes')).volumen === A.ajustes.volumen, [volAntes, A.ajustes.volumen]);
-  tabV.panel.botones.find((b) => b.id === 'vol+').accion(); tabV.ir('inicio');
+  tabV.panel.botones.find((b) => b.id === 'vol+').accion();
+  // B23: modo zurdo: el stick derecho mueve y el izquierdo gira
+  tabV.panel.redibujar(); tabV.panel.botones.find((b) => b.id === 'zurdo').accion();
+  ubicar(V(0, 0, -2.0)); A.rig.quaternion.identity(); A.camera.rotation.set(0, 0, 0); pasos(2);
+  der.stick(0, -1); seg(0.6); der.stick(0, 0);
+  const avanceZurdo = L.velocidad.length();
+  L.velocidad.set(0, 0, 0);
+  izq.stick(0, -1); seg(0.6); izq.stick(0, 0);
+  const avanceIzq = L.velocidad.length();
+  ok('B23: en modo zurdo el stick derecho es el propulsor y el izquierdo ya no mueve', A.ajustes.zurdo && avanceZurdo > 0.3 && avanceIzq < 0.05, [+avanceZurdo.toFixed(2), +avanceIzq.toFixed(2)]);
+  tabV.panel.redibujar(); tabV.panel.botones.find((b) => b.id === 'zurdo').accion(); L.velocidad.set(0, 0, 0);
+  ok('B23: el modo zurdo se apaga y queda guardado como ajuste del visor', !A.ajustes.zurdo && JSON.parse(window.localStorage.getItem('artigas1.ajustes')).zurdo === false);
+  tabV.ir('inicio');
+
+  // B09: con contexto de audio, el ambiente arma su grafo y sigue al lugar (afuera: solo respiración)
+  A.sonido.activar();
+  if (A.sonido.ctx) {
+    A.ambiente.actualizar('tacuarembo', false);
+    const adentro = { ...A.ambiente.objetivo };
+    A.ambiente.actualizar('tacuarembo', true);
+    ok('B09: ambiente por módulo y respiración afuera (grafo de audio armado)', !!A.ambiente.nodos && adentro.zumbido === 180 && adentro.respiracion === 0 && A.ambiente.objetivo.respiracion === 1 && A.ambiente.objetivo.aire === 0, [adentro, A.ambiente.objetivo]);
+    A.ambiente.actualizar(A.navegacion.actual, false);
+  } else ok('B09: este navegador no dio contexto de audio (no se pudo probar el grafo)', true);
 
   // =========================================================================================== FASE 14
   fase('FASE 14 · Sprint 01: almacenamiento repetido y nuevo estudiante');
@@ -1263,6 +1300,11 @@ async () => {
   return { R, informeTelemetria: inf };
 }
 """
+
+
+def con_parametro(url, parametro):
+    """Suma un parámetro a la dirección, tenga o no ya otros (?semilla=…)."""
+    return url + ("&" if "?" in url else "?") + parametro
 
 
 async def main():
@@ -1326,7 +1368,7 @@ async def main():
                 res["R"].append({"nombre": nombre, "pasa": False, "dato": str(e)[:800]})
         # con ?ktx2=no (o si el navegador no puede con KTX2) se usan las WebP de siempre
         pg3 = await b.new_page(viewport={"width": 320, "height": 180})
-        await pg3.goto(os.environ.get("URL", "http://localhost:8765/artigas1/") + "?ktx2=no")
+        await pg3.goto(con_parametro(os.environ.get("URL", "http://localhost:8765/artigas1/"), "ktx2=no"))
         await pg3.wait_for_function("!!window.artigas1", timeout=120000)
         formato = await pg3.evaluate("window.artigas1.texturasTierra().formato")
         res["R"].append({"nombre": "texturas: con ?ktx2=no se cargan las WebP de respaldo", "pasa": formato == "webp", "dato": formato})
@@ -1341,7 +1383,7 @@ async def main():
         pedidos4, consola4 = [], []
         pg4.on("request", lambda r: pedidos4.append(f"{r.method} {r.url}") if "/api/" in r.url else None)
         pg4.on("console", lambda m: consola4.append(f"{m.type}: {m.text}") if m.type == "error" else None)
-        await pg4.goto(os.environ.get("URL", "http://localhost:8765/artigas1/") + "?alumno=31")
+        await pg4.goto(con_parametro(os.environ.get("URL", "http://localhost:8765/artigas1/"), "alumno=31"))
         await pg4.wait_for_function("!!window.artigas1", timeout=120000)
         est = await pg4.evaluate("""(async () => {
           const A = window.artigas1, S = A.sesion, P = A.panelSesion;
@@ -1363,10 +1405,26 @@ async def main():
         await pg5.goto(base)
         await pg5.wait_for_function("!document.getElementById('cargando')", timeout=120000)
         sin = await pg5.evaluate("typeof window.artigas1")
-        await pg5.goto(base + "?depurar")
+        await pg5.goto(con_parametro(base, "depurar"))
         await pg5.wait_for_function("!!window.artigas1", timeout=120000)
         con = await pg5.evaluate("[window.artigas1.telemetria.config.backend, window.artigas1.telemetria.estadoBackend]")
         await pg5.close()
+        # B15: progreso guardado en este visor para el código 55 → al confirmar el código, se restaura
+        ctx6 = await b.new_context(viewport={"width": 320, "height": 180})
+        await ctx6.add_init_script("window.localStorage.setItem('artigas1.progreso', JSON.stringify({ '55': { mantenimiento: { mejor: 80 } } }))")
+        pg6 = await ctx6.new_page()
+        await pg6.goto(os.environ.get("URL", "http://localhost:8765/artigas1/"))
+        await pg6.wait_for_function("!!window.artigas1", timeout=120000)
+        prog = await pg6.evaluate("""(async () => {
+          const A = window.artigas1, S = A.sesion, G = A.gestor;
+          const antes = G.obtener('eva').estado;
+          S.aceptar(); S.teclear('5'); S.teclear('5'); S.confirmarCodigo();
+          await new Promise((r) => setTimeout(r, 300));
+          return { antes, mant: G.obtener('mantenimiento').estado, puntaje: G.obtener('mantenimiento').resultado?.puntaje, eva: G.obtener('eva').estado };
+        })()""")
+        await ctx6.close()
+        res["R"].append({"fase": "Sprint 03 · progreso por estudiante"})
+        res["R"].append({"nombre": "B15: con el código 55, lo que ya completó en este visor se restaura y desbloquea la EVA", "pasa": prog == {"antes": "BLOQUEADA", "mant": "COMPLETADA", "puntaje": 80, "eva": "DISPONIBLE"}, "dato": prog})
         res["R"].append({"fase": "Sprint 02 · acceso de depuración"})
         res["R"].append({"nombre": "B24: en un host no local no hay window.artigas1; con ?depurar sí, y la telemetría queda apagada", "pasa": sin == "undefined" and con == [None, "ninguno"], "dato": [sin, con]})
         mal = total = 0

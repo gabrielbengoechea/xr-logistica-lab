@@ -125,7 +125,7 @@ export const CONTENIDO = {
 };
 
 /** Actividades cuyo contenido cambia en cada intento (js/variacion.js). */
-export const CAMBIA_AL_REPETIR = ['recepcion', 'inventario'];
+export const CAMBIA_AL_REPETIR = ['recepcion', 'inventario', 'descarga'];
 
 /** Contenido de una actividad, o null si no tiene. */
 export function contenido(id) {

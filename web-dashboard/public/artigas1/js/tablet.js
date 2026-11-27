@@ -172,6 +172,7 @@ export class TabletLogistica {
       ctx.fillStyle = a.estado === ESTADO.COMPLETADA ? COLORES.verde : a.estado === ESTADO.FALLIDA ? COLORES.rojo : a.estado === ESTADO.BLOQUEADA ? COLORES.gris : COLORES.amarillo;
       let detalle = (this.gestor.recomendada && this.gestor.recomendada() === a && a.estado === ESTADO.DISPONIBLE ? 'Siguiente recomendada · ' : '') + ETIQUETA_ESTADO[a.estado];
       if (a.estado === ESTADO.ACTIVA || a.estado === ESTADO.PAUSADA) detalle += ` · ${formatoTiempo(a.tiempo)} · paso ${a.hechos + 1} de ${a.pasos.length} · ${a.errores} errores`;
+      else if (a.resultado && a.resultado.restaurado) detalle += ` · ${a.resultado.puntaje} puntos (sesión anterior)`;
       else if (a.resultado) detalle += a.resultado.completada ? ` · ${a.resultado.puntaje} puntos en ${formatoTiempo(a.resultado.segundos)} · ${a.resultado.errores} errores` : ` · ${a.resultado.motivo}`;
       else if (a.estado === ESTADO.BLOQUEADA) detalle += ` · ${this.gestor.impedimento(a.id)}`;
       ctx.fillText(detalle.slice(0, 62), 32, y + (compacta ? Math.min(58, fila - 15) : fila - 16));
@@ -232,18 +233,18 @@ export class TabletLogistica {
     this._cabecera(ctx, panel, 'AJUSTES');
     const a = this.ajustes;
     const fila = (i, titulo, valor) => {
-      const y = 80 + i * 62;
+      const y = 80 + i * 56;
       ctx.fillStyle = COLORES.blanco;
-      ctx.font = 'bold 23px sans-serif';
-      ctx.fillText(titulo, 28, y + 24);
+      ctx.font = 'bold 22px sans-serif';
+      ctx.fillText(titulo, 28, y + 21);
       ctx.fillStyle = COLORES.celeste;
-      ctx.font = '21px sans-serif';
-      ctx.fillText(valor, 28, y + 50);
+      ctx.font = '20px sans-serif';
+      ctx.fillText(valor, 28, y + 45);
       return y;
     };
-    const ALTO = 52;
+    const ALTO = 48;
     const TUNEL = { apagado: 'Apagado', suave: 'Suave', medio: 'Medio (recomendado)', fuerte: 'Fuerte' };
-    let y = fila(0, 'Giro con el stick derecho', a.giro === 'suave' ? 'Suave (continuo · marea más)' : 'Por pasos con parpadeo (recomendado)');
+    let y = fila(0, `Giro con el stick ${a.zurdo ? 'izquierdo' : 'derecho'}`, a.giro === 'suave' ? 'Suave (continuo · marea más)' : 'Por pasos con parpadeo (recomendado)');
     panel.boton('giro', 640, y, 300, ALTO, 'CAMBIAR', () => this.acciones.ajuste('giro', a.giro === 'suave' ? 'pasos' : 'suave'));
     y = fila(1, 'Mirar arriba y abajo con el stick', a.giroVertical ? `Activado · hasta ${a.limiteInclinacion}° de inclinación` : 'Desactivado (solo con la cabeza)');
     panel.boton('vertical', 640, y, 300, ALTO, 'CAMBIAR', () => this.acciones.siguienteInclinacion());
@@ -266,5 +267,8 @@ export class TabletLogistica {
     y = fila(8, 'Volumen de los sonidos', (a.volumen ?? 1) > 0 ? `${Math.round((a.volumen ?? 1) * 100)} %` : 'Silencio');
     panel.boton('vol-', 640, y, 144, ALTO, '−', () => this.acciones.ajuste('volumen', (a.volumen ?? 1) - 0.25), { activo: (a.volumen ?? 1) > 0 });
     panel.boton('vol+', 796, y, 144, ALTO, '+', () => this.acciones.ajuste('volumen', (a.volumen ?? 1) + 0.25), { activo: (a.volumen ?? 1) < 1 });
+    // B23: modo zurdo, se intercambian los controles (moverse con el stick derecho, girar con el izquierdo)
+    y = fila(9, 'Mano dominante', a.zurdo ? 'Izquierda: te movés con el stick derecho' : 'Derecha: te movés con el stick izquierdo');
+    panel.boton('zurdo', 640, y, 300, ALTO, 'CAMBIAR', () => this.acciones.ajuste('zurdo', !a.zurdo));
   }
 }

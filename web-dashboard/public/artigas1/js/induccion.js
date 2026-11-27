@@ -11,11 +11,24 @@ import { COLORES, PanelVR, renglones } from './paneles.js';
 export const PASOS_INDUCCION = [
   { id: 'agarre', titulo: 'Agarrate', texto: 'Acercá una mano a una baranda o a la pared y apretá el GRIP.', compu: 'F' },
   { id: 'impulso', titulo: 'Impulsate', texto: 'Con el grip apretado, tirá de la mano hacia atrás y soltá: vas a flotar.', compu: 'W' },
-  { id: 'freno', titulo: 'Frená', texto: 'Mientras flotás, apretá A (control derecho) hasta quedar quieto.', compu: 'Espacio' },
-  { id: 'giro', titulo: 'Girá', texto: 'Empujá el stick derecho a un costado: girás 30° con un parpadeo.', compu: 'arrastrar el mouse' },
-  { id: 'mapa', titulo: 'Mapa', texto: 'Mantené el GATILLO izquierdo: aparece el mapa en la mano. Soltalo para guardarlo.', compu: 'M' },
+  { id: 'freno', titulo: 'Frená', texto: 'Mientras flotás, apretá A (control derecho) hasta quedar quieto.', zurdo: 'Mientras flotás, apretá X (control izquierdo) hasta quedar quieto.', compu: 'Espacio' },
+  { id: 'giro', titulo: 'Girá', texto: 'Empujá el stick derecho a un costado: girás 30° con un parpadeo.', zurdo: 'Empujá el stick izquierdo a un costado: girás 30° con un parpadeo.', compu: 'arrastrar el mouse' },
+  { id: 'mapa', titulo: 'Mapa', texto: 'Mantené el GATILLO izquierdo: aparece el mapa en la mano. Soltalo para guardarlo.', zurdo: 'Mantené el GATILLO derecho: aparece el mapa en la mano. Soltalo para guardarlo.', compu: 'M' },
   { id: 'escaneo', titulo: 'Escaneá', texto: 'Tomá la pistola lectora (grip), apuntá a la etiqueta de un bulto y apretá el gatillo.', compu: 'F y X' },
 ];
+
+/** Resumen de los controles para la bienvenida, según la mano dominante (B23: modo zurdo). */
+export function resumenControles(zurdo = false) {
+  const [mueve, gira] = zurdo ? ['derecho', 'izquierdo'] : ['izquierdo', 'derecho'];
+  return [
+    'Estás en gravedad cero: el cuerpo conserva el impulso.',
+    '• GRIP: agarrarte de barandas y paredes, tomar objetos.',
+    `• Stick ${mueve}: propulsor.   ${zurdo ? 'A / B' : 'X / Y'}: bajar y subir.   ${zurdo ? 'X' : 'A'}: freno.`,
+    `• Stick ${gira}: girar 30° (con parpadeo) y mirar arriba o abajo.`,
+    `• Gatillo ${mueve}: el mapa en la mano.   Gatillo ${gira}: usar o apretar.`,
+    'Las actividades se inician en los terminales amarillos, la tablet o el mapa.',
+  ];
+}
 
 export class Induccion {
   constructor() {
@@ -71,7 +84,7 @@ export class Induccion {
 }
 
 /** Panel de bienvenida (la primera vez en el visor): controles en resumen y las dos opciones. */
-export function crearPanelBienvenida({ practicar, explorar }) {
+export function crearPanelBienvenida({ practicar, explorar, zurdo = () => false }) {
   const W = 1100, H = 700;
   const panel = new PanelVR({ ancho: 0.80, alto: 0.80 * H / W, px: W, nombre: 'Bienvenida', dibujar: (ctx, p) => {
     ctx.fillStyle = COLORES.fondo;
@@ -86,14 +99,7 @@ export function crearPanelBienvenida({ practicar, explorar }) {
     ctx.fillText('Bienvenido a la Estación Artigas-1', 30, 64);
     ctx.font = '28px sans-serif';
     let y = 140;
-    for (const linea of [
-      'Estás en gravedad cero: el cuerpo conserva el impulso.',
-      '• GRIP: agarrarte de barandas y paredes, tomar objetos.',
-      '• Stick izquierdo: propulsor.   X / Y: bajar y subir.   A: freno.',
-      '• Stick derecho: girar 30° (con parpadeo) y mirar arriba o abajo.',
-      '• Gatillo izquierdo: el mapa en la mano.   Gatillo derecho: usar o apretar.',
-      'Las actividades se inician en los terminales amarillos, la tablet o el mapa.',
-    ]) { ctx.fillText(linea, 30, y); y += 52; }
+    for (const linea of resumenControles(zurdo())) { ctx.fillText(linea, 30, y); y += 52; }
     p.boton('practicar', 30, H - 130, 620, 96, 'PRÁCTICA GUIADA (2 min)', practicar, { estilo: 'aviso' });
     p.boton('explorar', 670, H - 130, W - 700, 96, 'EXPLORAR', explorar);
   } });
@@ -101,7 +107,7 @@ export function crearPanelBienvenida({ practicar, explorar }) {
 }
 
 /** Panel de la práctica: paso actual, su control y el avance. */
-export function crearPanelInduccion(induccion, { cerrar }) {
+export function crearPanelInduccion(induccion, { cerrar, zurdo = () => false }) {
   const W = 900, H = 330;
   const panel = new PanelVR({ ancho: 0.56, alto: 0.56 * H / W, px: W, nombre: 'Practica', dibujar: (ctx, p) => {
     const paso = induccion.pasoActual;
@@ -116,7 +122,7 @@ export function crearPanelInduccion(induccion, { cerrar }) {
     ctx.fillText(induccion.terminada ? '¡Listo! Ya sabés moverte' : `Práctica · ${n + 1} de ${PASOS_INDUCCION.length}: ${paso.titulo}`, 24, 56);
     ctx.font = '30px sans-serif';
     let y = 110;
-    const texto = induccion.terminada ? 'Ahora elegí una actividad en un terminal amarillo, la tablet o el mapa.' : paso.texto;
+    const texto = induccion.terminada ? 'Ahora elegí una actividad en un terminal amarillo, la tablet o el mapa.' : (zurdo() && paso.zurdo) || paso.texto;
     for (const linea of renglones(ctx, texto, W - 48).slice(0, 3)) { ctx.fillText(linea, 24, y); y += 40; }
     if (!induccion.terminada) {
       ctx.font = '22px sans-serif';

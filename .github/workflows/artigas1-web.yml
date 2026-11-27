@@ -2,7 +2,6 @@ name: Artigas-1 web (navegador)
 
 # Sprint 02 (B14): las pruebas de navegador del recorrido web corren en cada PR que toca el recorrido.
 # Chrome sin interfaz con WebGL por software (SwiftShader), como en las corridas locales. No mide fps del Quest.
-# vision.py queda afuera mientras tenga la falla previa «luz: sin parpadeos» (ver docs/SPRINT_02_*.md).
 on:
   push:
     branches: [main]
@@ -38,7 +37,13 @@ jobs:
         run: python artigas1-vr/Tools/pruebas-web/fisica.py
         env:
           CHROME: /usr/bin/google-chrome
+      - name: Versión de Chrome
+        run: /usr/bin/google-chrome --version
       - name: Juego completo (actividades, sesión, consentimiento, telemetría)
         run: python artigas1-vr/Tools/pruebas-web/juego.py
+        env:
+          CHROME: /usr/bin/google-chrome
+      - name: Visión estéreo e iluminación de la caminata espacial
+        run: python artigas1-vr/Tools/pruebas-web/vision.py
         env:
           CHROME: /usr/bin/google-chrome

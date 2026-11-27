@@ -146,7 +146,7 @@ export class SesionEstudiante {
 // Paneles (VR y compu): consentimiento y código. Botones grandes, texto corto.
 
 export const TEXTO_CONSENTIMIENTO = [
-  'Si aceptás, el simulador registra lo que hacés en las actividades (pasos, errores, tiempos y pistas) con un código de estudiante, no con tu nombre.',
+  'Si aceptás, el simulador registra lo que hacés en las actividades (pasos, errores, tiempos y pistas) con un código de estudiante, no con tu nombre. Tu progreso queda guardado con ese código para la próxima vez.',
   'Sirve para evaluar el desempeño y mejorar las actividades. Los resultados los ve tu docente en el panel del aula.',
   'Si no aceptás, usás el simulador igual: no se envía nada.',
 ];
