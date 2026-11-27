@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { NOMBRE_HERRAMIENTA } from './inspeccion.js';
 import { FALTANTE, MANIFIESTO } from './descarga.js';
+import { crearAzar, elegirDistinto, semillaNueva } from './variacion.js';
 
 /** Puntos de trabajo del taller (interior). Los del exterior están en js/exterior.js. */
 export const PUNTOS_TALLER = {
@@ -20,22 +21,43 @@ export const PUNTOS_EVA = {
 };
 
 /**
+ * Ruta sugerida (B11): de lo más simple (identificar carga) a lo más exigente (caminata espacial). Recepción e
+ * inventario enseñan a leer la carga; almacenamiento, a ubicarla; descarga junta todo con RFID; balance pide
+ * razonar; el taller y el filtro, procedimientos con herramientas; la EVA, seguridad.
+ */
+export const RUTA_SUGERIDA = ['recepcion', 'almacenamiento', 'inventario', 'descarga', 'balance', 'mantenimiento', 'filtro', 'eva'];
+
+/**
  * @param {import('./actividades.js').GestorActividades} gestor
  * @param {{inventario: import('./inventario.js').Inventario, inspecciones: import('./inspeccion.js').Inspecciones}} mundo
  */
 export function definirActividades(gestor, mundo) {
-  const { inventario, inspecciones, balance, descarga, filtro } = mundo;
+  // reacomodarContenedores(lista) → cuántos devolvió a su lugar de origen (opcional: lo da recorrido.js)
+  const { inventario, inspecciones, balance, descarga, filtro, reacomodarContenedores } = mundo;
   const delCarguero = inventario.bultos.filter((b) => b.legible && b.ubicacion.startsWith('CR01')).sort((a, b) => a.codigo.localeCompare(b.codigo));
-  const manifiesto = delCarguero.filter((_, i) => i % Math.max(1, Math.floor(delCarguero.length / 5)) === 0).slice(0, 5);
+  // Variación entre intentos (B07): cada intento saca su generador de la semilla de la sesión
+  const semilla = Number.isFinite(mundo.semilla) ? mundo.semilla >>> 0 : semillaNueva();
+  const azarDe = (a) => {
+    let h = 2166136261;
+    for (const c of a.id) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+    a.datos.variante = `${semilla}-${a.intentos + 1}`;
+    return crearAzar((semilla ^ h) + (a.intentos + 1) * 7919);
+  };
 
   gestor.registrar({
     id: 'recepcion', titulo: 'Recepción del carguero', modulo: 'carguero', concepto: 'Recepción e identificación de mercancías',
     instrucciones: 'Llegó el Charrúa. Con la pistola lectora, escaneá los bultos del manifiesto en su bodega. Si encontrás un bulto dañado o sin etiqueta, escanealo igual: queda informado como discrepancia.',
     referencia: 150,
-    pasos: () => [
-      ...manifiesto.map((b) => ({ id: b.codigo, texto: `Escaneá ${b.codigo} · ${b.ubicacion}` })),
-      { id: 'discrepancia', texto: 'Informá una discrepancia (bulto dañado o sin etiqueta)' },
-    ],
+    pasos: (a) => {
+      // cinco bultos del carguero, distintos en cada intento
+      const manifiesto = elegirDistinto(delCarguero, 5, azarDe(a), (b) => b.codigo, a.datos.anterior || null)
+        .sort((x, y) => x.codigo.localeCompare(y.codigo));
+      a.datos.anterior = manifiesto.map((b) => b.codigo);
+      return [
+        ...manifiesto.map((b) => ({ id: b.codigo, texto: `Escaneá ${b.codigo} · ${b.ubicacion}` })),
+        { id: 'discrepancia', texto: 'Informá una discrepancia (bulto dañado o sin etiqueta)' },
+      ];
+    },
     alEvento(a, tipo, d) {
       if (tipo !== 'escaneo') return;
       if (d.motivo === 'ilegible') {
@@ -55,11 +77,25 @@ export function definirActividades(gestor, mundo) {
     pasos: (a) => {
       // los tres más cercanos al almacén que todavía no están en su lugar
       const centro = new THREE.Vector3(0, 0, -2.1);
-      const elegidos = inventario.contenedores.filter((f) => !f.datos.lastre && !f.datos.cuarentena && (!f.datos.hueco || f.datos.hueco.codigo !== f.datos.destino))
-        .sort((x, y) => x.posicion.distanceToSquared(centro) - y.posicion.distanceToSquared(centro)).slice(0, 3);
+      const almacenables = () => inventario.contenedores.filter((f) => !f.datos.lastre && !f.datos.cuarentena && f.datos.destino);
+      const pendientes = () => almacenables().filter((f) => !f.datos.hueco || f.datos.hueco.codigo !== f.datos.destino);
+      let elegidos = pendientes();
+      a.datos.reacomodados = 0;
+      // Con todos ya guardados (partida anterior completa), se arma una partida nueva: los contenedores bien
+      // ubicados que nadie tiene en la mano vuelven a su lugar de origen, sueltos (lo hace el mundo, que
+      // conoce las amarras y la física). Sin ese ayudante o sin nada para mover, quedan cero pasos y el gestor
+      // no la inicia (ver sinPasos).
+      if (!elegidos.length && reacomodarContenedores) {
+        const ubicados = almacenables().filter((f) => !f.mano && f.datos.hueco && f.datos.hueco.codigo === f.datos.destino)
+          .sort((x, y) => x.datos.codigo.localeCompare(y.datos.codigo)).slice(0, 3);
+        a.datos.reacomodados = ubicados.length ? reacomodarContenedores(ubicados) || 0 : 0;
+        elegidos = pendientes();
+      }
+      elegidos = elegidos.sort((x, y) => x.posicion.distanceToSquared(centro) - y.posicion.distanceToSquared(centro)).slice(0, 3);
       a.datos.codigos = elegidos.map((f) => f.datos.codigo);
       return elegidos.map((f) => ({ id: f.datos.codigo, texto: `Llevá ${f.datos.codigo} a ${f.datos.destino} y amarralo` }));
     },
+    sinPasos: () => 'El almacenamiento ya está completo: todos los contenedores están amarrados en su hueco. Soltá alguno de su lugar para practicar de nuevo.',
     alEvento(a, tipo, d) {
       if (tipo === 'escaneo' && d.ok && d.tipo === 'contenedor') a.aviso(`${d.codigo} va en ${d.destino}`);
       if ((tipo !== 'colocado' && tipo !== 'amarrado') || !a.datos.codigos.includes(d.codigo)) return;
@@ -74,10 +110,13 @@ export function definirActividades(gestor, mundo) {
     instrucciones: 'Conteo cíclico de una estantería de Rivera. Escaneá todos los bultos de esa estantería, uno por uno. Escanear un bulto de otra estantería cuenta como error.',
     referencia: 150,
     pasos: (a) => {
-      // la estantería de estribor con más bultos
+      // una estantería de estribor con cuatro bultos o más, distinta de la del intento anterior (B07)
       const cuenta = new Map();
       for (const b of inventario.bultos) if (b.legible && /^RIV-E\d/.test(b.ubicacion)) cuenta.set(b.ubicacion.slice(0, 6), (cuenta.get(b.ubicacion.slice(0, 6)) || 0) + 1);
-      const estante = [...cuenta.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0][0];
+      const ordenadas = [...cuenta.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]));
+      const candidatas = ordenadas.filter(([, n]) => n >= 4).map(([e]) => e);
+      const opciones = candidatas.length ? candidatas : ordenadas.slice(0, 1).map(([e]) => e);
+      const [estante] = elegirDistinto(opciones, 1, azarDe(a), (e) => e, a.datos.estante ? [a.datos.estante] : null);
       a.datos.estante = estante;
       return inventario.bultos.filter((b) => b.legible && b.ubicacion.startsWith(estante)).map((b) => ({ id: b.codigo, texto: `Contá el bulto de ${b.ubicacion}` }));
     },
@@ -203,4 +242,5 @@ export function definirActividades(gestor, mundo) {
       eva.alEvento(a, tipo, d);
     },
   });
+  gestor.ruta = RUTA_SUGERIDA.filter((id) => gestor.obtener(id));
 }

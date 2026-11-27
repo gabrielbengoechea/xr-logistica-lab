@@ -1,0 +1,44 @@
+name: Artigas-1 web (navegador)
+
+# Sprint 02 (B14): las pruebas de navegador del recorrido web corren en cada PR que toca el recorrido.
+# Chrome sin interfaz con WebGL por software (SwiftShader), como en las corridas locales. No mide fps del Quest.
+# vision.py queda afuera mientras tenga la falla previa «luz: sin parpadeos» (ver docs/SPRINT_02_*.md).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web-dashboard/public/artigas1/**"
+      - "artigas1-vr/Tools/pruebas-web/**"
+      - "backend/app/schemas.py"
+      - ".github/workflows/artigas1-web.yml"
+  pull_request:
+    paths:
+      - "web-dashboard/public/artigas1/**"
+      - "artigas1-vr/Tools/pruebas-web/**"
+      - "backend/app/schemas.py"
+      - ".github/workflows/artigas1-web.yml"
+
+jobs:
+  navegador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Dependencias (Playwright con el Chrome del runner; pydantic para validar SessionReport)
+        run: python -m pip install -q playwright -r backend/requirements-dev.txt
+      - name: Servir el recorrido
+        working-directory: web-dashboard/public
+        run: |
+          python -m http.server 8765 > /tmp/servidor.log 2>&1 &
+          for i in $(seq 1 20); do curl -sf http://localhost:8765/artigas1/ > /dev/null && break; sleep 0.5; done
+      - name: Física 0G sobre la estación real
+        run: python artigas1-vr/Tools/pruebas-web/fisica.py
+        env:
+          CHROME: /usr/bin/google-chrome
+      - name: Juego completo (actividades, sesión, consentimiento, telemetría)
+        run: python artigas1-vr/Tools/pruebas-web/juego.py
+        env:
+          CHROME: /usr/bin/google-chrome

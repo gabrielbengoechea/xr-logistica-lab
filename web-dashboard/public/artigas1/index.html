@@ -21,6 +21,9 @@
       #ayuda kbd { padding: 1px 5px; border: 1px solid #5a6b80; border-radius: 4px; font-size: 12px; }
       #panel a { color: #74acdf; font-size: 14px; }
       #ocultar { position: absolute; right: 10px; top: 8px; background: none; border: 0; color: #9fb0c4; font-size: 18px; cursor: pointer; }
+      #sesion { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+      #sesion p { margin: 0; flex: 1; color: #e8eef6; }
+      #nuevo-estudiante { padding: 8px 12px; border: 1px solid #fcd116; border-radius: 8px; background: #2a2410; color: #fcd116; font-size: 14px; cursor: pointer; }
       #cargando { position: fixed; inset: 0; display: grid; place-items: center; color: #e8eef6; font-size: 18px; background: #000; }
       #fundido { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
       @media (max-width: 600px) { #panel { left: 8px; right: 8px; top: auto; bottom: 8px; max-width: none; } #ayuda { display: none; } }
@@ -34,10 +37,14 @@
       <button id="ocultar" type="button" aria-label="Ocultar el panel">×</button>
       <h1>Estación Artigas-1</h1>
       <p>La primera estación logística de Uruguay, en órbita. Tomá la pistola lectora, escaneá la carga, guardá contenedores, hacé el mantenimiento del taller y salí a una caminata espacial. Las actividades se inician en los terminales amarillos, en la tablet o en el mapa.</p>
+      <div id="sesion" role="group" aria-label="Sesión del estudiante">
+        <p id="sesion-estado" aria-live="polite">Sin iniciar sesión</p>
+        <button id="nuevo-estudiante" type="button">Nuevo estudiante</button>
+      </div>
       <div id="modulos" role="group" aria-label="Ir a un módulo"></div>
       <p id="ayuda">
         Estás en gravedad cero: el cuerpo conserva el impulso y las paredes son sólidas.<br />
-        <b>Quest:</b> tocá «Enter VR». <kbd>Stick izq.</kbd> moverte hacia donde mirás; <kbd>X</kbd>/<kbd>Y</kbd> bajar y subir. <kbd>Stick der.</kbd> girar 30° a los costados y 20° arriba o abajo (la vista parpadea a negro para que no maree). <kbd>Grip</kbd> tomar objetos y agarrarte de barandas. <kbd>Gatillo izq.</kbd> mapa. <kbd>Gatillo der.</kbd> usar la herramienta o apretar un botón apuntándole. <kbd>A</kbd> freno, <kbd>B</kbd> enderezarte. Al moverte se oscurecen los bordes de la vista: se ajusta en la tablet. Los contenedores se amarran con el <kbd>Gatillo</kbd> de la mano libre junto al trinquete naranja (tres veces). Para ver los fps en el visor, abrí la dirección con <kbd>?fps</kbd> al final.<br />
+        <b>Quest:</b> tocá «Entrar en realidad virtual». <kbd>Stick izq.</kbd> moverte hacia donde mirás; <kbd>X</kbd>/<kbd>Y</kbd> bajar y subir. <kbd>Stick der.</kbd> girar 30° a los costados y 20° arriba o abajo (la vista parpadea a negro para que no maree). <kbd>Grip</kbd> tomar objetos y agarrarte de barandas. <kbd>Gatillo izq.</kbd> mapa. <kbd>Gatillo der.</kbd> usar la herramienta o apretar un botón apuntándole. <kbd>A</kbd> freno, <kbd>B</kbd> enderezarte. Al moverte se oscurecen los bordes de la vista: se ajusta en la tablet. Los contenedores se amarran con el <kbd>Gatillo</kbd> de la mano libre junto al trinquete naranja (tres veces).<br />
         <b>Compu:</b> arrastrá para mirar, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> moverte, <kbd>Q</kbd>/<kbd>E</kbd> bajar y subir, <kbd>Espacio</kbd> frenar, <kbd>F</kbd> tomar o soltar, <kbd>X</kbd> gatillo, <kbd>M</kbd> mapa, <kbd>T</kbd> tablet, <kbd>V</kbd> verte de afuera. Los botones de los paneles se aprietan con un clic.
       </p>
       <p><a href="../">← Volver a los simuladores</a></p>

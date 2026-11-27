@@ -36,6 +36,7 @@ export function formatoTiempo(segundos) {
  * @property {number} [limite]      Segundos máximos; al pasarlos la actividad falla.
  * @property {(a: Actividad) => {id: string, texto: string}[]} pasos
  * @property {(a: Actividad, tipo: string, datos: object) => void} alEvento
+ * @property {(a: Actividad) => string} [sinPasos]  Mensaje para cuando no hay pasos que hacer.
  */
 
 export class Actividad {
@@ -93,6 +94,19 @@ export class GestorActividades {
     /** @type {Actividad|null} */
     this.activa = null;
     this._oyentes = [];
+    /** Por qué falló el último `iniciar` ('' si arrancó). */
+    this.motivoNoInicio = '';
+    /** Orden sugerido de las actividades (B11): ids. No bloquea nada, solo recomienda. */
+    this.ruta = [];
+  }
+
+  /** La siguiente actividad recomendada: la primera de la ruta que todavía no está completada ni bloqueada. */
+  recomendada() {
+    for (const id of this.ruta) {
+      const a = this.actividades.get(id);
+      if (a && a.estado !== ESTADO.COMPLETADA && a.estado !== ESTADO.BLOQUEADA) return a;
+    }
+    return null;
   }
 
   /** @param {Definicion} def */
@@ -126,11 +140,30 @@ export class GestorActividades {
     return '';
   }
 
-  /** Inicia (o reinicia, si ya se había jugado) una actividad. */
+  /**
+   * Inicia (o reinicia, si ya se había jugado) una actividad.
+   * Una actividad sin pasos válidos no se activa: quedaría ACTIVA para siempre (nunca se cumple «todos los
+   * pasos hechos») y bloquearía a las demás. En ese caso devuelve false, deja el motivo en `motivoNoInicio`
+   * y avisa con el evento 'sin_pasos'.
+   */
   iniciar(id) {
-    if (this.impedimento(id)) return false;
+    this.motivoNoInicio = '';
+    const impedimento = this.impedimento(id);
+    if (impedimento) { this.motivoNoInicio = impedimento; return false; }
     const a = this.actividades.get(id);
-    a.pasos = a.def.pasos(a).map((p) => ({ ...p, hecho: false }));
+    let pasos;
+    try {
+      pasos = (a.def.pasos(a) || []).filter((p) => p && typeof p.id === 'string' && p.id);
+    } catch (e) {
+      console.error(`actividad ${id}: no se pudieron armar los pasos`, e);
+      pasos = [];
+    }
+    if (!pasos.length) {
+      this.motivoNoInicio = (a.def.sinPasos && a.def.sinPasos(a)) || `«${a.def.titulo}» no tiene tareas pendientes ahora`;
+      this._emitir('sin_pasos', a, this.motivoNoInicio);
+      return false;
+    }
+    a.pasos = pasos.map((p) => ({ ...p, hecho: false }));
     a.tiempo = 0;
     a.errores = 0;
     a.intentos++;

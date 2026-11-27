@@ -14,6 +14,8 @@ export class Sonido {
   constructor() {
     this.ctx = null;
     this.volumen = 0.25;
+    /** Volumen elegido en la tablet (0 a 1, B23): multiplica al de fábrica. Es un ajuste del visor. */
+    this.factor = 1;
     /** Último sonido pedido: lo leen las pruebas. */
     this.ultimo = '';
     const activar = () => {
@@ -30,7 +32,8 @@ export class Sonido {
   tocar(nombre) {
     this.ultimo = nombre;
     const tonos = TONOS[nombre];
-    if (!this.ctx || !tonos) return;
+    const volumen = this.volumen * Math.max(0, Math.min(1, this.factor));
+    if (!this.ctx || !tonos || volumen <= 0) return;
     if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
     const t0 = this.ctx.currentTime;
     for (const [frecuencia, inicio, duracion] of tonos) {
@@ -39,7 +42,7 @@ export class Sonido {
       osc.type = nombre === 'error' || nombre === 'esclusa' ? 'sawtooth' : 'sine';
       osc.frequency.value = frecuencia;
       gan.gain.setValueAtTime(0, t0 + inicio);
-      gan.gain.linearRampToValueAtTime(this.volumen, t0 + inicio + 0.008);
+      gan.gain.linearRampToValueAtTime(volumen, t0 + inicio + 0.008);
       gan.gain.exponentialRampToValueAtTime(0.0008, t0 + inicio + duracion);
       osc.connect(gan).connect(this.ctx.destination);
       osc.start(t0 + inicio);
