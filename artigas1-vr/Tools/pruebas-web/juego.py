@@ -980,10 +980,15 @@ async () => {
     A.ir(id); A.rig.quaternion.setFromAxisAngle(V(0, 1, 0), yaw); A.camera.rotation.set(0, 0, 0); pasos(4, DT);
     PV.activo = true; pasos(1, 0); A.renderer.render(A.scene, A.camera); const a = leer(); const n = A.renderer.info.render.calls;
     PV.activo = false; pasos(1, 0); A.renderer.render(A.scene, A.camera); const b = leer(); const nTodo = A.renderer.info.render.calls; PV.activo = true;
-    let dif = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30) dif++;
+    // Un píxel cuenta si algún canal cambia más de 24/255 (~10 %). Con Chrome 157 (runner de GitHub) el borde
+    // diagonal de la escotilla del fondo de Rivera se suaviza distinto según lo que haya detrás: 6 px que cambian
+    // 10 a 12 niveles por canal (Sprint 03). Lo que este control busca, geometría que aparece o desaparece,
+    // cambia decenas de niveles.
+    const distinto = (i) => Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])) > 24;
+    let dif = 0; for (let i = 0; i < a.length; i += 4) if (distinto(i)) dif++;
     if (dif > 3) {
       const muestra = [];
-      for (let i = 0; i < a.length && muestra.length < 8; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30) {
+      for (let i = 0; i < a.length && muestra.length < 8; i += 4) if (distinto(i)) {
         const k = i / 4; muestra.push(`(${k % W8},${H8 - 1 - Math.floor(k / W8)}) con ${a[i]},${a[i + 1]},${a[i + 2]} sin ${b[i]},${b[i + 1]},${b[i + 2]}`);
       }
       difPortales.push(`${id} ${yaw ? 'atrás' : 'adelante'}: ${dif} px · ${muestra.join(' · ')}`);
@@ -992,7 +997,7 @@ async () => {
         for (let yy = 0; yy < H8; yy++) for (let xx = 0; xx < W8 * 4; xx++) im.data[yy * W8 * 4 + xx] = px[(H8 - 1 - yy) * W8 * 4 + xx];
         x.putImageData(im, 0, 0); return c.toDataURL('image/png'); };
       const mapa = new Uint8Array(a.length);
-      for (let i = 0; i < a.length; i += 4) { const d = Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30; mapa[i] = d ? 255 : a[i] / 3; mapa[i + 1] = a[i + 1] / 3; mapa[i + 2] = a[i + 2] / 3; mapa[i + 3] = 255; }
+      for (let i = 0; i < a.length; i += 4) { const d = distinto(i); mapa[i] = d ? 255 : a[i] / 3; mapa[i + 1] = a[i + 1] / 3; mapa[i + 2] = a[i + 2] / 3; mapa[i + 3] = 255; }
       window.__fotosPortales = Object.assign(window.__fotosPortales || {}, { [`portal_${id}_${yaw ? 'atras' : 'adelante'}_con`]: aPng(a), [`portal_${id}_${yaw ? 'atras' : 'adelante'}_sin`]: aPng(b), [`portal_${id}_${yaw ? 'atras' : 'adelante'}_dif`]: aPng(mapa) });
     }
     llamadasPortal[`${id}${yaw ? '_atras' : ''}`] = `${nTodo}→${n}`;
