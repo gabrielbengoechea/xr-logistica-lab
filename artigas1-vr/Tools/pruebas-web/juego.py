@@ -980,7 +980,23 @@ async () => {
     PV.activo = true; pasos(1, 0); A.renderer.render(A.scene, A.camera); const a = leer(); const n = A.renderer.info.render.calls;
     PV.activo = false; pasos(1, 0); A.renderer.render(A.scene, A.camera); const b = leer(); const nTodo = A.renderer.info.render.calls; PV.activo = true;
     let dif = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30) dif++;
-    if (dif > 3) difPortales.push(`${id} ${yaw ? 'atrás' : 'adelante'}: ${dif} px`);
+    if (dif > 3) {
+      difPortales.push(`${id} ${yaw ? 'atrás' : 'adelante'}: ${dif} px`);
+      // DIAGNÓSTICO TEMPORAL: qué objeto hay en cada píxel distinto (con todo dibujado)
+      const visto = {}; const ray = new T.Raycaster(); PV.activo = false; pasos(1, 0);
+      A.renderer.render(A.scene, A.camera); const b2 = leer(); let inestable = 0;
+      for (let i = 0; i < b.length; i++) if (b[i] !== b2[i]) inestable++;
+      for (let i = 0; i < a.length; i += 4) {
+        const d = Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]); if (d <= 30) continue;
+        const px = (i / 4) % W8, py = Math.floor(i / 4 / W8);
+        ray.setFromCamera(new T.Vector2((px + 0.5) / W8 * 2 - 1, (py + 0.5) / H8 * 2 - 1), A.camera);
+        const hits = ray.intersectObjects(A.scene.children, true).filter((h) => h.object.visible).slice(0, 3)
+          .map((h) => `${h.object.name || h.object.type}@${h.distance.toFixed(3)}`);
+        visto[`${px},${py} d${d} a[${a[i]},${a[i+1]},${a[i+2]}] b[${b[i]},${b[i+1]},${b[i+2]}]`] = hits;
+      }
+      PV.activo = true; const vis = PV.calcular(A.camera.getWorldPosition(new T.Vector3()), false);
+      console.warn('DIAG portales ' + JSON.stringify({ id, yaw, inestable, visiblesConPortales: [...vis], visto }));
+    }
     llamadasPortal[`${id}${yaw ? '_atras' : ''}`] = `${nTodo}→${n}`;
   }
   pasos(1, 0);
