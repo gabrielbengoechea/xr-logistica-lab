@@ -979,7 +979,10 @@ async () => {
     A.ir(id); A.rig.quaternion.setFromAxisAngle(V(0, 1, 0), yaw); A.camera.rotation.set(0, 0, 0); pasos(4, DT);
     PV.activo = true; pasos(1, 0); A.renderer.render(A.scene, A.camera); const a = leer(); const n = A.renderer.info.render.calls;
     PV.activo = false; pasos(1, 0); A.renderer.render(A.scene, A.camera); const b = leer(); const nTodo = A.renderer.info.render.calls; PV.activo = true;
-    let dif = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30) dif++;
+    // Umbral 60 (suma de RGB): con antialiasing (MSAA), en el borde de una escotilla cerrada alguna submuestra ve
+    // el módulo de al lado por la rendija con el marco, y ese píxel cambia unos 10 o 12 niveles por canal (en el
+    // Chrome de CI pasa en «rivera adelante»: 6 px de 31 a 39). Un objeto que falta de verdad cambia mucho más.
+    let dif = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 60) dif++;
     if (dif > 3) difPortales.push(`${id} ${yaw ? 'atrás' : 'adelante'}: ${dif} px`);
     llamadasPortal[`${id}${yaw ? '_atras' : ''}`] = `${nTodo}→${n}`;
   }
