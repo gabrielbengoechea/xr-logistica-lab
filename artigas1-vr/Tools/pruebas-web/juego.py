@@ -811,7 +811,12 @@ async () => {
   ok('esclusa: cerca, el botón SALIR AL EXTERIOR inicia la transición', A.transicion.activa && !EV.afuera);
   seg(0.3); ok('esclusa: durante la transición no se puede mover', (() => { izq.stick(0, -1); seg(0.3); izq.stick(0, 0); return L.velocidad.length() < 0.01; })());
   seg(3);
-  ok('caminata: aparece afuera, frente a la escotilla, con la misma orientación', EV.afuera && cabeza().distanceTo(ES.salida) < 0.05 && A.rig.quaternion.angleTo(qAntes) < 1e-6, cabeza().toArray().map((x) => +x.toFixed(2)));
+  // Sprint 02 (B17): sale frente a la escotilla y, con la vista a negro, gira solo alrededor de su «arriba» para mirar a la estación
+  const arribaEva = V(0, 1, 0).applyQuaternion(A.rig.quaternion), arribaAntes = V(0, 1, 0).applyQuaternion(qAntes);
+  const hacia = V(0, 0.6, -3).sub(cabeza()).projectOnPlane(arribaEva).normalize();
+  const miraEva = A.camera.getWorldDirection(V(0, 0, 0)).projectOnPlane(arribaEva).normalize();
+  ok('caminata: aparece afuera, frente a la escotilla, mirando hacia la estación (solo gira en horizontal)', EV.afuera && cabeza().distanceTo(ES.salida) < 0.05 && arribaEva.angleTo(arribaAntes) < 1e-6 && miraEva.dot(hacia) > 0.99, [cabeza().toArray().map((x) => +x.toFixed(2)), +miraEva.dot(hacia).toFixed(3)]);
+  A.rig.quaternion.copy(qAntes);                       // el resto de la fase supone la orientación de antes
   ok('caminata: traje puesto (guantes presurizados, casco con indicadores, cable a la vista)', M.grosor === 1.28 && EV.casco.visible && EV.hud.malla.visible && EV.cable.linea.visible && X.grupo.visible && X.colisiones.activo);
   ok('caminata: el paso «salir» queda hecho y el mapa dice «exterior»', G.obtener('eva').pasos[0]?.hecho && A.navegacion.actual === 'exterior');
   // el casco exterior es sólido
@@ -1184,6 +1189,43 @@ async () => {
   const inf = sesion && sesion.cuerpo;
   ok('telemetría: la sesión cuenta los pasos de las actividades como piezas y termina con session_end', inf && inf.parts_total > 0 && inf.parts_placed <= inf.parts_total && inf.parts_placed > 0 && inf.events[inf.events.length - 1].type === 'session_end' && inf.scenario === 'artigas1-web', inf && [inf.parts_placed, inf.parts_total, inf.assembly_errors, inf.hints_used]);
 
+  // =========================================================================================== FASE 15
+  fase('FASE 15 · Sprint 02: variación, ruta sugerida, debrief y Cúpula');
+  if (G.activa) G.abandonar();
+  A.panelInforme.malla.visible = false;
+  // B07: dos intentos seguidos de Recepción y de Conteo piden otro contenido
+  const intento15 = (id) => { A.acciones.iniciarActividad(id); const a = G.obtener(id); const r = { pasos: a.pasos.map((p) => p.id).join(), estante: a.datos.estante, variante: a.datos.variante }; G.abandonar(); return r; };
+  const rec1 = intento15('recepcion'), rec2 = intento15('recepcion');
+  ok('B07: dos intentos de Recepción piden manifiestos distintos', rec1.pasos !== rec2.pasos && /^\d+-\d+$/.test(rec2.variante), [rec1.variante, rec2.variante]);
+  const con1 = intento15('inventario'), con2 = intento15('inventario');
+  ok('B07: dos intentos de Conteo cuentan estanterías distintas', con1.estante !== con2.estante, [con1.estante, con2.estante]);
+  const inicios15 = TL.eventos.filter((e) => e.type === 'activity_start' && /variante/.test(e.detail || ''));
+  ok('B07: la variante queda en la telemetría (activity_start)', inicios15.length >= 4, inicios15.slice(-2).map((e) => e.detail));
+  // B11: la ruta existe y la tablet nombra la siguiente
+  ok('B11: el gestor tiene la ruta sugerida de las ocho actividades', G.ruta.length === 8 && G.ruta[0] === 'recepcion' && G.ruta[7] === 'eva', G.ruta);
+  // B05/B10: instrucciones en pasos cortos y debrief con POR QUÉ IMPORTA
+  A.acciones.iniciarActividad('almacenamiento');
+  const PI15 = A.panelInforme; PI15.redibujar();
+  ok('B10: las instrucciones son pasos cortos con objetivo (panel abierto, con ENTENDIDO)', PI15.malla.visible && PI15.botones.some((b) => b.id === 'cerrar'));
+  G.obtener('almacenamiento').fallar('prueba de debrief'); pasos(1); PI15.redibujar();
+  ok('B05: el resultado ofrece POR QUÉ IMPORTA', PI15.botones.some((b) => b.id === 'porque'));
+  PI15.botones.find((b) => b.id === 'porque').accion(); PI15.redibujar();
+  ok('B05: POR QUÉ IMPORTA muestra el debrief y permite volver y cerrar', ['volver-resultado', 'cerrar'].every((id) => PI15.botones.some((b) => b.id === id)));
+  PI15.botones.find((b) => b.id === 'cerrar').accion();
+  // B17: en la Cúpula, mirando a los pies, se oculta el torso
+  A.ir('cupula'); pasos(3);
+  A.rig.quaternion.identity(); A.camera.rotation.set(-1.4, 0, 0); pasos(2);
+  const oculto15 = !A.manos.torso.visible && A.manos.ocultarTorso;
+  A.camera.rotation.set(0, 0, 0); pasos(2);
+  ok('B17: en la Cúpula, mirando abajo, el torso se oculta y vuelve al mirar al frente', A.navegacion.actual === 'cupula' && oculto15 && A.manos.torso.visible, [A.navegacion.actual, oculto15]);
+  A.ir('rivera'); pasos(3);
+  // B23: volumen en AJUSTES de la tablet; es un ajuste del visor (queda guardado)
+  const tabV = A.tablets[0]; tabV.ir('ajustes'); tabV.panel.redibujar();
+  const volAntes = A.ajustes.volumen;
+  tabV.panel.botones.find((b) => b.id === 'vol-').accion();
+  ok('B23: el volumen baja desde AJUSTES, se aplica al sonido y se guarda', A.ajustes.volumen === volAntes - 0.25 && A.sonido.factor === A.ajustes.volumen && JSON.parse(window.localStorage.getItem('artigas1.ajustes')).volumen === A.ajustes.volumen, [volAntes, A.ajustes.volumen]);
+  tabV.panel.botones.find((b) => b.id === 'vol+').accion(); tabV.ir('inicio');
+
   // =========================================================================================== FASE 14
   fase('FASE 14 · Sprint 01: almacenamiento repetido y nuevo estudiante');
   if (G.activa) G.abandonar();
@@ -1223,7 +1265,8 @@ async () => {
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path=os.environ.get("CHROME", "/usr/bin/google-chrome"),
-                                    args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
+                                    args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
+                                          "--host-resolver-rules=MAP aula.test 127.0.0.1"])
         pg = await b.new_page(viewport={"width": 640, "height": 360})
         errs = []
         consola = []
@@ -1311,6 +1354,18 @@ async def main():
         gets4 = [x for x in pedidos4 if x.startswith("GET") and x.endswith("/api/v1/health")]
         res["R"].append({"nombre": "B26: con registro aceptado en un servidor estático: una sola prueba de salud, ningún POST, telemetría apagada", "pasa": not posts4 and len(gets4) == 1 and est["backend"] == "ausente" and not est["activa"], "dato": {"pedidos": pedidos4, "errores_consola": consola4[:3]}})
         res["R"].append({"nombre": "B02: ?alumno= solo propone el código; queda confirmado en la sesión y no se guarda en el navegador", "pasa": est["sugerido"] == "31" and est["paso"] == "lista" and est["alumno"] == "31" and est["alumnoGuardado"] is None, "dato": est})
+        # B24: con un nombre que no es local, window.artigas1 no existe salvo con ?depurar (y ahí no hay telemetría)
+        base = os.environ.get("URL", "http://localhost:8765/artigas1/").replace("localhost", "aula.test")
+        pg5 = await b.new_page(viewport={"width": 320, "height": 180})
+        await pg5.goto(base)
+        await pg5.wait_for_function("!document.getElementById('cargando')", timeout=120000)
+        sin = await pg5.evaluate("typeof window.artigas1")
+        await pg5.goto(base + "?depurar")
+        await pg5.wait_for_function("!!window.artigas1", timeout=120000)
+        con = await pg5.evaluate("[window.artigas1.telemetria.config.backend, window.artigas1.telemetria.estadoBackend]")
+        await pg5.close()
+        res["R"].append({"fase": "Sprint 02 · acceso de depuración"})
+        res["R"].append({"nombre": "B24: en un host no local no hay window.artigas1; con ?depurar sí, y la telemetría queda apagada", "pasa": sin == "undefined" and con == [None, "ninguno"], "dato": [sin, con]})
         mal = total = 0
         for r in res["R"]:
             if "fase" in r:

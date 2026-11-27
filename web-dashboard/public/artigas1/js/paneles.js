@@ -102,7 +102,10 @@ export class PanelVR {
       ctx.strokeStyle = encima ? COLORES.blanco : COLORES.celeste;
       ctx.stroke();
       ctx.fillStyle = !b.activo ? COLORES.gris : destello || b.estilo === 'aviso' || encima ? '#0b1420' : COLORES.blanco;
-      ctx.font = `bold ${Math.round(Math.min(b.h * 0.42, 34))}px sans-serif`;
+      // la etiqueta se achica si no entra en el botón (antes, PRÁCTICA GUIADA se salía de la tablet)
+      let px = Math.round(Math.min(b.h * 0.42, 34));
+      ctx.font = `bold ${px}px sans-serif`;
+      while (px > 14 && ctx.measureText(b.texto || '').width > b.w - 20) { px -= 2; ctx.font = `bold ${px}px sans-serif`; }
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(b.texto || '', b.x + b.w / 2, b.y + b.h / 2 + 1);

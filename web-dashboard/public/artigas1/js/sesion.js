@@ -32,7 +32,7 @@ export function limpiarDatosDeSesion(almacen) {
  */
 export function conectarTelemetria(gestor, telemetria) {
   gestor.escuchar((tipo, a) => {
-    if (tipo === 'inicio') telemetria.registrar('activity_start', a.id);
+    if (tipo === 'inicio') telemetria.registrar('activity_start', a.id, null, a.datos && a.datos.variante ? `variante ${a.datos.variante}` : null);
     if (tipo === 'paso' || tipo === 'error') telemetria.progreso(a.pasos.length, a.hechos, a.errores);
     if (tipo === 'fin' || tipo === 'abandono') {
       const r = a.resultado;

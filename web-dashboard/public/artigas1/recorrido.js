@@ -17,6 +17,7 @@
 //   js/materiales.js, js/entorno.js, js/etiquetas.js, js/barandas.js
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { armarEstacion } from './js/estacion.js';
 import { Locomocion0G } from './js/locomocion.js';
@@ -51,6 +52,8 @@ import { CambioFiltro, crearPantallaSoporte } from './js/filtro.js';
 import { Induccion, crearPanelBienvenida, crearPanelInduccion } from './js/induccion.js';
 import { PASO_SESION, SesionEstudiante, conectarTelemetria, crearPanelSesion, resumenParaCerrar } from './js/sesion.js';
 import { traducirBotonVR } from './js/entrada.js';
+import { consejos, contenido, pasosCortos } from './js/debrief.js';
+import { esServidorLocal, torsoOcultoEnCupula } from './js/vista.js';
 
 const INICIO = 'rivera';
 
@@ -61,10 +64,10 @@ const INICIO = 'rivera';
 const VERSION_AJUSTES = 3;
 const AJUSTES_BASE = {
   version: VERSION_AJUSTES, giro: 'pasos', sensibilidad: 1, velocidad: 1, giroVertical: true, limiteInclinacion: 80,
-  zonaMuerta: 0.2, frenoAsistido: false, tunel: 'medio', calibracionManos: 0,
+  zonaMuerta: 0.2, frenoAsistido: false, tunel: 'medio', calibracionManos: 0, volumen: 1,
 };
 /** Límites de los ajustes numéricos que se cambian desde la tablet. */
-const RANGOS_AJUSTES = { sensibilidad: [0.5, 2], velocidad: [0.5, 1.5], zonaMuerta: [0.1, 0.4] };
+const RANGOS_AJUSTES = { sensibilidad: [0.5, 2], velocidad: [0.5, 1.5], zonaMuerta: [0.1, 0.4], volumen: [0, 1] };
 /** Opciones para mirar arriba y abajo con el stick: apagado o límite de inclinación en grados. */
 const LIMITES_INCLINACION = [0, 45, 60, 80];
 const ajustes = { ...AJUSTES_BASE };
@@ -115,8 +118,10 @@ const manager = new THREE.LoadingManager();
 manager.onProgress = (_url, hechos, total) => { pct.textContent = `${Math.round((hechos / total) * 100)} %`; };
 manager.onError = (url) => { pct.textContent = '· falta una parte de la estación; probá recargar la página'; console.warn(`no se pudo cargar ${url}`); };
 const loader = new GLTFLoader(manager);
+loader.setMeshoptDecoder(MeshoptDecoder);        // estacion.glb va comprimido con meshopt (B20: 4,2 MB → 1,5 MB)
 
 const sonido = new Sonido();
+sonido.factor = ajustes.volumen;
 const manos = new Manos(renderer, rig, scene, camera);
 manos.calibrar(ajustes.calibracionManos);
 // el guante de Blender llega aparte: mientras tanto (o si no llega) se ven las manos de cápsulas
@@ -249,7 +254,7 @@ const panelInforme = new PanelVR({ ancho: 0.74, alto: 0.48, px: 1110, nombre: 'I
   ctx.strokeRect(3, 3, W - 6, H - 6);
   if (!a) return;
   const r = a.resultado;
-  const fin = informe.modo === 'resultado' && r;
+  const fin = (informe.modo === 'resultado' || informe.modo === 'porque') && r;
   ctx.fillStyle = fin ? (r.completada ? '#14532d' : '#7f1d1d') : COLORES.azul;
   ctx.fillRect(6, 6, W - 12, 84);
   ctx.fillStyle = COLORES.blanco;
@@ -257,29 +262,49 @@ const panelInforme = new PanelVR({ ancho: 0.74, alto: 0.48, px: 1110, nombre: 'I
   ctx.fillText(a.def.titulo, 30, 62);
   ctx.font = '26px sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText(fin ? (r.completada ? 'COMPLETADA' : 'NO SUPERADA') : 'INSTRUCCIONES', W - 30, 60);
+  ctx.fillText(informe.modo === 'porque' && fin ? 'POR QUÉ IMPORTA' : fin ? (r.completada ? 'COMPLETADA' : 'NO SUPERADA') : 'INSTRUCCIONES', W - 30, 60);
   ctx.textAlign = 'left';
   let y = 140;
-  if (fin) {
+  const c = contenido(a.id);
+  const parrafo = (texto, color, fuente, max = 4, alto = 36) => {
+    ctx.fillStyle = color;
+    ctx.font = fuente;
+    for (const linea of renglones(ctx, texto, W - 60).slice(0, max)) { ctx.fillText(linea, 30, y); y += alto; }
+  };
+  if (fin && informe.modo === 'porque' && c) {
+    // debrief (B05 y B27): por qué importa, el caso terrestre y lo que está simplificado
+    parrafo('Por qué importa', COLORES.amarillo, 'bold 28px sans-serif', 1, 38);
+    parrafo(c.porQue, COLORES.blanco, '27px sans-serif', 4, 35);
+    y += 12;
+    parrafo('En tierra', COLORES.amarillo, 'bold 28px sans-serif', 1, 38);
+    parrafo(c.enTierra, COLORES.blanco, '27px sans-serif', 3, 35);
+    if (c.ficcion) { y += 10; parrafo(`En el simulador: ${c.ficcion}`, COLORES.gris, '23px sans-serif', 2, 30); }
+    p.boton('volver-resultado', 30, H - 110, 320, 80, '◀ RESULTADO', () => { informe.modo = 'resultado'; panelInforme.sucio = true; });
+  } else if (fin) {
     ctx.font = 'bold 34px sans-serif';
     ctx.fillStyle = COLORES.amarillo;
     ctx.fillText(r.completada ? `${r.puntaje} puntos  ${'★'.repeat(r.puntaje >= 85 ? 3 : r.puntaje >= 60 ? 2 : 1)}` : r.motivo, 30, y);
-    y += 58;
-    ctx.font = '30px sans-serif';
+    y += 52;
+    ctx.font = '28px sans-serif';
     ctx.fillStyle = COLORES.blanco;
-    for (const linea of [`Tiempo: ${formatoTiempo(r.segundos)} (referencia ${formatoTiempo(a.def.referencia)})`, `Errores: ${r.errores}`, `Pasos: ${r.pasos} de ${r.total}`, `Qué practicaste: ${a.def.concepto}`]) {
+    for (const linea of [`Tiempo: ${formatoTiempo(r.segundos)} (referencia ${formatoTiempo(a.def.referencia)})   ·   Errores: ${r.errores}   ·   Pasos: ${r.pasos} de ${r.total}`, `Qué practicaste: ${a.def.concepto}`]) {
       ctx.fillText(linea, 30, y);
-      y += 46;
+      y += 42;
     }
-    p.boton('repetir', 30, H - 110, 320, 80, 'REPETIR', () => { cerrarInforme(); iniciarActividad(a.id); }, { estilo: 'aviso' });
+    y += 6;
+    parrafo('Para la próxima', COLORES.celeste, 'bold 27px sans-serif', 1, 36);
+    for (const consejo of consejos(a).slice(0, 2)) parrafo(`• ${consejo}`, COLORES.blanco, '25px sans-serif', 2, 32);
+    p.boton('repetir', 30, H - 110, 300, 80, 'REPETIR', () => { cerrarInforme(); iniciarActividad(a.id); }, { estilo: 'aviso' });
+    if (c) p.boton('porque', 350, H - 110, 380, 80, 'POR QUÉ IMPORTA', () => { informe.modo = 'porque'; panelInforme.sucio = true; });
   } else {
-    ctx.font = '30px sans-serif';
-    ctx.fillStyle = COLORES.blanco;
-    for (const linea of renglones(ctx, a.def.instrucciones, W - 60)) { ctx.fillText(linea, 30, y); y += 40; }
-    y += 14;
-    ctx.fillStyle = COLORES.amarillo;
-    ctx.font = 'bold 28px sans-serif';
-    if (a.pasoActual) for (const linea of renglones(ctx, `Primer paso: ${a.pasoActual.texto}`, W - 60)) { ctx.fillText(linea, 30, y); y += 38; }
+    // instrucciones en pasos cortos (B10), con el objetivo arriba
+    if (c) {
+      parrafo(`Objetivo: ${c.objetivo}`, COLORES.celeste, 'bold 28px sans-serif', 2, 36);
+      y += 8;
+      pasosCortos(a).forEach((t, i) => parrafo(`${i + 1}. ${t}`, COLORES.blanco, '29px sans-serif', 2, 38));
+    } else parrafo(a.def.instrucciones, COLORES.blanco, '30px sans-serif', 9, 40);
+    y += 10;
+    if (a.pasoActual) parrafo(`Ahora: ${a.pasoActual.texto}`, COLORES.amarillo, 'bold 28px sans-serif', 2, 38);
   }
   p.boton('cerrar', W - 350, H - 110, 320, 80, fin ? 'CERRAR' : 'ENTENDIDO', () => cerrarInforme());
 } });
@@ -333,7 +358,11 @@ function crearTerminal(idActividad, posicion, giroY, extra = null) {
       if (a.ultimoAviso) { ctx.fillStyle = COLORES.celeste; ctx.fillText(a.ultimoAviso.slice(0, 64), 26, Math.min(y + 8, 440)); }
     } else {
       ctx.fillStyle = COLORES.blanco;
-      for (const linea of renglones(ctx, a.estado === ESTADO.BLOQUEADA ? gestor.impedimento(a.id) : a.def.instrucciones, W - 52).slice(0, 7)) { ctx.fillText(linea, 26, y); y += 34; }
+      // objetivo y pasos cortos (B10) en lugar del párrafo de instrucciones
+      const c = contenido(a.id);
+      const textos = a.estado === ESTADO.BLOQUEADA ? [gestor.impedimento(a.id)] : c ? [`Objetivo: ${c.objetivo}`, ...c.pasos.map((t, i) => `${i + 1}. ${t}`)] : [a.def.instrucciones];
+      const lineas = textos.flatMap((t) => renglones(ctx, t, W - 52));
+      for (const linea of lineas.slice(0, 7)) { ctx.fillText(linea, 26, y); y += 34; }
     }
     const ancho = extra ? 280 : 420;
     if (a.estado === ESTADO.ACTIVA) {
@@ -578,6 +607,7 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
           const r = RANGOS_AJUSTES[clave];
           ajustes[clave] = typeof valor === 'number' && r ? Math.round(THREE.MathUtils.clamp(valor, r[0], r[1]) * 100) / 100 : valor;
           guardarAjustes();
+          if (clave === 'volumen') { sonido.factor = ajustes.volumen; sonido.tocar('clic'); }
           t.panel.sucio = true;
         },
         siguienteInclinacion: () => {
@@ -803,6 +833,8 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   terminales.push(pantallaSoporte);
   definirActividades(gestor, {
     inventario, inspecciones, balance, descarga, filtro: cambioFiltro,
+    // B07: semilla de la sesión; con ?semilla=123 se reproduce un caso que reportó un docente
+    semilla: /^\d+$/.test(new URLSearchParams(window.location.search).get('semilla') || '') ? Number(new URLSearchParams(window.location.search).get('semilla')) : undefined,
     // Almacenamiento repetido con todo ya guardado: estos contenedores vuelven sueltos a su lugar de origen,
     // igual que los tanques del balance al iniciarlo (B01)
     reacomodarContenedores: (lista) => {
@@ -913,7 +945,9 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
   ir(INICIO);
   document.getElementById('cargando').remove();
   // para las pruebas automáticas y para depurar desde la consola
-  window.artigas1 = {
+  // B24: el acceso de depuración (pruebas automáticas y consola) solo en un servidor local o con ?depurar.
+  // Con ?depurar fuera de local, la telemetría se apaga: lo que se haga desde la consola no llega al panel docente.
+  const depuracion = {
     guanteListo, manosPoses: POSES,
     THREE, renderer, scene, camera, rig, loco, estacion, etiquetas, manos, orbital, texturasTierra: () => texTierraCargadas, flotantes, ir, manosDePrueba,
     inventario, amarres, medidorFps, lotes: () => lotes, portales: () => portales, telemetria, balance: () => balance, panelBalance: () => panelBalance, descarga: () => descarga, panelesDescarga: () => panelesDescarga, cambioFiltro: () => cambioFiltro, pantallaSoporte: () => pantallaSoporte, escaneres, tablets, terminales, paneles, gestor, navegacion, mapa, exterior, eva, inspecciones, transicion, confort, sonido, ajustes, guardarAjustes, inclinacionDelCuerpo,
@@ -921,6 +955,15 @@ Promise.all([loader.loadAsync('./estacion.glb'), cargarTexturasTierra(manager, a
     sesion, panelSesion, reinicio,
     avanzar: (dt = 1 / 72, dibujar = false) => cuadro(0, null, dt, !dibujar),
   };
+  const local = esServidorLocal(window.location);
+  if (local || new URLSearchParams(window.location.search).has('depurar')) {
+    window.artigas1 = depuracion;
+    if (!local) {
+      telemetria.config.backend = null;
+      telemetria.estadoBackend = 'ninguno';
+      console.info('Artigas-1: modo de depuración (window.artigas1). La telemetría queda apagada.');
+    }
+  }
 }).catch((e) => {
   pct.textContent = '· no se pudo cargar la estación. Recargá la página; si sigue igual, avisale a tu docente.';
   console.error(e);
@@ -1336,6 +1379,8 @@ function cuadro(_tiempo, _xrFrame, dtFijo = null, sinDibujar = false) {
       for (const p of Object.values(panelesDescarga)) if (p.malla.visible && p.malla.position.distanceToSquared(cabeza) < 25) p.sucio = true;
       if (pantallaSoporte.malla.visible && pantallaSoporte.malla.position.distanceToSquared(cabeza) < 16) pantallaSoporte.sucio = true;
     }
+    // B17: en la Cúpula, mirando hacia los pies (hacia la ventana central), el torso y las piernas se ocultan
+    manos.ocultarTorso = torsoOcultoEnCupula(navegacion.actual === 'cupula' && !eva.afuera, mirada.dot(arribaRig.copy(ARRIBA).applyQuaternion(rig.quaternion)), manos.ocultarTorso);
     manos.mostrar(dt);
     if (loco.ultimoChoque > 0.35) manos.vibrarTodas(Math.min(1, loco.ultimoChoque / 2), 30);
     for (const e of estacion.escotillas) e.actualizar(dt, cabeza);

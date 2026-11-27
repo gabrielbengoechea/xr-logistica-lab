@@ -378,6 +378,8 @@ export class Manos {
     this.calibracion = 0;
     /** Se puede apagar el cuerpo en primera persona (queda solo el guante con su puño). */
     this.cuerpoVisible = true;
+    /** Oculta solo torso y piernas (los brazos siguen): en la Cúpula, al mirar abajo, el cuerpo tapaba la ventana (B17). */
+    this.ocultarTorso = false;
     this._porIndice = [];
     this._frente = new THREE.Vector3(0, 0, -1);
     this._material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.82, metalness: 0.0 });
@@ -695,7 +697,7 @@ float banda(float z, float c, float a) { float w = max(fwidth(z), 1e-4); return 
   /** Torso, unidad de control, cadera y piernas debajo de la cabeza: se ven al mirar hacia abajo. */
   _cuerpo(ojos, arriba, frente, derecha, g) {
     const base = MANOS_MAX * PIEZAS_POR_LADO;
-    if (!this.cuerpoVisible) {
+    if (!this.cuerpoVisible || this.ocultarTorso) {
       if (this._cuerpoDibujado !== false) {
         for (let i = 0; i < PIEZAS_CUERPO; i++) this.malla.setMatrixAt(base + i, _cero);
         for (let i = ARO_CINTURA; i < AROS; i++) this.aros.setMatrixAt(i, _cero);

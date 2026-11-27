@@ -106,7 +106,9 @@ export class TabletLogistica {
     ctx.fillText(a ? a.def.titulo : 'Sin actividad en curso', 44, 502);
     ctx.font = '23px sans-serif';
     ctx.fillStyle = a ? COLORES.amarillo : COLORES.gris;
-    const texto = a ? (a.pasoActual ? `Ahora: ${a.pasoActual.texto}` : '') : 'Abrí ÓRDENES DE TRABAJO para empezar una. El mapa se abre con el gatillo izquierdo.';
+    const sugerida = this.gestor.recomendada ? this.gestor.recomendada() : null;
+    const texto = a ? (a.pasoActual ? `Ahora: ${a.pasoActual.texto}` : '')
+      : sugerida ? `Siguiente recomendada: ${sugerida.def.titulo}. Iniciala en ÓRDENES DE TRABAJO.` : 'Abrí ÓRDENES DE TRABAJO para empezar una. El mapa se abre con el gatillo izquierdo.';
     // sin actividad, a la derecha: la práctica guiada de los controles (js/induccion.js)
     const anchoTexto = !a && this.acciones.practica ? W - 96 - 300 : W - 96;
     renglones(ctx, texto, anchoTexto).slice(0, 2).forEach((r, i) => ctx.fillText(r, 44, 540 + i * 30));
@@ -168,7 +170,7 @@ export class TabletLogistica {
       ctx.fillStyle = COLORES.gris;
       if (!compacta) ctx.fillText(a.def.concepto, 32, y + Math.round(fila * 0.58));
       ctx.fillStyle = a.estado === ESTADO.COMPLETADA ? COLORES.verde : a.estado === ESTADO.FALLIDA ? COLORES.rojo : a.estado === ESTADO.BLOQUEADA ? COLORES.gris : COLORES.amarillo;
-      let detalle = ETIQUETA_ESTADO[a.estado];
+      let detalle = (this.gestor.recomendada && this.gestor.recomendada() === a && a.estado === ESTADO.DISPONIBLE ? 'Siguiente recomendada · ' : '') + ETIQUETA_ESTADO[a.estado];
       if (a.estado === ESTADO.ACTIVA || a.estado === ESTADO.PAUSADA) detalle += ` · ${formatoTiempo(a.tiempo)} · paso ${a.hechos + 1} de ${a.pasos.length} · ${a.errores} errores`;
       else if (a.resultado) detalle += a.resultado.completada ? ` · ${a.resultado.puntaje} puntos en ${formatoTiempo(a.resultado.segundos)} · ${a.resultado.errores} errores` : ` · ${a.resultado.motivo}`;
       else if (a.estado === ESTADO.BLOQUEADA) detalle += ` · ${this.gestor.impedimento(a.id)}`;
@@ -230,7 +232,7 @@ export class TabletLogistica {
     this._cabecera(ctx, panel, 'AJUSTES');
     const a = this.ajustes;
     const fila = (i, titulo, valor) => {
-      const y = 82 + i * 68;
+      const y = 80 + i * 62;
       ctx.fillStyle = COLORES.blanco;
       ctx.font = 'bold 23px sans-serif';
       ctx.fillText(titulo, 28, y + 24);
@@ -239,7 +241,7 @@ export class TabletLogistica {
       ctx.fillText(valor, 28, y + 50);
       return y;
     };
-    const ALTO = 56;
+    const ALTO = 52;
     const TUNEL = { apagado: 'Apagado', suave: 'Suave', medio: 'Medio (recomendado)', fuerte: 'Fuerte' };
     let y = fila(0, 'Giro con el stick derecho', a.giro === 'suave' ? 'Suave (continuo · marea más)' : 'Por pasos con parpadeo (recomendado)');
     panel.boton('giro', 640, y, 300, ALTO, 'CAMBIAR', () => this.acciones.ajuste('giro', a.giro === 'suave' ? 'pasos' : 'suave'));
@@ -261,5 +263,8 @@ export class TabletLogistica {
     y = fila(7, 'Manos', `Posición ${a.calibracionManos + 1} de 8`);
     panel.boton('manos', 640, y, 144, ALTO, 'GIRAR', () => { a.calibracionManos = this.acciones.calibrarManos(); this.panel.sucio = true; });
     panel.boton('reunir', 796, y, 144, ALTO, 'REUNIR', () => this.acciones.reunir());
+    y = fila(8, 'Volumen de los sonidos', (a.volumen ?? 1) > 0 ? `${Math.round((a.volumen ?? 1) * 100)} %` : 'Silencio');
+    panel.boton('vol-', 640, y, 144, ALTO, '−', () => this.acciones.ajuste('volumen', (a.volumen ?? 1) - 0.25), { activo: (a.volumen ?? 1) > 0 });
+    panel.boton('vol+', 796, y, 144, ALTO, '+', () => this.acciones.ajuste('volumen', (a.volumen ?? 1) + 0.25), { activo: (a.volumen ?? 1) < 1 });
   }
 }

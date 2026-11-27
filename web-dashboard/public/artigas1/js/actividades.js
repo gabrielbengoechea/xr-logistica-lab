@@ -96,6 +96,17 @@ export class GestorActividades {
     this._oyentes = [];
     /** Por qué falló el último `iniciar` ('' si arrancó). */
     this.motivoNoInicio = '';
+    /** Orden sugerido de las actividades (B11): ids. No bloquea nada, solo recomienda. */
+    this.ruta = [];
+  }
+
+  /** La siguiente actividad recomendada: la primera de la ruta que todavía no está completada ni bloqueada. */
+  recomendada() {
+    for (const id of this.ruta) {
+      const a = this.actividades.get(id);
+      if (a && a.estado !== ESTADO.COMPLETADA && a.estado !== ESTADO.BLOQUEADA) return a;
+    }
+    return null;
   }
 
   /** @param {Definicion} def */

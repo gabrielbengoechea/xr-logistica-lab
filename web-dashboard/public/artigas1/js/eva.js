@@ -6,6 +6,11 @@ import { COLORES, PanelVR } from './paneles.js';
 import { crearMascaraOcular } from './confort.js';
 import { formatoTiempo } from './actividades.js';
 import { ESCLUSA } from './exterior.js';
+import { giroHacia } from './vista.js';
+
+/** Al salir, la vista se orienta hacia este punto del casco de la estación (B17): a lo largo del cuerpo de la
+ * estación, hacia Rivera, en lugar de quedar mirando al vacío. */
+export const MIRAR_AL_SALIR = new THREE.Vector3(0, 0.6, -3);
 
 /** Capa del traje de la vista en tercera persona. No usar 1 ni 2: son las de cada ojo en WebXR. */
 export const CAPA_TERCERA_PERSONA = 3;
@@ -230,6 +235,20 @@ export class EVAController {
     this.loco.teletransportar(_m);
   }
 
+  /** Gira el cuerpo alrededor de la cabeza (solo en el plano horizontal del cuerpo) para mirar hacia `punto`. */
+  _mirarHacia(punto) {
+    this.rig.updateWorldMatrix(true, true);
+    const cabeza = this.camara.getWorldPosition(new THREE.Vector3());
+    const mirada = this.camara.getWorldDirection(new THREE.Vector3());
+    const arriba = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rig.quaternion).normalize();
+    const angulo = giroHacia(mirada, punto.clone().sub(cabeza), arriba);
+    if (!angulo) return;
+    const q = new THREE.Quaternion().setFromAxisAngle(arriba, angulo);
+    this.rig.position.sub(cabeza).applyQuaternion(q).add(cabeza);
+    this.rig.quaternion.premultiply(q).normalize();
+    this.rig.updateWorldMatrix(true, true);
+  }
+
   /** Sale al exterior. Devuelve '' o el motivo por el que no se puede. */
   salir(cabeza) {
     if (this.afuera) return 'Ya estás afuera';
@@ -240,6 +259,7 @@ export class EVAController {
       this.afuera = true;
       this.tiempo = 0;
       this._cruzar(ESCLUSA.salida);
+      this._mirarHacia(MIRAR_AL_SALIR);              // con la vista a negro: no se percibe el giro
       this.exterior.grupo.visible = true;
       this.exterior.colisiones.activo = true;
       this.exterior.traje.visible = true;

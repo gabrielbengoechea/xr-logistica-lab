@@ -400,13 +400,15 @@ export class MapaEstacion {
         ctx.fillText(LUGAR[id].rol.split(':')[0].split(' y ')[0], x + w / 2, y + h / 2 + 18);
       }
       // actividades del módulo: un punto por cada una
+      const sugerida = this.gestor.recomendada ? this.gestor.recomendada() : null;
       this._actividadesEn(id).forEach((a, i) => {
         ctx.beginPath();
-        ctx.arc(x + 16 + i * 22, y + 16, 8, 0, Math.PI * 2);
+        ctx.arc(x + 16 + i * 22, y + 16, a === sugerida ? 10 : 8, 0, Math.PI * 2);
         ctx.fillStyle = a.estado === ESTADO.COMPLETADA ? COLORES.verde : a.estado === ESTADO.BLOQUEADA ? COLORES.apagado : a.estado === ESTADO.ACTIVA ? COLORES.blanco : COLORES.amarillo;
         ctx.fill();
-        ctx.strokeStyle = '#0b1420';
-        ctx.lineWidth = 2;
+        // la siguiente recomendada (B11) lleva un aro celeste
+        ctx.strokeStyle = a === sugerida ? COLORES.celeste : '#0b1420';
+        ctx.lineWidth = a === sugerida ? 4 : 2;
         ctx.stroke();
       });
       panel.boton(`lugar:${id}`, x, y, w, h, '', () => this.seleccionar(id), { invisible: true });
@@ -507,6 +509,12 @@ export class MapaEstacion {
       ctx.fillStyle = a.estado === ESTADO.COMPLETADA ? COLORES.verde : a.estado === ESTADO.BLOQUEADA ? COLORES.gris : COLORES.amarillo;
       const extra = a.resultado && a.estado === ESTADO.COMPLETADA ? ` · ${a.resultado.puntaje} puntos` : '';
       ctx.fillText(ETIQUETA_ESTADO[a.estado] + extra, fx + 18, y + 24);
+      if (this.gestor.recomendada && this.gestor.recomendada() === a && a.estado === ESTADO.DISPONIBLE) {
+        ctx.fillStyle = COLORES.celeste;
+        ctx.textAlign = 'right';
+        ctx.fillText('SIGUIENTE RECOMENDADA', fx + fw - 18, y + 24);
+        ctx.textAlign = 'left';
+      }
       const impedimento = this.gestor.impedimento(a.id);
       const enCurso = a.estado === ESTADO.ACTIVA || a.estado === ESTADO.PAUSADA;
       panel.boton(`act:${a.id}`, fx + 18, y + 36, fw - 36, 50, enCurso ? 'EN CURSO' : a.estado === ESTADO.COMPLETADA ? 'REPETIR' : 'INICIAR', () => this.acciones.iniciar(a.id), { activo: !impedimento, estilo: 'aviso' });
