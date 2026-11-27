@@ -43,15 +43,7 @@ jobs:
         run: python artigas1-vr/Tools/pruebas-web/juego.py
         env:
           CHROME: /usr/bin/google-chrome
-          GUARDAR: /tmp/capturas
       - name: Visión estéreo e iluminación de la caminata espacial
         run: python artigas1-vr/Tools/pruebas-web/vision.py
         env:
           CHROME: /usr/bin/google-chrome
-      - name: Capturas para diagnosticar (solo si algo falló)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: capturas-navegador
-          path: /tmp/capturas
-          if-no-files-found: ignore
