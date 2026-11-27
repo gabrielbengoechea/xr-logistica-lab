@@ -23,6 +23,8 @@ async () => {
   const A = window.artigas1, T = A.THREE, L = A.loco, G = A.gestor, EV = A.eva;
   A.renderer.setAnimationLoop(null);
   A.sonido.tocar = () => {};
+  // Sprint 01: la sesión arranca con el panel de consentimiento delante; estas pruebas juegan en modo anónimo
+  A.sesion.bienvenidaVista = true; A.sesion.anonimo();
   const R = [];
   const ok = (nombre, pasa, dato = '') => R.push({ nombre, pasa: !!pasa, dato });
   const fotos = {};

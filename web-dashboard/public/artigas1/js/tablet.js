@@ -18,7 +18,8 @@ export class TabletLogistica {
    * @param {object} o.ajustes        Ajustes de locomoción (los cambia la pantalla de ajustes).
    * @param {{iniciar: Function, pausar: Function, reanudar: Function, abandonar: Function, guiar: Function, abrirMapa: Function,
    *          ajuste: (clave: string, valor: any) => void, calibrarManos: () => number, reunir: () => void,
-   *          siguienteTunel: () => string, siguienteInclinacion: () => void}} o.acciones
+   *          siguienteTunel: () => string, siguienteInclinacion: () => void, practica?: () => void,
+   *          sesion?: () => string, resumenCierre?: () => string, nuevoEstudiante?: () => void}} o.acciones
    */
   constructor({ pantalla, inventario, gestor, navegacion, ajustes, acciones }) {
     this.inventario = inventario;
@@ -74,17 +75,28 @@ export class TabletLogistica {
     if (this.pagina === 'ordenes') return this._ordenes(ctx, panel);
     if (this.pagina === 'modulos') return this._modulos(ctx, panel);
     if (this.pagina === 'ajustes') return this._ajustes(ctx, panel);
+    if (this.pagina === 'sesion') return this._sesion(ctx, panel);
     this._cabecera(ctx, panel, 'ARTIGAS-1 · TABLET LOGÍSTICA');
     const opciones = [['inventario', 'INVENTARIO', 'Bultos, contenedores y ubicaciones'], ['ordenes', 'ÓRDENES DE TRABAJO', 'Actividades: iniciar, pausar, resultados'],
       ['modulos', 'MÓDULOS', 'Qué hay en cada uno y cómo llegar'], ['ajustes', 'AJUSTES', 'Movimiento, giro y manos']];
     opciones.forEach(([id, titulo, sub], i) => {
       const x = 24 + (i % 2) * 462;
-      const y = 100 + Math.floor(i / 2) * 176;
-      panel.boton(`ir:${id}`, x, y, 450, 110, titulo, () => this.ir(id));
+      const y = 92 + Math.floor(i / 2) * 140;
+      panel.boton(`ir:${id}`, x, y, 450, 92, titulo, () => this.ir(id));
       ctx.fillStyle = COLORES.gris;
       ctx.font = '22px sans-serif';
-      ctx.fillText(sub, x + 8, y + 142);
+      ctx.fillText(sub, x + 8, y + 118);
     });
+    // sesión del estudiante (B02): quién está jugando y el cambio de estudiante
+    if (this.acciones.sesion) {
+      ctx.fillStyle = COLORES.panel;
+      rectRedondo(ctx, 24, 374, W - 48, 76, 14);
+      ctx.fill();
+      ctx.fillStyle = COLORES.blanco;
+      ctx.font = 'bold 23px sans-serif';
+      ctx.fillText(this.acciones.sesion().slice(0, 44), 44, 421);
+      panel.boton('ir:sesion', W - 344, 384, 300, 56, 'NUEVO ESTUDIANTE', () => this.ir('sesion'));
+    }
     const a = this.gestor.activa;
     ctx.fillStyle = COLORES.panel;
     rectRedondo(ctx, 24, 462, W - 48, 158, 14);
@@ -171,6 +183,28 @@ export class TabletLogistica {
         panel.boton(`inicio:${a.id}`, 740, y + 16, 200, bot, a.resultado ? 'REPETIR' : 'INICIAR', () => this.acciones.iniciar(a.id), { activo: !this.gestor.impedimento(a.id), estilo: 'aviso' });
       }
     });
+  }
+
+  /** Confirmación de «nuevo estudiante»: dos pasos, para que no se termine una sesión por un toque sin querer. */
+  _sesion(ctx, panel) {
+    this._cabecera(ctx, panel, 'NUEVO ESTUDIANTE');
+    ctx.fillStyle = COLORES.blanco;
+    ctx.font = 'bold 28px sans-serif';
+    ctx.fillText(`Ahora: ${this.acciones.sesion ? this.acciones.sesion() : ''}`.slice(0, 58), 32, 132);
+    ctx.font = '24px sans-serif';
+    const texto = [
+      '¿Terminar esta sesión y dejar el visor listo para otra persona?',
+      this.acciones.resumenCierre ? this.acciones.resumenCierre() : '',
+      'Si se aceptó el registro, se envía el informe final. La estación se reinicia y el próximo estudiante elige de nuevo si acepta el registro y ve la bienvenida.',
+      'Los ajustes del visor (movimiento, giro, manos) se conservan.',
+    ].filter(Boolean);
+    let y = 182;
+    for (const parrafo of texto) {
+      for (const r of renglones(ctx, parrafo, W - 64).slice(0, 3)) { ctx.fillText(r, 32, y); y += 32; }
+      y += 12;
+    }
+    panel.boton('terminar-sesion', 32, 540, 440, 84, 'SÍ, TERMINAR', () => this.acciones.nuevoEstudiante(), { estilo: 'aviso', activo: !!this.acciones.nuevoEstudiante });
+    panel.boton('cancelar-sesion', 488, 540, 440, 84, 'CANCELAR', () => this.ir('inicio'));
   }
 
   _modulos(ctx, panel) {

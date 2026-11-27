@@ -24,7 +24,8 @@ export const PUNTOS_EVA = {
  * @param {{inventario: import('./inventario.js').Inventario, inspecciones: import('./inspeccion.js').Inspecciones}} mundo
  */
 export function definirActividades(gestor, mundo) {
-  const { inventario, inspecciones, balance, descarga, filtro } = mundo;
+  // reacomodarContenedores(lista) → cuántos devolvió a su lugar de origen (opcional: lo da recorrido.js)
+  const { inventario, inspecciones, balance, descarga, filtro, reacomodarContenedores } = mundo;
   const delCarguero = inventario.bultos.filter((b) => b.legible && b.ubicacion.startsWith('CR01')).sort((a, b) => a.codigo.localeCompare(b.codigo));
   const manifiesto = delCarguero.filter((_, i) => i % Math.max(1, Math.floor(delCarguero.length / 5)) === 0).slice(0, 5);
 
@@ -55,11 +56,25 @@ export function definirActividades(gestor, mundo) {
     pasos: (a) => {
       // los tres más cercanos al almacén que todavía no están en su lugar
       const centro = new THREE.Vector3(0, 0, -2.1);
-      const elegidos = inventario.contenedores.filter((f) => !f.datos.lastre && !f.datos.cuarentena && (!f.datos.hueco || f.datos.hueco.codigo !== f.datos.destino))
-        .sort((x, y) => x.posicion.distanceToSquared(centro) - y.posicion.distanceToSquared(centro)).slice(0, 3);
+      const almacenables = () => inventario.contenedores.filter((f) => !f.datos.lastre && !f.datos.cuarentena && f.datos.destino);
+      const pendientes = () => almacenables().filter((f) => !f.datos.hueco || f.datos.hueco.codigo !== f.datos.destino);
+      let elegidos = pendientes();
+      a.datos.reacomodados = 0;
+      // Con todos ya guardados (partida anterior completa), se arma una partida nueva: los contenedores bien
+      // ubicados que nadie tiene en la mano vuelven a su lugar de origen, sueltos (lo hace el mundo, que
+      // conoce las amarras y la física). Sin ese ayudante o sin nada para mover, quedan cero pasos y el gestor
+      // no la inicia (ver sinPasos).
+      if (!elegidos.length && reacomodarContenedores) {
+        const ubicados = almacenables().filter((f) => !f.mano && f.datos.hueco && f.datos.hueco.codigo === f.datos.destino)
+          .sort((x, y) => x.datos.codigo.localeCompare(y.datos.codigo)).slice(0, 3);
+        a.datos.reacomodados = ubicados.length ? reacomodarContenedores(ubicados) || 0 : 0;
+        elegidos = pendientes();
+      }
+      elegidos = elegidos.sort((x, y) => x.posicion.distanceToSquared(centro) - y.posicion.distanceToSquared(centro)).slice(0, 3);
       a.datos.codigos = elegidos.map((f) => f.datos.codigo);
       return elegidos.map((f) => ({ id: f.datos.codigo, texto: `Llevá ${f.datos.codigo} a ${f.datos.destino} y amarralo` }));
     },
+    sinPasos: () => 'El almacenamiento ya está completo: todos los contenedores están amarrados en su hueco. Soltá alguno de su lugar para practicar de nuevo.',
     alEvento(a, tipo, d) {
       if (tipo === 'escaneo' && d.ok && d.tipo === 'contenedor') a.aviso(`${d.codigo} va en ${d.destino}`);
       if ((tipo !== 'colocado' && tipo !== 'amarrado') || !a.datos.codigos.includes(d.codigo)) return;

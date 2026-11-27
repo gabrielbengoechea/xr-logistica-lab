@@ -20,10 +20,12 @@ import os
 from playwright.async_api import async_playwright
 
 JS = r"""
-() => {
+async () => {
   const A = window.artigas1, T = A.THREE, L = A.loco, F = A.flotantes, G = A.gestor, I = A.inventario;
   A.renderer.setAnimationLoop(null);                  // las pruebas manejan el tiempo
   A.sonido.tocar = () => {};
+  // Sprint 01: la sesión arranca con el panel de consentimiento delante; estas pruebas juegan en modo anónimo
+  A.sesion.bienvenidaVista = true; A.sesion.anonimo();
   const R = [];
   window.__pruebas = R;                               // si una prueba revienta, se ve hasta dónde llegó
   const ok = (nombre, pasa, dato = '') => R.push({ nombre, pasa: !!pasa, dato });
@@ -1109,11 +1111,11 @@ JS = r"""
   const IND = A.induccion, PBV = A.panelBienvenida, PPR = A.panelPractica;
   soltar(izq); soltar(der); A.rig.quaternion.identity(); A.camera.rotation.set(0, 0, 0);
   ubicar(V(0.1, 0.1, -2.0)); pasos(3);
-  try { window.localStorage.removeItem('artigas1.bienvenida'); } catch { /* */ }
+  A.sesion.bienvenidaVista = false;                  // una vez por sesión de estudiante (Sprint 01)
   A.acciones.mostrarBienvenida(); pasos(1);
   ok('bienvenida: aparece delante, encima de todo, con PRÁCTICA GUIADA y EXPLORAR', PBV.malla.visible && PBV.malla.material.depthTest === false && ['practicar', 'explorar'].every((id) => PBV.botones.some((b) => b.id === id)));
   der.en(cabeza().add(V(0.15, -0.2, -0.3))); pasos(2);
-  ok('bienvenida: PRÁCTICA GUIADA la cierra, la recuerda y empieza la práctica', apretar(der, PBV, 'practicar') && !PBV.malla.visible && IND.activa && PPR.malla.visible && window.localStorage.getItem('artigas1.bienvenida') === '1');
+  ok('bienvenida: PRÁCTICA GUIADA la cierra, la recuerda y empieza la práctica', apretar(der, PBV, 'practicar') && !PBV.malla.visible && IND.activa && PPR.malla.visible && A.sesion.bienvenidaVista === true && window.localStorage.getItem('artigas1.bienvenida') === null);
   ok('práctica: un paso adelantado no cuenta (se aprende de a uno)', !IND.marcar('mapa') && IND.pasoActual.id === 'agarre');
   // 1 · agarrarse de una baranda
   const barP = A.estacion.barandas.segmentos.find((sg) => sg.a.z < -0.5 && sg.b.z > -4.5 || sg.b.z < -0.5 && sg.a.z > -4.5);
@@ -1155,19 +1157,64 @@ JS = r"""
   ok('telemetría: los eventos están en orden de tiempo', TL.eventos.every((e, i) => i === 0 || e.t >= TL.eventos[i - 1].t));
   const fins = TL.eventos.filter((e) => e.type === 'activity_end').map((e) => `${e.part}: ${e.detail}`);
   ok('telemetría: cada actividad terminada manda su resultado', fins.some((x) => /almacenamiento: completada/.test(x)) && fins.some((x) => /mantenimiento: completada/.test(x)), fins);
+  // Sprint 01: en modo anónimo (como se jugó hasta acá) no salió ningún pedido
+  ok('telemetría: en modo anónimo no se mandó nada', TL.consentimiento === 'anonimo' && TL.enviados === 0 && TL.fallidos === 0 && TL.omitidos > 0, [TL.enviados, TL.omitidos]);
   const enviadas = [];
   const fetchOriginal = window.fetch;
-  window.fetch = (url, op) => { enviadas.push({ url: String(url), cuerpo: JSON.parse(op.body), clave: op.headers['X-API-Key'] || '' }); return Promise.resolve(new Response('{}', { status: 201 })); };
+  window.fetch = (url, op = {}) => {
+    if (String(url).endsWith('/api/v1/health')) { enviadas.push({ url: String(url), metodo: 'GET' }); return Promise.resolve(new Response(JSON.stringify({ status: 'ok', version: 't', models_available: 0, sessions: 0 }), { status: 200 })); }
+    enviadas.push({ url: String(url), metodo: op.method, cuerpo: JSON.parse(op.body), clave: op.headers['X-API-Key'] || '' });
+    return Promise.resolve(new Response('{}', { status: 201 }));
+  };
   TL.config = { ...TL.config, backend: 'http://aula.local:8000', clave: 'secreta' };
+  TL.estadoBackend = 'sin_probar';
+  TL.consentimiento = null;                           // como si el estudiante recién decidiera (prueba)
+  TL.registrar('hint', 'prueba', null, 'sin consentimiento');
+  await new Promise((r) => setTimeout(r, 20));
+  ok('telemetría: sin consentimiento no hay ningún pedido, ni la prueba del backend', enviadas.length === 0, enviadas.map((x) => x.url));
+  TL.aceptar('prueba-7');
   TL.registrar('hint', 'prueba', null, 'evento en vivo');
-  TL.enviar(true);
+  await new Promise((r) => setTimeout(r, 20));
+  await TL.enviar(true);
   window.fetch = fetchOriginal;
   TL.config = { ...TL.config, backend: null };
   const sesion = enviadas.find((x) => x.url.endsWith('/api/v1/telemetry/session'));
   const vivo = enviadas.find((x) => x.url.endsWith('/api/v1/telemetry/event'));
-  ok('telemetría: manda el evento en vivo y la sesión al backend configurado, con la clave', !!sesion && !!vivo && sesion.clave === 'secreta' && vivo.cuerpo.event.type === 'hint', enviadas.map((x) => x.url));
+  ok('telemetría: con consentimiento prueba el backend y manda el evento en vivo y la sesión, con la clave y el código', enviadas[0].metodo === 'GET' && !!sesion && !!vivo && sesion.clave === 'secreta' && vivo.cuerpo.event.type === 'hint' && sesion.cuerpo.student_id === 'prueba-7', enviadas.map((x) => x.url));
   const inf = sesion && sesion.cuerpo;
   ok('telemetría: la sesión cuenta los pasos de las actividades como piezas y termina con session_end', inf && inf.parts_total > 0 && inf.parts_placed <= inf.parts_total && inf.parts_placed > 0 && inf.events[inf.events.length - 1].type === 'session_end' && inf.scenario === 'artigas1-web', inf && [inf.parts_placed, inf.parts_total, inf.assembly_errors, inf.hints_used]);
+
+  // =========================================================================================== FASE 14
+  fase('FASE 14 · Sprint 01: almacenamiento repetido y nuevo estudiante');
+  if (G.activa) G.abandonar();
+  cerrarInforme();
+  // B01: todos los contenedores en su hueco y Almacenamiento otra vez
+  const almacenables = I.contenedores.filter((f) => !f.datos.lastre && !f.datos.cuarentena && f.datos.destino);
+  for (const f of almacenables) {
+    if (f.mano) { f.mano.sostiene = null; f.mano = null; }
+    if (f.datos.hueco && f.datos.hueco.codigo === f.datos.destino) continue;
+    if (f.datos.hueco) I.retirar(f);
+    const h = I.huecos.find((x) => x.codigo === f.datos.destino);
+    if (h && !h.ocupado) { I.colocar(f, h); f.posicion.copy(h.posicion); f.fijo = true; }
+  }
+  const todosGuardados = almacenables.every((f) => f.datos.hueco && f.datos.hueco.codigo === f.datos.destino);
+  const arranco = A.acciones.iniciarActividad('almacenamiento');
+  const actA = G.obtener('almacenamiento');
+  ok('B01: con todo guardado, Almacenamiento arma una partida nueva con 3 contenedores sueltos', todosGuardados && arranco && actA.estado === 'ACTIVA' && actA.pasos.length === 3 && actA.datos.reacomodados === 3 && actA.datos.codigos.every((c) => !I.contenedores.find((f) => f.datos.codigo === c).datos.hueco), [almacenables.length, arranco, actA.pasos.length, actA.datos.reacomodados]);
+  G.abandonar(); pasos(2);
+  ok('B01: después, las otras actividades se inician', A.acciones.iniciarActividad('inventario') && G.activa && G.activa.id === 'inventario');
+  // B02: la tablet ofrece NUEVO ESTUDIANTE con confirmación y recarga sin ?alumno=
+  const tab14 = A.tablets[0];
+  tab14.ir('inicio'); tab14.panel.redibujar();
+  ok('B02: el menú de la tablet muestra la sesión y NUEVO ESTUDIANTE', tab14.panel.botones.some((b) => b.id === 'ir:sesion'));
+  tab14.panel.botones.find((b) => b.id === 'ir:sesion').accion(); tab14.panel.redibujar();
+  ok('B02: NUEVO ESTUDIANTE pide confirmación (SÍ, TERMINAR / CANCELAR)', tab14.pagina === 'sesion' && ['terminar-sesion', 'cancelar-sesion'].every((id) => tab14.panel.botones.some((b) => b.id === id)));
+  let recargada = '';
+  A.reinicio.recargar = (url) => { recargada = url; };
+  tab14.panel.botones.find((b) => b.id === 'terminar-sesion').accion();
+  await new Promise((r) => setTimeout(r, 1700));
+  ok('B02: terminar cierra la actividad en curso, finaliza la sesión y recarga la estación', !G.activa && A.sesion.paso === 'finalizada' && TL.terminada && recargada.includes('/artigas1/') && !recargada.includes('alumno='), [recargada, A.sesion.paso]);
+  ok('B02: los ajustes del visor siguen guardados', !!window.localStorage.getItem('artigas1.ajustes'));
   return { R, informeTelemetria: inf };
 }
 """
@@ -1179,10 +1226,20 @@ async def main():
                                     args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
         pg = await b.new_page(viewport={"width": 640, "height": 360})
         errs = []
+        consola = []
         pg.on("pageerror", lambda e: errs.append(str(e)))
+        pg.on("console", lambda m: consola.append(f"{m.type}: {m.text}") if m.type in ("error", "warning") else None)
+        pg.on("request", lambda r: consola.append(f"POST: {r.url}") if r.method == "POST" else None)
         await pg.goto(os.environ.get("URL", "http://localhost:8765/artigas1/"))
         await pg.wait_for_function("!!window.artigas1", timeout=120000)
         await pg.evaluate("window.artigas1.guanteListo")
+        # Sprint 01 (B22 y B06): interfaz inicial en español y panel de consentimiento al cargar
+        inicial = await pg.evaluate("""(() => {
+          const b = document.getElementById('VRButton') || [...document.querySelectorAll('a,button')].find((x) => /VR|REALIDAD/.test(x.textContent));
+          const texto = document.body.innerText;
+          return { boton: b ? b.textContent : null, ingles: /ENTER VR|NOT SUPPORTED|NOT AVAILABLE|NEEDS HTTPS|Enter VR/.test(texto), fps: /[?]fps/.test(texto),
+                   panelSesion: window.artigas1.panelSesion.malla.visible, paso: window.artigas1.sesion.paso, estado: document.getElementById('sesion-estado').textContent };
+        })()""")
         try:
             res = await pg.evaluate(JS)
         except Exception as e:  # noqa: BLE001
@@ -1228,6 +1285,32 @@ async def main():
         formato = await pg3.evaluate("window.artigas1.texturasTierra().formato")
         res["R"].append({"nombre": "texturas: con ?ktx2=no se cargan las WebP de respaldo", "pasa": formato == "webp", "dato": formato})
         await pg3.close()
+        res["R"].append({"fase": "Sprint 01 · pantalla inicial"})
+        res["R"].append({"nombre": "B22: el botón de entrada está en español y no queda texto en inglés ni de depuración", "pasa": bool(inicial["boton"]) and "REALIDAD VIRTUAL" in inicial["boton"] and not inicial["ingles"] and not inicial["fps"], "dato": inicial["boton"]})
+        res["R"].append({"nombre": "B06: al cargar aparece el panel de consentimiento y no se decidió nada", "pasa": inicial["panelSesion"] and inicial["paso"] == "consentimiento" and inicial["estado"] == "Sin iniciar sesión", "dato": inicial})
+        posts = [c for c in consola if c.startswith("POST:") and "aula.local" not in c]
+        res["R"].append({"nombre": "B26: en un servidor estático no salió ningún POST", "pasa": not posts, "dato": posts[:3]})
+        # B26: con el registro aceptado en un servidor estático (este http.server) se prueba la salud una vez y no hay POST
+        pg4 = await b.new_page(viewport={"width": 320, "height": 180})
+        pedidos4, consola4 = [], []
+        pg4.on("request", lambda r: pedidos4.append(f"{r.method} {r.url}") if "/api/" in r.url else None)
+        pg4.on("console", lambda m: consola4.append(f"{m.type}: {m.text}") if m.type == "error" else None)
+        await pg4.goto(os.environ.get("URL", "http://localhost:8765/artigas1/") + "?alumno=31")
+        await pg4.wait_for_function("!!window.artigas1", timeout=120000)
+        est = await pg4.evaluate("""(async () => {
+          const A = window.artigas1, S = A.sesion, P = A.panelSesion;
+          const apretar = (id) => { P.redibujar(); P.botones.find((x) => x.id === id).accion(); };
+          apretar('aceptar'); const sugerido = S.codigo; apretar('listo');
+          A.telemetria.registrar('scan', 'B1');
+          await new Promise((r) => setTimeout(r, 800));
+          await A.telemetria.enviar(false);
+          return { sugerido, paso: S.paso, alumno: A.telemetria.config.alumno, backend: A.telemetria.estadoBackend, activa: A.telemetria.activa, alumnoGuardado: window.localStorage.getItem('artigas1.alumno') };
+        })()""")
+        await pg4.close()
+        posts4 = [x for x in pedidos4 if x.startswith("POST")]
+        gets4 = [x for x in pedidos4 if x.startswith("GET") and x.endswith("/api/v1/health")]
+        res["R"].append({"nombre": "B26: con registro aceptado en un servidor estático: una sola prueba de salud, ningún POST, telemetría apagada", "pasa": not posts4 and len(gets4) == 1 and est["backend"] == "ausente" and not est["activa"], "dato": {"pedidos": pedidos4, "errores_consola": consola4[:3]}})
+        res["R"].append({"nombre": "B02: ?alumno= solo propone el código; queda confirmado en la sesión y no se guarda en el navegador", "pasa": est["sugerido"] == "31" and est["paso"] == "lista" and est["alumno"] == "31" and est["alumnoGuardado"] is None, "dato": est})
         mal = total = 0
         for r in res["R"]:
             if "fase" in r:
@@ -1238,6 +1321,7 @@ async def main():
             print(("OK   " if r["pasa"] else "FALLA"), r["nombre"], "→", json.dumps(r["dato"], ensure_ascii=False))
         print(f"\n{total - mal} de {total}")
         print(errs[:5])
+        print("consola (errores y advertencias):", [c for c in consola if not c.startswith("POST:")][:8])
         await b.close()
         raise SystemExit(1 if mal or errs else 0)
 
