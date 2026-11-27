@@ -982,7 +982,11 @@ async () => {
     PV.activo = false; pasos(1, 0); A.renderer.render(A.scene, A.camera); const b = leer(); const nTodo = A.renderer.info.render.calls; PV.activo = true;
     let dif = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30) dif++;
     if (dif > 3) {
-      difPortales.push(`${id} ${yaw ? 'atrás' : 'adelante'}: ${dif} px`);
+      const muestra = [];
+      for (let i = 0; i < a.length && muestra.length < 8; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30) {
+        const k = i / 4; muestra.push(`(${k % W8},${H8 - 1 - Math.floor(k / W8)}) con ${a[i]},${a[i + 1]},${a[i + 2]} sin ${b[i]},${b[i + 1]},${b[i + 2]}`);
+      }
+      difPortales.push(`${id} ${yaw ? 'atrás' : 'adelante'}: ${dif} px · ${muestra.join(' · ')}`);
       // para diagnosticar (GUARDAR=carpeta): las dos imágenes y un mapa de los píxeles distintos
       const aPng = (px) => { const c = document.createElement('canvas'); c.width = W8; c.height = H8; const x = c.getContext('2d'); const im = x.createImageData(W8, H8);
         for (let yy = 0; yy < H8; yy++) for (let xx = 0; xx < W8 * 4; xx++) im.data[yy * W8 * 4 + xx] = px[(H8 - 1 - yy) * W8 * 4 + xx];
